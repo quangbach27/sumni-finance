@@ -13,9 +13,8 @@ export default defineConfig([
     'prettier.config.js',
   ]),
   {
+    files: ['**/*.{ts,tsx}'],
     rules: {
-      'import/no-cycle': 'off',
-      'sort-imports': 'off',
       '@typescript-eslint/array-type': 'off',
       '@typescript-eslint/require-await': 'off',
       'pnpm/json-enforce-catalog': 'off',
@@ -38,22 +37,14 @@ export default defineConfig([
             'type',
           ],
           pathGroups: [
-            // 1. React + TanStack Router
+            { pattern: 'react', group: 'builtin', position: 'before' },
+            { pattern: 'react/**', group: 'builtin', position: 'before' },
+            { pattern: 'react-*/**', group: 'builtin', position: 'before' },
             {
-              pattern:
-                '{react,react-dom,react-dom/**,@tanstack/react-router,@tanstack/react-router/**}',
-              group: 'external',
-              position: 'before',
-            },
-            // 2. Other TanStack (Query, Table, Form...)
-            { pattern: '@tanstack/**', group: 'external', position: 'before' },
-            // 3. shadcn primitives
-            {
-              pattern: '@/components/ui{,/**}',
+              pattern: '@/components/ui/**',
               group: 'internal',
               position: 'before',
             },
-            // 4. Layout + shared components
             {
               pattern: '@/components/{layout,shared}{,/**}',
               group: 'internal',

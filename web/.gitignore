@@ -11,3 +11,9 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# env files
+.env
+.env.*
+!.env.example*
+!.env.test*
