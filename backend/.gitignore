@@ -1,0 +1,17 @@
+
+# cache
+.go/
+.go-cache/
+
+#vendor
+vendor/
+
+.DS_Store
+coverage.out
+coverage-*.out
+
+# env files
+.env
+.env.*
+!.env.example*
+!.env.test*

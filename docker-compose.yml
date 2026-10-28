@@ -1,0 +1,48 @@
+name: "wild-workouts"
+
+services:
+  sumni-finance-backend:
+    container_name: sumni-finance-backend
+    build:
+      context: backend/docker/app-local
+    volumes:
+      # Source code volumes
+      - ./backend/internal:/app/internal
+      - ./backend/cmd:/app/cmd
+      # Go module files
+      - ./backend/go.mod:/app/go.mod
+      - ./backend/go.sum:/app/go.sum
+      # Go cache volumes (kept inside backend/, git-ignored)
+      - ./backend/.go/pkg:/app/go/pkg
+      - ./backend/.go-cache:/app/go-cache
+    working_dir: /app
+    ports:
+      - "127.0.0.1:4000:4000" # App port (must match PORT in backend/.env)
+    env_file:
+      - ./backend/.env
+    environment:
+      GOPATH: /app/go # so module cache lands in /app/go/pkg/mod
+      GOCACHE: /app/go-cache
+    depends_on:
+      sumni-finance-db:
+        condition: service_healthy
+
+  sumni-finance-db:
+    image: postgres:17.6-alpine3.22
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: sumni-finance
+    volumes:
+      - sumni-finance-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U user -d sumni-finance && psql -U user -d sumni-finance -c 'SELECT 1' >/dev/null
+      interval: 1s
+      retries: 120
+      start_period: 2s
+
+volumes:
+  sumni-finance-postgres-data:
