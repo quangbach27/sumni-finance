@@ -5,13 +5,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   ...tanstackConfig,
-  globalIgnores([
-    'dist',
-    'storybook-static',
-    'src/routeTree.gen.ts',
-    'eslint.config.js',
-    'prettier.config.js',
-  ]),
+  globalIgnores(['dist', 'storybook-static', 'src/routeTree.gen.ts']),
   {
     files: ['**/*.{ts,tsx}'],
     rules: {
