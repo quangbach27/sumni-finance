@@ -4,7 +4,6 @@ import { env } from '@/lib/env';
 
 import type { AxiosError, AxiosRequestConfig } from 'axios';
 
-
 type ApiErrorBody = {
   message: string;
   slug: string;

@@ -1,7 +1,7 @@
 export default function LandingPage() {
-  return <div>
-    <header>
-      
-    </header>
-  </div>;
+  return (
+    <div>
+      <header></header>
+    </div>
+  );
 }

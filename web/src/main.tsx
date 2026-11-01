@@ -22,6 +22,9 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }
+  interface StaticDataRouteOption {
+    crumb?: string;
+  }
 }
 
 const rootElement = document.getElementById('app')!;

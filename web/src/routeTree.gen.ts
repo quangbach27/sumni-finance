@@ -10,33 +10,83 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as AppFundSourcesRouteImport } from './routes/_app/fund-sources'
+import { Route as AppLedgerBooksRouteImport } from './routes/_app/ledger-books'
+import { Route as AppReportsRouteImport } from './routes/_app/reports'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppFundSourcesRoute = AppFundSourcesRouteImport.update({
+  id: '/fund-sources',
+  path: '/fund-sources',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppLedgerBooksRoute = AppLedgerBooksRouteImport.update({
+  id: '/ledger-books',
+  path: '/ledger-books',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/fund-sources': typeof AppFundSourcesRoute
+  '/ledger-books': typeof AppLedgerBooksRoute
+  '/reports': typeof AppReportsRoute
+  '/settings': typeof AppSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/fund-sources': typeof AppFundSourcesRoute
+  '/ledger-books': typeof AppLedgerBooksRoute
+  '/reports': typeof AppReportsRoute
+  '/settings': typeof AppSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteRouteWithChildren
+  '/_app/fund-sources': typeof AppFundSourcesRoute
+  '/_app/ledger-books': typeof AppLedgerBooksRoute
+  '/_app/reports': typeof AppReportsRoute
+  '/_app/settings': typeof AppSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/fund-sources' | '/ledger-books' | '/reports' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/fund-sources' | '/ledger-books' | '/reports' | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/fund-sources'
+    | '/_app/ledger-books'
+    | '/_app/reports'
+    | '/_app/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +98,65 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/fund-sources': {
+      id: '/_app/fund-sources'
+      path: '/fund-sources'
+      fullPath: '/fund-sources'
+      preLoaderRoute: typeof AppFundSourcesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/ledger-books': {
+      id: '/_app/ledger-books'
+      path: '/ledger-books'
+      fullPath: '/ledger-books'
+      preLoaderRoute: typeof AppLedgerBooksRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/reports': {
+      id: '/_app/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
   }
 }
 
+interface AppRouteRouteChildren {
+  AppFundSourcesRoute: typeof AppFundSourcesRoute
+  AppLedgerBooksRoute: typeof AppLedgerBooksRoute
+  AppReportsRoute: typeof AppReportsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+}
+
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppFundSourcesRoute: AppFundSourcesRoute,
+  AppLedgerBooksRoute: AppLedgerBooksRoute,
+  AppReportsRoute: AppReportsRoute,
+  AppSettingsRoute: AppSettingsRoute,
+}
+
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRouteRoute: AppRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
