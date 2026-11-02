@@ -1,9 +1,6 @@
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 
 import { createFileRoute } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
-
-import { Button } from '@/components/ui/button';
 
 import ContentLayout from '@/components/layout/content-layout/content-layout';
 
@@ -12,7 +9,9 @@ import {
   FundSourceListSkeleton,
 } from '@/features/fund-sources/components/fund-source-list';
 
-import { useIsMobile } from '@/hooks/use-mobile';
+const CreateFundSourceTrigger = lazy(
+  () => import('@/features/fund-sources/components/create-fund-source-trigger'),
+);
 
 export const Route = createFileRoute('/_app/fund-sources')({
   staticData: { crumb: 'Nguồn quỹ' },
@@ -20,16 +19,14 @@ export const Route = createFileRoute('/_app/fund-sources')({
 });
 
 function RouteComponent() {
-  const isMobile = useIsMobile();
   return (
     <ContentLayout
       title="Nguồn quỹ"
       description="Nguồn quỹ chỉ giữ số dư. Bút toán được ghi trong sổ cái."
       additionalContent={
-        <Button>
-          <Plus data-icon="inline-start" />
-          <span>{isMobile ? 'Thêm' : 'Thêm nguồn quỹ'}</span>
-        </Button>
+        <Suspense fallback={null}>
+          <CreateFundSourceTrigger />
+        </Suspense>
       }
     >
       <Suspense fallback={<FundSourceListSkeleton />}>

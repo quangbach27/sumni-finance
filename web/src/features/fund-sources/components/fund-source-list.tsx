@@ -3,12 +3,11 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import StatCard from '@/components/shared/stat-card/stat-card';
 import StatCardSkeleton from '@/components/shared/stat-card/stat-card-skeleton';
 
+import { formatCurrency } from '@/lib/currency';
+
 import { getFundSourcesQueryOptions } from '../api/get-fund-sources';
 
-const GRID_CLASS = 'mt-4 grid grid-cols-1 gap-3 md:grid-cols-4';
-
-const formatNumber = (value: number) =>
-  new Intl.NumberFormat('vi-VN').format(value);
+const GRID_CLASS = 'mt-4 grid grid-cols-1 gap-3 md:grid-cols-4 sm:grid-cols-2';
 
 export function FundSourceList() {
   const { data: fundSources } = useSuspenseQuery(getFundSourcesQueryOptions());
@@ -19,13 +18,17 @@ export function FundSourceList() {
       <StatCard
         variant="primary"
         label="Tổng số dư"
-        value={`${formatNumber(total)} VND`}
+        value={formatCurrency(total, 'VND')}
       />
       {fundSources.map((item) => (
         <StatCard
           key={item.id}
-          label={`${item.name} · ${item.code}`}
-          value={`${formatNumber(item.balance)} ${item.currency}`}
+          label={
+            item.type === 'bank'
+              ? `${item.name} · ${item.details.code}`
+              : item.name
+          }
+          value={formatCurrency(item.balance, item.currency)}
         />
       ))}
     </div>
