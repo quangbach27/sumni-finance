@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 import AppBreadcrum from './app-breadcrum';
+import ThemeToggle from './theme-toggle';
 
 type AppHeaderProps = {
   className?: string;
@@ -20,6 +21,9 @@ export default function AppHeader({ className }: AppHeaderProps) {
       <SidebarTrigger />
       <Separator orientation="vertical" />
       <AppBreadcrum />
+      <div className="ml-auto">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }
