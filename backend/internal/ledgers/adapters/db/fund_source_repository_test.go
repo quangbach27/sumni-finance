@@ -35,7 +35,7 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 	t.Run("bank", func(t *testing.T) {
 		t.Parallel()
 
-		details, err := factory.CreateBankDetails(ctx, "VCB", "970436", "Vietcombank", "An", "123456")
+		details, err := factory.CreateBankDetails(ctx, "VCB", 970436, "Vietcombank", "An", "123456")
 		require.NoError(t, err)
 		fs, err := factory.CreateFundSource("An - VCB", decimal.NewFromInt(15_000_000), vnd, details)
 		require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 			Currency:      "VND",
 			OwnerName:     "An",
 			BankCode:      ptr("VCB"),
-			BankBin:       ptr("970436"),
+			BankBin:       ptr(int32(970436)),
 			BankShortName: ptr("Vietcombank"),
 			AccountNumber: ptr("123456"),
 		}

@@ -33,7 +33,7 @@ func TestFundSourceReadModel_ListFundSources(t *testing.T) {
 
 	vnd := common.MustEnum[shared.Currency]("VND")
 
-	bankDetails, err := factory.CreateBankDetails(ctx, "VCB", "970436", "Vietcombank", "An", "123456")
+	bankDetails, err := factory.CreateBankDetails(ctx, "VCB", 970436, "Vietcombank", "An", "123456")
 	require.NoError(t, err)
 	bankFs, err := factory.CreateFundSource("An - VCB (list)", decimal.NewFromInt(15_000_000), vnd, bankDetails)
 	require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestFundSourceReadModel_ListFundSources(t *testing.T) {
 				OwnerName: "An",
 				Bank: &queries.BankDetails{
 					BankCode:      "VCB",
-					BankBin:       "970436",
+					BankBin:       970436,
 					BankShortName: "Vietcombank",
 					AccountNumber: "123456",
 				},

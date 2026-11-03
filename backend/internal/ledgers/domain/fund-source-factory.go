@@ -82,10 +82,11 @@ func (f *FundSourceFactory) CreateFundSource(
 // CreateBankDetails builds bank details after verifying the account with the BankAccountVerifier.
 func (f *FundSourceFactory) CreateBankDetails(
 	ctx context.Context,
-	bankCode, bankBin, bankShortName, ownerName, accountNumber string,
+	bankCode string,
+	bankBin int32,
+	bankShortName, ownerName, accountNumber string,
 ) (*BankDetails, error) {
 	bankCode = strings.TrimSpace(bankCode)
-	bankBin = strings.TrimSpace(bankBin)
 	bankShortName = strings.TrimSpace(bankShortName)
 	ownerName = strings.TrimSpace(ownerName)
 	accountNumber = strings.TrimSpace(accountNumber)
@@ -98,11 +99,11 @@ func (f *FundSourceFactory) CreateBankDetails(
 			Message:    "bank code is required",
 		})
 	}
-	if bankBin == "" {
+	if bankBin <= 0 {
 		errDetails = append(errDetails, common.ErrorDetails{
 			EntityType: "BankDetails",
 			ErrorSlug:  "bank-bin-required",
-			Message:    "bank bin is required",
+			Message:    "bank bin is required and must be positive",
 		})
 	}
 	if bankShortName == "" {

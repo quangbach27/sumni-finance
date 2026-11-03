@@ -70,7 +70,7 @@ type FundSourceDetails struct {
 	AccountNumber *string `json:"account_number,omitempty"`
 
 	// BankBin Bank only.
-	BankBin *string `json:"bank_bin,omitempty"`
+	BankBin *int32 `json:"bank_bin,omitempty"`
 
 	// BankCode Bank only.
 	BankCode *string `json:"bank_code,omitempty"`

@@ -46,7 +46,7 @@ func createFundSource(
 		body.Details = ledgersClients.FundSourceDetails{
 			OwnerName:     "An",
 			BankCode:      ptr("VCB"),
-			BankBin:       ptr("970436"),
+			BankBin:       ptr(int32(970436)),
 			BankShortName: ptr("Vietcombank"),
 			AccountNumber: ptr("123456789"),
 		}

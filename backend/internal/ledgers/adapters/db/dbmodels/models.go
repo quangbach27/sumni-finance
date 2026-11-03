@@ -19,7 +19,7 @@ type LedgersFundSource struct {
 	Currency      string
 	OwnerName     string
 	BankCode      *string
-	BankBin       *string
+	BankBin       *int32
 	BankShortName *string
 	AccountNumber *string
 	CreatedAt     time.Time

@@ -86,7 +86,8 @@ components:
           type: string
           description: Bank only.
         bank_bin:
-          type: string
+          type: integer
+          format: int32
           description: Bank only.
         bank_short_name:
           type: string

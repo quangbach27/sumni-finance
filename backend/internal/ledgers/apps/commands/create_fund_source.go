@@ -12,7 +12,7 @@ import (
 
 type BankInput struct {
 	BankCode      string
-	BankBin       string
+	BankBin       int32
 	BankShortName string
 	AccountNumber string
 }

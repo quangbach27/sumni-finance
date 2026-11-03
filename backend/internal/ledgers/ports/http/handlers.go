@@ -60,13 +60,13 @@ func (h *Handlers) CreateFundSource(ctx context.Context, request CreateFundSourc
 		OwnerName:    body.Details.OwnerName,
 	}
 
-	// Missing bank fields become "" so the domain factory reports them.
+	// Missing bank fields become zero values (0 for bin) so the domain factory reports them.
 	if body.Type == domain.FundSourceTypeBank {
 		cmd.Bank = &commands.BankInput{
-			BankCode:      deref(body.Details.BankCode),
-			BankBin:       deref(body.Details.BankBin),
-			BankShortName: deref(body.Details.BankShortName),
-			AccountNumber: deref(body.Details.AccountNumber),
+			BankCode:      deref(body.Details.BankCode, ""),
+			BankBin:       deref(body.Details.BankBin, 0),
+			BankShortName: deref(body.Details.BankShortName, ""),
+			AccountNumber: deref(body.Details.AccountNumber, ""),
 		}
 	}
 
@@ -111,10 +111,11 @@ func toAPIFundSource(fs queries.FundSource) FundSource {
 	}
 }
 
-func deref(s *string) string {
-	if s == nil {
-		return ""
+// deref returns the pointed-to value, or fallbackValue when p is nil.
+func deref[T any](p *T, fallbackValue T) T {
+	if p == nil {
+		return fallbackValue
 	}
 
-	return *s
+	return *p
 }

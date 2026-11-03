@@ -47,47 +47,60 @@ func TestCreateCashDetails(t *testing.T) {
 	assert.Error(t, err)
 }
 
+type bankArgs struct {
+	code      string
+	bin       int32
+	shortName string
+	owner     string
+	account   string
+}
+
 func TestCreateBankDetails(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name        string
-		args        [5]string // code, bin, shortName, owner, account
+		args        bankArgs
 		vefifiedErr error
 		wantErr     bool
 	}{
 		{
 			name: "create successfully",
-			args: [5]string{"VCB", "970436", "Vietcombank", "An", "123"},
+			args: bankArgs{"VCB", 970436, "Vietcombank", "An", "123"},
 		},
 		{
 			name:    "reject blank bank code",
-			args:    [5]string{"", "970436", "Vietcombank", "An", "123"},
+			args:    bankArgs{"", 970436, "Vietcombank", "An", "123"},
 			wantErr: true,
 		},
 		{
-			name:    "reject blank bank bin",
-			args:    [5]string{"VCB", " ", "Vietcombank", "An", "123"},
+			name:    "reject non-positive bank bin",
+			args:    bankArgs{"VCB", 0, "Vietcombank", "An", "123"},
+			wantErr: true,
+		},
+		{
+			name:    "reject negative bank bin",
+			args:    bankArgs{"VCB", -1, "Vietcombank", "An", "123"},
 			wantErr: true,
 		},
 		{
 			name:    "reject blank short name",
-			args:    [5]string{"VCB", "970436", "", "An", "123"},
+			args:    bankArgs{"VCB", 970436, "", "An", "123"},
 			wantErr: true,
 		},
 		{
 			name:    "reject blank owner",
-			args:    [5]string{"VCB", "970436", "Vietcombank", "", "123"},
+			args:    bankArgs{"VCB", 970436, "Vietcombank", "", "123"},
 			wantErr: true,
 		},
 		{
 			name:    "reject blank account",
-			args:    [5]string{"VCB", "970436", "Vietcombank", "An", ""},
+			args:    bankArgs{"VCB", 970436, "Vietcombank", "An", ""},
 			wantErr: true,
 		},
 		{
 			name:        "reject verifier error",
-			args:        [5]string{"VCB", "970436", "Vietcombank", "An", "123"},
+			args:        bankArgs{"VCB", 970436, "Vietcombank", "An", "123"},
 			vefifiedErr: errors.New("not found"),
 			wantErr:     true,
 		},
@@ -103,7 +116,7 @@ func TestCreateBankDetails(t *testing.T) {
 			}
 
 			a := tt.args
-			d, err := f.CreateBankDetails(context.Background(), a[0], a[1], a[2], a[3], a[4])
+			d, err := f.CreateBankDetails(context.Background(), a.code, a.bin, a.shortName, a.owner, a.account)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Nil(t, d)
@@ -118,11 +131,11 @@ func TestCreateBankDetails(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, domain.FundSourceTypeBank, d.Type())
-			assert.Equal(t, a[0], d.BankCode())
-			assert.Equal(t, a[1], d.BankBin())
-			assert.Equal(t, a[2], d.BankShortName())
-			assert.Equal(t, a[3], d.OwnerName())
-			assert.Equal(t, a[4], d.AccountNumber())
+			assert.Equal(t, a.code, d.BankCode())
+			assert.Equal(t, a.bin, d.BankBin())
+			assert.Equal(t, a.shortName, d.BankShortName())
+			assert.Equal(t, a.owner, d.OwnerName())
+			assert.Equal(t, a.account, d.AccountNumber())
 		})
 	}
 }
@@ -217,7 +230,7 @@ func TestCreateBankDetails_TrimsInput(t *testing.T) {
 	t.Parallel()
 
 	f, _ := newFactory(t)
-	d, err := f.CreateBankDetails(context.Background(), " VCB ", " 1 ", " V ", " An ", " 123 ")
+	d, err := f.CreateBankDetails(context.Background(), " VCB ", 1, " V ", " An ", " 123 ")
 	require.NoError(t, err)
 	assert.Equal(t, "VCB", d.BankCode())
 	assert.Equal(t, "An", d.OwnerName())

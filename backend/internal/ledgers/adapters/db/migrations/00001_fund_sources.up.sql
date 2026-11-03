@@ -8,7 +8,7 @@ CREATE TABLE ledgers.fund_sources (
     currency        text NOT NULL,
     owner_name      text NOT NULL,
     bank_code       text,
-    bank_bin        text,
+    bank_bin        integer,
     bank_short_name text,
     account_number  text,
     created_at      timestamptz NOT NULL DEFAULT now(),
