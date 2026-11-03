@@ -1,0 +1,60 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries"
+    schema: "migrations"
+    gen:
+      go:
+        package: "dbmodels"
+        out: "dbmodels"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          # Domain type overrides
+          - column: "ledgers.fund_sources.uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceUUID"
+
+          - column: "ledgers.fund_sources.type"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceType"
+
+          # Common type overrides
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+
+          - db_type: "timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+
+          - db_type: "pg_catalog.numeric"
+            go_type:
+              import: "github.com/shopspring/decimal"
+              type: "Decimal"
+
+          - db_type: "pg_catalog.numeric"
+            nullable: true
+            go_type:
+              import: "github.com/shopspring/decimal"
+              type: "Decimal"
+              pointer: true
+
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/quangbach27/golang-common"
+              type: "UUID"
+
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/quangbach27/golang-common"
+              type: "UUID"
+              pointer: true

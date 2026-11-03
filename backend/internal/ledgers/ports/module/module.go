@@ -3,7 +3,7 @@ package module
 import (
 	"context"
 
-	"backend/internal/ledger/ports/module/client"
+	"backend/internal/ledgers/ports/module/client"
 )
 
 type Ledger struct{}

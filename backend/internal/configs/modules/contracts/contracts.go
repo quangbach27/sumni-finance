@@ -3,7 +3,7 @@ package contracts
 import (
 	"errors"
 
-	ledgerClient "backend/internal/ledger/ports/module/client"
+	ledgerClient "backend/internal/ledgers/ports/module/client"
 )
 
 type Contracts struct {

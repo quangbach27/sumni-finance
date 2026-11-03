@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: Ledgers API
+  version: 1.0.0
+
+tags:
+  - name: fund-sources
+
+paths:
+  /api/v1/fund-sources:
+    get:
+      tags: [fund-sources]
+      operationId: listFundSources
+      summary: List fund sources
+      responses:
+        "200":
+          description: List of fund sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFundSourcesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags: [fund-sources]
+      operationId: createFundSource
+      summary: Create a fund source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFundSourceRequest"
+      responses:
+        "201":
+          description: Fund source created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateFundSourceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  schemas:
+    FundSourceUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.FundSourceUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    FundSourceType:
+      type: string
+      enum: [bank, cash]
+      x-go-type: domain.FundSourceType
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    Currency:
+      type: string
+      enum: [VND]
+      x-go-type: shared.Currency
+      x-go-type-import:
+        path: backend/internal/shared
+
+    Decimal:
+      type: number
+      x-go-type: decimal.Decimal
+      x-go-type-import:
+        path: github.com/shopspring/decimal
+
+    FundSourceDetails:
+      type: object
+      required: [owner_name]
+      properties:
+        owner_name:
+          type: string
+        bank_code:
+          type: string
+          description: Bank only.
+        bank_bin:
+          type: string
+          description: Bank only.
+        bank_short_name:
+          type: string
+          description: Bank only.
+        account_number:
+          type: string
+          description: Bank only.
+
+    FundSource:
+      type: object
+      required: [uuid, name, type, balance, currency, details]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/FundSourceUUID"
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/FundSourceType"
+        balance:
+          $ref: "#/components/schemas/Decimal"
+        currency:
+          $ref: "#/components/schemas/Currency"
+        details:
+          $ref: "#/components/schemas/FundSourceDetails"
+
+    ListFundSourcesResponse:
+      type: object
+      required: [fund_sources]
+      properties:
+        fund_sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/FundSource"
+
+    CreateFundSourceRequest:
+      type: object
+      required: [name, type, start_balance, currency, details]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/FundSourceType"
+        start_balance:
+          $ref: "#/components/schemas/Decimal"
+        currency:
+          $ref: "#/components/schemas/Currency"
+        details:
+          $ref: "#/components/schemas/FundSourceDetails"
+
+    CreateFundSourceResponse:
+      type: object
+      required: [fund_source_uuid]
+      properties:
+        fund_source_uuid:
+          $ref: "#/components/schemas/FundSourceUUID"
+
+    ErrorDetail:
+      type: object
+      required: [error_slug, message]
+      properties:
+        entity_id:
+          type: string
+        entity_type:
+          type: string
+        error_slug:
+          type: string
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [slug, message]
+      properties:
+        slug:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
