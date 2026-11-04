@@ -43,14 +43,19 @@ func TestFundSource_TopUp(t *testing.T) {
 			t.Parallel()
 
 			fs := newFundSource(t, 100)
-			err := fs.TopUp(decimal.NewFromInt(tt.amount))
+			snap, err := fs.TopUp(decimal.NewFromInt(tt.amount))
 
+			assert.True(t, decimal.NewFromInt(tt.want).Equal(fs.Balance()))
 			if tt.wantErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+				assert.Equal(t, domain.FundSourceSnapshot{}, snap)
+				return
 			}
-			assert.True(t, decimal.NewFromInt(tt.want).Equal(fs.Balance()))
+
+			assert.NoError(t, err)
+			assert.Equal(t, fs.UUID(), snap.FundSourceUUID)
+			assert.True(t, decimal.NewFromInt(100).Equal(snap.Balance))
+			assert.True(t, decimal.NewFromInt(tt.want).Equal(snap.BalanceAfter))
 		})
 	}
 }
@@ -76,14 +81,19 @@ func TestFundSource_Withdraw(t *testing.T) {
 			t.Parallel()
 
 			fs := newFundSource(t, 100)
-			err := fs.Withdraw(decimal.NewFromInt(tt.amount))
+			snap, err := fs.Withdraw(decimal.NewFromInt(tt.amount))
 
+			assert.True(t, decimal.NewFromInt(tt.want).Equal(fs.Balance()))
 			if tt.wantErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+				assert.Equal(t, domain.FundSourceSnapshot{}, snap)
+				return
 			}
-			assert.True(t, decimal.NewFromInt(tt.want).Equal(fs.Balance()))
+
+			assert.NoError(t, err)
+			assert.Equal(t, fs.UUID(), snap.FundSourceUUID)
+			assert.True(t, decimal.NewFromInt(100).Equal(snap.Balance))
+			assert.True(t, decimal.NewFromInt(tt.want).Equal(snap.BalanceAfter))
 		})
 	}
 }
