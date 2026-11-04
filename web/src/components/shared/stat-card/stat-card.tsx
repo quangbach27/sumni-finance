@@ -7,6 +7,10 @@ import type React from 'react';
 export type StatCardProps = {
   label: string;
   value: React.ReactNode;
+  /** Secondary line under the value. */
+  description?: React.ReactNode;
+  /** Extra content under the description, e.g. a progress bar. */
+  footer?: React.ReactNode;
   variant?: 'default' | 'primary';
   className?: string;
 };
@@ -14,6 +18,8 @@ export type StatCardProps = {
 export default function StatCard({
   label,
   value,
+  description,
+  footer,
   variant = 'default',
   className,
 }: StatCardProps) {
@@ -33,7 +39,21 @@ export default function StatCard({
           {label}
         </CardTitle>
       </CardHeader>
-      <CardContent>{value}</CardContent>
+      <CardContent className="flex flex-col gap-2">
+        <div>{value}</div>
+        {description && (
+          <p
+            className={cn(
+              'text-sm',
+              !isPrimary && 'text-muted-foreground',
+              isPrimary && 'text-primary-foreground/80',
+            )}
+          >
+            {description}
+          </p>
+        )}
+        {footer}
+      </CardContent>
     </Card>
   );
 }

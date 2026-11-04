@@ -1,41 +1,23 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import type { FundSource } from './types';
+import { http } from '@/lib/clients';
 
-// TODO: replace with the real endpoint once the backend exposes it
-export const FUND_SOURCES_URL = '/fund-sources';
+import type { FundSource, ListFundSourcesResponse } from './types';
 
-const MOCK_FUND_SOURCES: FundSource[] = [
-  {
-    id: '1',
-    name: 'Nguyễn Văn An · Ngân hàng',
-    type: 'bank',
-    details: {
-      owner_name: 'Nguyễn Văn An',
-      account_number: '19034567890123',
-      code: 'VCB',
-      bin: 970436,
-      short_name: 'Vietcombank',
-    },
-    balance: 32_640_000,
-    currency: 'VND',
-  },
-  {
-    id: '2',
-    name: 'Nguyễn Văn An · Tiền mặt',
-    type: 'cash',
-    details: { owner_name: 'Nguyễn Văn An' },
-    balance: 4_310_000,
-    currency: 'VND',
-  },
-];
+export const FUND_SOURCES_URL = '/api/v1/fund-sources';
 
-export const getFundSources = async (_options?: {
+export const getFundSources = async (options?: {
   signal?: AbortSignal;
 }): Promise<FundSource[]> => {
-  // TODO: replace with http.get<FundSource[]>(URL, { signal: _options?.signal })
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return MOCK_FUND_SOURCES;
+  const { fund_sources } = await http.get<ListFundSourcesResponse>(
+    FUND_SOURCES_URL,
+    { signal: options?.signal },
+  );
+  // Decimal may be serialized as a string; normalize so sums don't concatenate.
+  return fund_sources.map((item) => ({
+    ...item,
+    balance: Number(item.balance),
+  }));
 };
 
 export const getFundSourcesQueryOptions = () =>

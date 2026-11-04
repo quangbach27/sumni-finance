@@ -1,16 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-import {
-  Banknote,
-  CircleAlert,
-  CircleCheck,
-  Landmark,
-  Lock,
-  Sparkles,
-} from 'lucide-react';
+import { Banknote, Landmark, Lock, Sparkles } from 'lucide-react';
 import { Controller } from 'react-hook-form';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -21,6 +13,8 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+
+import StatusAlert from '@/components/shared/status-alert/status-alert';
 
 import { isApiError } from '@/lib/clients';
 import { formatAmount, getCurrencySymbol, parseAmount } from '@/lib/currency';
@@ -133,27 +127,25 @@ export default function CreateFundSourceForm({
     <form id={id} onSubmit={handleSubmit} noValidate>
       <FieldGroup>
         {status && (
-          <Alert
+          <StatusAlert
             ref={alertRef}
             variant={status.type === 'success' ? 'success' : 'destructive'}
-          >
-            {status.type === 'success' ? <CircleCheck /> : <CircleAlert />}
-            <AlertTitle>
-              {status.type === 'success'
+            title={
+              status.type === 'success'
                 ? 'Thêm nguồn quỹ thành công'
-                : 'Không thể thêm nguồn quỹ'}
-            </AlertTitle>
-            <AlertDescription>
-              {status.message}
-              {status.details && status.details.length > 0 && (
-                <ul className="mt-1 list-disc pl-4">
-                  {status.details.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
-                </ul>
-              )}
-            </AlertDescription>
-          </Alert>
+                : 'Không thể thêm nguồn quỹ'
+            }
+            onDismiss={() => setStatus(null)}
+          >
+            {status.message}
+            {status.details && status.details.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {status.details.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </StatusAlert>
         )}
 
         <Controller
