@@ -13,9 +13,13 @@ import (
 
 	"backend/internal"
 	"backend/internal/configs"
+	"backend/internal/ledgers/adapters/bankverifier"
 )
 
 var (
+	// BankVerifier lets component tests push valid bank accounts (empty list = bypass).
+	BankVerifier = bankverifier.NewBankAccountVerifierStub()
+
 	BaseURL  string
 	verifier = auth.NewStubTokenVerifier()
 )
@@ -36,7 +40,8 @@ func StartServer(ctx context.Context) {
 		config,
 		db,
 		internal.ExternalServices{
-			TokenVerifier: verifier,
+			TokenVerifier:       verifier,
+			BankAccountVerifier: BankVerifier,
 		},
 	)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 
 	"backend/internal"
 	"backend/internal/configs"
+	"backend/internal/ledgers/adapters/bankverifier"
 )
 
 func main() {
@@ -32,7 +33,8 @@ func main() {
 		config,
 		pgxDb,
 		internal.ExternalServices{
-			TokenVerifier: newStubTokenVerifier(),
+			TokenVerifier:       newStubTokenVerifier(),
+			BankAccountVerifier: bankverifier.NewBankAccountVerifierStub(),
 		},
 	)
 	if err != nil {

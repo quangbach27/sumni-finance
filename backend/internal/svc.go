@@ -16,10 +16,12 @@ import (
 	"backend/internal/configs/modules"
 	"backend/internal/configs/modules/contracts"
 	"backend/internal/ledgers"
+	"backend/internal/ledgers/domain"
 )
 
 type ExternalServices struct {
-	TokenVerifier commonAuth.TokenVerifier
+	TokenVerifier       commonAuth.TokenVerifier
+	BankAccountVerifier domain.BankAccountVerifier
 }
 
 type Svc struct {
@@ -37,7 +39,7 @@ func New(
 ) (*Svc, error) {
 	moduleContracts := &contracts.Contracts{}
 	modules := []modules.Module{
-		ledgers.NewModule(pgxDB),
+		ledgers.NewModule(pgxDB, externalServices.BankAccountVerifier),
 	}
 
 	if err := initModules(ctx, modules); err != nil {
