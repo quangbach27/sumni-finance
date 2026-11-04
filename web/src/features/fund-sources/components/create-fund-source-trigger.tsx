@@ -4,13 +4,10 @@ import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
-import { useIsMobile } from '@/hooks/use-mobile';
-
 const loadDialog = () => import('./create-fund-source-dialog');
 const CreateFundSourceDialog = lazy(loadDialog);
 
 export default function CreateFundSourceTrigger() {
-  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -31,7 +28,7 @@ export default function CreateFundSourceTrigger() {
         onFocus={prefetchDialog}
       >
         <Plus data-icon="inline-start" />
-        <span>{isMobile ? 'Thêm' : 'Thêm nguồn quỹ'}</span>
+        <span>Thêm nguồn quỹ</span>
       </Button>
       {mounted && (
         <Suspense fallback={null}>

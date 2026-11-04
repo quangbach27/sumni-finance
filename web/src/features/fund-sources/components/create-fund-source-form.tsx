@@ -1,6 +1,5 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Banknote,
   CircleAlert,
@@ -9,8 +8,7 @@ import {
   Lock,
   Sparkles,
 } from 'lucide-react';
-import { Controller, useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { Controller } from 'react-hook-form';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -24,58 +22,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
+import { isApiError } from '@/lib/clients';
 import { formatAmount, getCurrencySymbol, parseAmount } from '@/lib/currency';
 
-import { BankCombobox } from './bank-combobox';
+import BankCombobox from './bank-combobox';
+import { formatApiError } from '../api/format-api-error';
 
-import type { CreateFundSourceInput, FundSource } from '../api/types';
-import type { Resolver } from 'react-hook-form';
-
-const baseFields = {
-  name: z.string().trim().min(1, 'Vui lòng nhập tên nguồn quỹ'),
-  owner_name: z.string().trim().min(1, 'Vui lòng nhập tên'),
-  balance: z.number().min(0, 'Số dư không được âm'),
-};
-
-const bankSchema = z.object({
-  ...baseFields,
-  type: z.literal('bank'),
-  code: z.string().min(1, 'Vui lòng chọn ngân hàng'),
-  bin: z.number(),
-  short_name: z.string(),
-  account_number: z
-    .string()
-    .trim()
-    .min(1, 'Vui lòng nhập số tài khoản')
-    .regex(/^\d+$/, 'Số tài khoản chỉ gồm chữ số'),
-});
-
-const cashSchema = z.object({
-  ...baseFields,
-  type: z.literal('cash'),
-});
-
-const schema = z.discriminatedUnion('type', [bankSchema, cashSchema]);
-
-// Flat shape for react-hook-form: every field exists while the user switches
-// type; the schema decides which ones are validated.
-type FormValues = Omit<z.infer<typeof bankSchema>, 'type'> & {
-  type: FundSource['type'];
-};
-
-const DEFAULT_VALUES: FormValues = {
-  type: 'bank',
-  name: '',
-  owner_name: '',
-  account_number: '',
-  code: '',
-  bin: 0,
-  short_name: '',
-  balance: 0,
-};
+import type { CreateFundSourceFormValues } from '../api/create-fund-source';
+import type { FundSourceType } from '../api/types';
+import type { UseFormReturn } from 'react-hook-form';
 
 const TYPE_OPTIONS: {
-  value: FundSource['type'];
+  value: FundSourceType;
   label: string;
   icon: typeof Landmark;
 }[] = [
@@ -83,63 +41,48 @@ const TYPE_OPTIONS: {
   { value: 'cash', label: 'Tiền mặt', icon: Banknote },
 ];
 
-const TYPE_LABEL: Record<FundSource['type'], string> = {
+const TYPE_LABEL: Record<FundSourceType, string> = {
   bank: 'Ngân hàng',
   cash: 'Tiền mặt',
 };
 
-const suggestName = (ownerName: string, type: FundSource['type']) => {
+const suggestName = (ownerName: string, type: FundSourceType) => {
   const owner = ownerName.trim();
   return owner ? `${owner} · ${TYPE_LABEL[type]}` : '';
 };
 
-const toInput = (values: FormValues): CreateFundSourceInput => {
-  const base = {
-    name: values.name,
-    balance: values.balance,
-    currency: 'VND',
-  };
-  if (values.type === 'cash') {
-    return {
-      ...base,
-      type: 'cash',
-      details: { owner_name: values.owner_name },
-    };
-  }
-  return {
-    ...base,
-    type: 'bank',
-    details: {
-      owner_name: values.owner_name,
-      account_number: values.account_number,
-      code: values.code,
-      bin: values.bin,
-      short_name: values.short_name,
-    },
-  };
+// Backend entity ids -> form field names.
+const ENTITY_TO_FIELD: Record<string, keyof CreateFundSourceFormValues> = {
+  name: 'name',
+  start_balance: 'balance',
+  owner_name: 'owner_name',
+  account_number: 'account_number',
+  bank_code: 'code',
+  bank_bin: 'bin',
+  bank_short_name: 'short_name',
 };
 
 type CreateFundSourceFormProps = {
   id: string;
-  /** Resolves on success, rejects with an Error on failure. */
-  onSubmit: (input: CreateFundSourceInput) => Promise<void>;
-  onDirtyChange?: (dirty: boolean) => void;
+  /** Owned by the parent so values survive Dialog <-> Drawer remounts. */
+  form: UseFormReturn<CreateFundSourceFormValues>;
+  /** Resolves on success, rejects (ideally with an ApiError) on failure. */
+  onSubmit: (values: CreateFundSourceFormValues) => Promise<void>;
 };
 
-type Status = { type: 'success' | 'error'; message: string };
+type Status = {
+  type: 'success' | 'error';
+  message: string;
+  details?: string[];
+};
 
 const ERROR_FALLBACK = 'Không thể thêm nguồn quỹ. Vui lòng thử lại.';
 
-const CreateFundSourceForm = ({
+export default function CreateFundSourceForm({
   id,
+  form,
   onSubmit,
-  onDirtyChange,
-}: CreateFundSourceFormProps) => {
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: DEFAULT_VALUES,
-  });
-
+}: CreateFundSourceFormProps) {
   const type = form.watch('type');
   const ownerName = form.watch('owner_name');
   const code = form.watch('code');
@@ -162,30 +105,27 @@ const CreateFundSourceForm = ({
     if (status) alertRef.current?.scrollIntoView({ block: 'nearest' });
   }, [status]);
 
-  const { isDirty } = form.formState;
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-    return () => onDirtyChange?.(false);
-  }, [isDirty, onDirtyChange]);
-
   const handleSubmit = form.handleSubmit(async (values) => {
     setStatus(null);
     try {
-      await onSubmit(toInput(values));
+      await onSubmit(values);
       // Reset first: it notifies watchers, which would clear the alert.
-      form.reset(DEFAULT_VALUES);
+      form.reset();
       setStatus({
         type: 'success',
         message: `Đã thêm nguồn quỹ "${values.name}".`,
       });
     } catch (error) {
-      setStatus({
-        type: 'error',
-        message:
-          error instanceof Error && error.message
-            ? error.message
-            : ERROR_FALLBACK,
-      });
+      const { message, details } = formatApiError(error, ERROR_FALLBACK);
+      // Set field errors first: they must not be wiped by the watch() reset
+      // of the alert, and setError does not notify watchers.
+      if (isApiError(error)) {
+        for (const detail of error.details) {
+          const field = detail.entity_id && ENTITY_TO_FIELD[detail.entity_id];
+          if (field) form.setError(field, { message: detail.message });
+        }
+      }
+      setStatus({ type: 'error', message, details });
     }
   });
 
@@ -203,7 +143,16 @@ const CreateFundSourceForm = ({
                 ? 'Thêm nguồn quỹ thành công'
                 : 'Không thể thêm nguồn quỹ'}
             </AlertTitle>
-            <AlertDescription>{status.message}</AlertDescription>
+            <AlertDescription>
+              {status.message}
+              {status.details && status.details.length > 0 && (
+                <ul className="mt-1 list-disc pl-4">
+                  {status.details.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              )}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -216,7 +165,7 @@ const CreateFundSourceForm = ({
               <ToggleGroup
                 value={[field.value]}
                 onValueChange={(values) => {
-                  const next = values[0] as FormValues['type'] | undefined;
+                  const next = values[0] as FundSourceType | undefined;
                   if (!next) return;
                   form.reset();
                   field.onChange(next);
@@ -253,9 +202,14 @@ const CreateFundSourceForm = ({
                 value={code}
                 invalid={!!form.formState.errors.code}
                 onBankSelect={(bank) => {
-                  form.setValue('code', bank.code, { shouldValidate: true });
-                  form.setValue('bin', bank.bin);
-                  form.setValue('short_name', bank.short_name);
+                  form.setValue('code', bank.code, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  form.setValue('bin', bank.bin, { shouldDirty: true });
+                  form.setValue('short_name', bank.short_name, {
+                    shouldDirty: true,
+                  });
                 }}
               />
               <FieldError errors={[form.formState.errors.code]} />
@@ -264,18 +218,18 @@ const CreateFundSourceForm = ({
             <div className="bg-primary/10 border-primary/20 rounded-lg border p-3">
               <dl className="grid grid-cols-3 gap-2 text-sm">
                 <div>
+                  <dt className="text-primary/70 text-xs">Tên ngân hàng</dt>
+                  <dd className="text-primary font-semibold">
+                    {shortName || '—'}
+                  </dd>
+                </div>
+                <div>
                   <dt className="text-primary/70 text-xs">Mã ngân hàng</dt>
                   <dd className="text-primary font-semibold">{code || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-primary/70 text-xs">BIN</dt>
+                  <dt className="text-primary/70 text-xs">Mã BIN</dt>
                   <dd className="text-primary font-semibold">{bin || '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-primary/70 text-xs">Tên viết tắt</dt>
-                  <dd className="text-primary font-semibold">
-                    {shortName || '—'}
-                  </dd>
                 </div>
               </dl>
             </div>
@@ -404,6 +358,7 @@ const CreateFundSourceForm = ({
                   onClick={() => {
                     form.setValue('name', suggestedName, {
                       shouldValidate: true,
+                      shouldDirty: true,
                     });
                   }}
                 >
@@ -425,6 +380,4 @@ const CreateFundSourceForm = ({
       </FieldGroup>
     </form>
   );
-};
-
-export default memo(CreateFundSourceForm);
+}

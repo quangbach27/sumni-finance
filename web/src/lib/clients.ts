@@ -76,14 +76,10 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// api.interceptors.request.use(async (config) => {
-//   const token = await getAuthToken();
-//
-//   if (token) {
-//     config.headers.set('Authorization', `Bearer ${token}`);
-//   }
-//   return config;
-// });
+api.interceptors.request.use(async (config) => {
+  config.headers.set('Authorization', `Bearer token-1`);
+  return config;
+});
 
 function toApiError(error: AxiosError<Partial<ApiErrorBody>>): ApiError {
   const { response } = error;

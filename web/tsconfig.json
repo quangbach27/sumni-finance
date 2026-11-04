@@ -3,9 +3,9 @@
     "**/*.ts",
     "**/*.tsx",
     ".storybook/*.ts",
-    "eslint.config.js",
-    "prettier.config.js",
-    "vite.config.js"
+    "eslint.config.ts",
+    "prettier.config.ts",
+    "vite.config.ts"
   ],
 
   "compilerOptions": {

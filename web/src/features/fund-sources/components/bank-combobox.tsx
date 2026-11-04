@@ -1,22 +1,25 @@
 import { useState } from 'react';
 
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 
+import { useIsMobile } from '@/hooks/use-mobile';
+
+import BankList from './bank-list';
+import BankSummary from './bank-summary';
 import { useBanks } from '../api/get-banks';
 
 import type { Bank } from '../api/types';
@@ -29,89 +32,102 @@ type BankComboboxProps = {
   id?: string;
 };
 
-function BankIcon({ bank }: { bank: Bank }) {
-  return (
-    <span className="bg-muted flex h-8 w-10 shrink-0 items-center justify-center rounded-md">
-      <img
-        src={bank.icon_url}
-        alt=""
-        className="h-5 w-8 object-contain"
-        loading="lazy"
-      />
-    </span>
-  );
-}
+type PickerProps = {
+  trigger: React.ReactElement;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: React.ReactNode;
+};
 
-export function BankCombobox({
+const BankDrawer = ({ trigger, open, onOpenChange, children }: PickerProps) => (
+  <>
+    {trigger}
+    <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
+      <DrawerContent className="h-[85dvh]">
+        <DrawerHeader className="flex-row items-center justify-between pb-2">
+          <DrawerTitle>Chọn ngân hàng</DrawerTitle>
+          <DrawerClose
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Đóng"
+              />
+            }
+          >
+            <X />
+          </DrawerClose>
+        </DrawerHeader>
+        <div className="min-h-0 flex-1 px-2 pb-4">{children}</div>
+      </DrawerContent>
+    </Drawer>
+  </>
+);
+
+const BankPopover = ({
+  trigger,
+  open,
+  onOpenChange,
+  children,
+}: PickerProps) => (
+  <Popover open={open} onOpenChange={onOpenChange}>
+    <PopoverTrigger render={trigger} />
+    <PopoverContent className="w-(--anchor-width) p-0" align="start">
+      {children}
+    </PopoverContent>
+  </Popover>
+);
+
+export default function BankCombobox({
   value,
   onBankSelect,
   invalid,
   id,
 }: BankComboboxProps) {
-  const { data: banks = [] } = useBanks();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
-
+  // Same query as BankList's; TanStack Query dedupes it into one request.
+  const { data: banks = [] } = useBanks();
   const selected = banks.find((bank) => bank.code === value);
 
+  const handleSelect = (bank: Bank) => {
+    onBankSelect(bank);
+    setOpen(false);
+  };
+
+  const trigger = (
+    <Button
+      id={id}
+      type="button"
+      variant="outline"
+      role="combobox"
+      aria-expanded={open}
+      aria-haspopup="listbox"
+      aria-invalid={invalid}
+      className="h-12 w-full justify-between font-normal"
+      onClick={isMobile ? () => setOpen(true) : undefined}
+    >
+      {selected ? (
+        <span className="flex min-w-0 items-center gap-2">
+          <BankSummary bank={selected} />
+        </span>
+      ) : (
+        <span className="text-placeholder">Chọn ngân hàng</span>
+      )}
+      <ChevronsUpDown className="opacity-50" />
+    </Button>
+  );
+
+  const Picker = isMobile ? BankDrawer : BankPopover;
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            aria-invalid={invalid}
-            className="h-12 w-full justify-between font-normal"
-          />
-        }
-      >
-        {selected ? (
-          <span className="flex min-w-0 items-center gap-2">
-            <BankIcon bank={selected} />
-            <span className="font-medium">{selected.code}</span>
-            <span className="text-muted-foreground truncate">
-              {selected.name}
-            </span>
-          </span>
-        ) : (
-          <span className="text-placeholder">Chọn ngân hàng</span>
-        )}
-        <ChevronsUpDown className="opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent className="w-(--anchor-width) p-0" align="start">
-        <Command
-          filter={(itemValue, query) =>
-            itemValue.toLowerCase().includes(query.trim().toLowerCase()) ? 1 : 0
-          }
-        >
-          <CommandInput placeholder="Tìm ngân hàng..." />
-          <CommandList>
-            <CommandEmpty>Không tìm thấy ngân hàng.</CommandEmpty>
-            <CommandGroup>
-              {banks.map((bank) => (
-                <CommandItem
-                  key={bank.id}
-                  value={`${bank.code} ${bank.short_name} ${bank.name}`}
-                  data-checked={bank.code === value}
-                  onSelect={() => {
-                    onBankSelect(bank);
-                    setOpen(false);
-                  }}
-                >
-                  <BankIcon bank={bank} />
-                  <span className="font-medium">{bank.code}</span>
-                  <span className="text-muted-foreground truncate">
-                    {bank.name}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Picker trigger={trigger} open={open} onOpenChange={setOpen}>
+      <BankList
+        value={value}
+        onSelect={handleSelect}
+        className={isMobile ? 'mt-3 max-h-none flex-1' : 'mt-3'}
+      />
+    </Picker>
   );
 }

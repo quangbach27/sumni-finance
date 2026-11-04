@@ -1,4 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 
 import {
   AlertDialog,
@@ -30,9 +33,14 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 
 import CreateFundSourceForm from './create-fund-source-form';
-import { useCreateFundSource } from '../api/create-fund-source';
+import {
+  createFundSourceSchema,
+  getCreateFundSourceDefaultValues,
+  useCreateFundSource,
+} from '../api/create-fund-source';
 
-import type { CreateFundSourceInput } from '../api/types';
+import type { CreateFundSourceFormValues } from '../api/create-fund-source';
+import type { Resolver } from 'react-hook-form';
 
 const FORM_ID = 'create-fund-source-form';
 
@@ -51,14 +59,27 @@ export default function CreateFundSourceDialog({
   const isMobile = useIsMobile();
   const { mutateAsync, isPending } = useCreateFundSource();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // A ref (not state): only read when closing, must not re-render the shell.
-  const dirtyRef = useRef(false);
+  // Owned here, above the Drawer/Dialog switch, so values survive the
+  // breakpoint changing (which remounts everything below).
+  const form = useForm<CreateFundSourceFormValues>({
+    resolver: zodResolver(
+      createFundSourceSchema,
+    ) as Resolver<CreateFundSourceFormValues>,
+    defaultValues: getCreateFundSourceDefaultValues('bank'),
+  });
+  const { isDirty } = form.formState;
+
+  // Reset on open (not close) so fields don't blank out during the exit
+  // animation.
+  useEffect(() => {
+    if (open) form.reset();
+  }, [open, form]);
 
   const handleOpenChange = (next: boolean) => {
     if (isPending) return;
     if (!next) {
       // Nothing to lose (e.g. right after a successful create): close directly.
-      if (dirtyRef.current) setConfirmOpen(true);
+      if (isDirty) setConfirmOpen(true);
       else onOpenChange(false);
       return;
     }
@@ -70,25 +91,12 @@ export default function CreateFundSourceDialog({
     onOpenChange(false);
   };
 
-  // The form unmounts with the popup, so closing also resets it.
-  // Stable references so the memoized form skips re-renders caused by
-  // confirm / pending state changes in this shell.
-  const handleSubmit = useCallback(
-    async (input: CreateFundSourceInput) => {
-      await mutateAsync(input);
-    },
-    [mutateAsync],
-  );
-  const handleDirtyChange = useCallback((dirty: boolean) => {
-    dirtyRef.current = dirty;
-  }, []);
+  const handleSubmit = async (input: CreateFundSourceFormValues) => {
+    await mutateAsync(input);
+  };
 
-  const form = (
-    <CreateFundSourceForm
-      id={FORM_ID}
-      onSubmit={handleSubmit}
-      onDirtyChange={handleDirtyChange}
-    />
+  const formContent = (
+    <CreateFundSourceForm id={FORM_ID} form={form} onSubmit={handleSubmit} />
   );
 
   const cancelButton = (
@@ -125,7 +133,7 @@ export default function CreateFundSourceDialog({
               <DrawerTitle>{TITLE}</DrawerTitle>
               <DrawerDescription>{DESCRIPTION}</DrawerDescription>
             </DrawerHeader>
-            <div className="overflow-y-auto px-4">{form}</div>
+            <div className="overflow-y-auto px-4">{formContent}</div>
             <div className="flex flex-col gap-2 p-4">
               {submitButton}
               {cancelButton}
@@ -160,7 +168,9 @@ export default function CreateFundSourceDialog({
             <DialogTitle>{TITLE}</DialogTitle>
             <DialogDescription>{DESCRIPTION}</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[80vh] overflow-y-auto px-0.5">{form}</div>
+          <div className="max-h-[80vh] overflow-y-auto px-0.5">
+            {formContent}
+          </div>
           <DialogFooter>
             {cancelButton}
             {submitButton}

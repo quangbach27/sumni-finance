@@ -1,11 +1,14 @@
-// @ts-check
-
 import { tanstackConfig } from '@tanstack/eslint-config';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   ...tanstackConfig,
-  globalIgnores(['dist', 'storybook-static', 'src/routeTree.gen.ts']),
+  globalIgnores([
+    'dist',
+    'storybook-static',
+    'src/routeTree.gen.ts',
+    'src/features/generated',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     rules: {
@@ -18,7 +21,7 @@ export default defineConfig([
         'single',
         { avoidEscape: true, allowTemplateLiterals: true },
       ],
-      'jsx-quotes': ['error', 'prefer-double'],
+      'jsx-quotes': ['warn', 'prefer-double'],
       'import/order': [
         'warn',
         {

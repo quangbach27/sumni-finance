@@ -1,3 +1,5 @@
+import type { components } from '@/features/generated/ledgers.gen';
+
 type FundSourceBase = {
   id: string;
   name: string;
@@ -23,11 +25,13 @@ export type FundSource = FundSourceBase &
     | { type: 'cash'; details: CashDetails }
   );
 
-export type CreateFundSourceInput = FundSource extends infer T
-  ? T extends FundSource
-    ? Omit<T, 'id'>
-    : never
-  : never;
+type Schemas = components['schemas'];
+
+export type CreateFundSourceRequest = Schemas['CreateFundSourceRequest'];
+export type CreateFundSourceResponse = Schemas['CreateFundSourceResponse'];
+export type FundSourceDetailsRequest = Schemas['FundSourceDetails'];
+export type FundSourceType = Schemas['FundSourceType'];
+export type Currency = Schemas['Currency'];
 
 export type Bank = {
   id: string;
