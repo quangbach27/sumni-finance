@@ -23,7 +23,7 @@ type EchoRouter interface {
 type Name string
 
 const (
-	LedgerModuleName Name = "ledger"
+	LedgersModuleName Name = "ledgers"
 )
 
 type Module interface {

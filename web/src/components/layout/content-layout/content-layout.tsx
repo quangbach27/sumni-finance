@@ -23,7 +23,7 @@ export default function ContentLayout({
         <div>
           <h1 className="text-4xl font-bold">{title}</h1>
           {description && (
-            <span className="text-foreground hidden md:block">
+            <span className="text-muted-foreground hidden md:block">
               {description}
             </span>
           )}

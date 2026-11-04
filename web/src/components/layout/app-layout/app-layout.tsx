@@ -7,11 +7,8 @@ import {
 
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
-import { useIsMobile } from '@/hooks/use-mobile';
-
 import AppHeader from './app-header';
 import AppSidebar from './app-sidebar';
-import BottomNav from './bottom-nav';
 
 import type { LucideIcon } from 'lucide-react';
 
@@ -49,16 +46,15 @@ const navItems = [
 ] satisfies NavItem[];
 
 export default function AppLayout({ children }: Props) {
-  const isMobile = useIsMobile();
   return (
     <div>
       <SidebarProvider>
         <AppSidebar navItems={navItems} />
         <SidebarInset>
-          {!isMobile && <AppHeader />}
+          <AppHeader />
+
           {children}
         </SidebarInset>
-        <BottomNav navItems={navItems} className="block md:hidden" />
       </SidebarProvider>
     </div>
   );

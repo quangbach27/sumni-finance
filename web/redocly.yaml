@@ -1,0 +1,5 @@
+apis:
+  ledgers:
+    root: ../api/openapi/ledgers.yml
+    x-openapi-ts:
+      output: ./src/features/generated/ledgers.gen.ts

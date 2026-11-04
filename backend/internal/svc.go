@@ -15,7 +15,7 @@ import (
 	"backend/internal/configs"
 	"backend/internal/configs/modules"
 	"backend/internal/configs/modules/contracts"
-	"backend/internal/ledger"
+	"backend/internal/ledgers"
 )
 
 type ExternalServices struct {
@@ -37,7 +37,7 @@ func New(
 ) (*Svc, error) {
 	moduleContracts := &contracts.Contracts{}
 	modules := []modules.Module{
-		ledger.NewModule(),
+		ledgers.NewModule(pgxDB),
 	}
 
 	if err := initModules(ctx, modules); err != nil {
