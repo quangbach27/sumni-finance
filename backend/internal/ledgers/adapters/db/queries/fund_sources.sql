@@ -33,3 +33,9 @@ WHERE uuid = @uuid;
 SELECT *
 FROM ledgers.fund_sources
 ORDER BY created_at DESC;
+
+-- name: ListFundSourcesByUUIDs :many
+SELECT *
+FROM ledgers.fund_sources
+WHERE uuid = ANY(@uuids::uuid[])
+ORDER BY created_at;

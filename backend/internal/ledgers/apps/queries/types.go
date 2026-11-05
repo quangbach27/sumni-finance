@@ -1,6 +1,10 @@
 package queries
 
-import "github.com/shopspring/decimal"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type FundSource struct {
 	UUID     string
@@ -21,4 +25,17 @@ type BankDetails struct {
 	BankBin       int32
 	BankShortName string
 	AccountNumber string
+}
+
+type LedgerPeriod struct {
+	UUID           string
+	Name           string
+	OpeningBalance decimal.Decimal
+	ClosingBalance *decimal.Decimal // nil until reconciled
+	OpenDate       time.Time
+	CloseDate      time.Time
+	Status         string // "opened" | "closed" | "reconciled"
+	ReopenReason   *string
+	ReopenedAt     *time.Time
+	ReconciledAt   *time.Time
 }

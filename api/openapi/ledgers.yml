@@ -5,6 +5,7 @@ info:
 
 tags:
   - name: fund-sources
+  - name: ledger-periods
 
 paths:
   /api/v1/fund-sources:
@@ -44,6 +45,78 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods:
+    get:
+      tags: [ledger-periods]
+      operationId: listLedgerPeriods
+      summary: List ledger periods
+      description: Newest period (by open date) first.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          required: false
+          explode: false
+          schema:
+            $ref: "#/components/schemas/LedgerStatus"
+      responses:
+        "200":
+          description: A page of ledger periods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLedgerPeriodsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags: [ledger-periods]
+      operationId: openLedgerPeriod
+      summary: Open a ledger period
+      description: >
+        Opens a new period. Fails with 409 while an unlocked (not reconciled)
+        period exists. The opening balance is taken from the fund sources.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenLedgerPeriodRequest"
+      responses:
+        "201":
+          description: Ledger period opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenLedgerPeriodResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -144,6 +217,97 @@ components:
         fund_source_uuid:
           $ref: "#/components/schemas/FundSourceUUID"
 
+    LedgerPeriodUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.LedgerPeriodUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    LedgerStatus:
+      type: string
+      enum: [opened, closed, reconciled]
+      x-go-type: domain.LedgerStatus
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    PageInfo:
+      type: object
+      required: [page, page_size, total_count]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_count:
+          type: integer
+
+    LedgerPeriod:
+      type: object
+      required: [uuid, name, opening_balance, open_date, close_date, status]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/LedgerPeriodUUID"
+        name:
+          type: string
+        opening_balance:
+          $ref: "#/components/schemas/Decimal"
+        closing_balance:
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+          description: Set once the period is reconciled.
+        open_date:
+          type: string
+          format: date-time
+        close_date:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/LedgerStatus"
+        reopen_reason:
+          type: string
+        reopened_at:
+          type: string
+          format: date-time
+        reconciled_at:
+          type: string
+          format: date-time
+
+    ListLedgerPeriodsResponse:
+      type: object
+      required: [items, page_info]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerPeriod"
+        page_info:
+          $ref: "#/components/schemas/PageInfo"
+
+    OpenLedgerPeriodRequest:
+      type: object
+      required: [name, open_date, close_date, fund_source_uuids]
+      properties:
+        name:
+          type: string
+        open_date:
+          type: string
+          format: date-time
+        close_date:
+          type: string
+          format: date-time
+        fund_source_uuids:
+          type: array
+          items:
+            $ref: "#/components/schemas/FundSourceUUID"
+
+    OpenLedgerPeriodResponse:
+      type: object
+      required: [ledger_period_uuid]
+      properties:
+        ledger_period_uuid:
+          $ref: "#/components/schemas/LedgerPeriodUUID"
+
     ErrorDetail:
       type: object
       required: [error_slug, message]
@@ -194,6 +358,13 @@ components:
 
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Request conflicts with the current state
       content:
         application/json:
           schema:

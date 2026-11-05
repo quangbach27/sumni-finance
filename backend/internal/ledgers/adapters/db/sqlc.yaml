@@ -22,6 +22,31 @@ sql:
               import: "backend/internal/ledgers/domain"
               type: "FundSourceType"
 
+          - column: "ledgers.ledger_periods.uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerPeriodUUID"
+
+          - column: "ledgers.ledger_periods.status"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerStatus"
+
+          - column: "ledgers.fund_source_statements.uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceStatementUUID"
+
+          - column: "ledgers.fund_source_statements.ledger_period_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerPeriodUUID"
+
+          - column: "ledgers.fund_source_statements.fund_source_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceUUID"
+
           # Common type overrides
           - db_type: "timestamptz"
             nullable: true

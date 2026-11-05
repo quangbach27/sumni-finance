@@ -24,3 +24,29 @@ type LedgersFundSource struct {
 	AccountNumber *string
 	CreatedAt     time.Time
 }
+
+type LedgersFundSourceStatement struct {
+	Uuid             domain.FundSourceStatementUUID
+	LedgerPeriodUuid domain.LedgerPeriodUUID
+	FundSourceUuid   domain.FundSourceUUID
+	OpeningBalance   decimal.Decimal
+	ClosingBalance   *decimal.Decimal
+	ActualBalance    *decimal.Decimal
+	ReconciledBy     *string
+	ReconciledAt     *time.Time
+	CreatedAt        time.Time
+}
+
+type LedgersLedgerPeriod struct {
+	Uuid           domain.LedgerPeriodUUID
+	Name           string
+	OpeningBalance decimal.Decimal
+	ClosingBalance *decimal.Decimal
+	OpenDate       time.Time
+	CloseDate      time.Time
+	Status         domain.LedgerStatus
+	ReopenReason   *string
+	ReopenedAt     *time.Time
+	ReconciledAt   *time.Time
+	CreatedAt      time.Time
+}

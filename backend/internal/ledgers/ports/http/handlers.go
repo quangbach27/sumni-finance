@@ -1,15 +1,17 @@
 package http
 
 import (
+	"context"
+	"errors"
+
+	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/log"
+
 	"backend/internal/ledgers/apps/commands"
 	"backend/internal/ledgers/apps/queries"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 	"backend/internal/utils"
-	"context"
-	"errors"
-
-	common "github.com/quangbach27/golang-common"
 )
 
 type Handlers struct {
@@ -77,6 +79,71 @@ func (h *Handlers) CreateFundSource(ctx context.Context, request CreateFundSourc
 	}
 
 	return CreateFundSource201JSONResponse{FundSourceUuid: fundSourceUUID}, nil
+}
+
+func (h *Handlers) OpenLedgerPeriod(ctx context.Context, request OpenLedgerPeriodRequestObject) (OpenLedgerPeriodResponseObject, error) {
+	body := request.Body
+
+	periodUUID, err := h.commandHandlers.OpenLedgerPeriod(ctx, commands.OpenLedgerPeriod{
+		Name:            body.Name,
+		OpenDate:        body.OpenDate,
+		CloseDate:       body.CloseDate,
+		FundSourceUUIDs: body.FundSourceUuids,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return OpenLedgerPeriod201JSONResponse{LedgerPeriodUuid: periodUUID}, nil
+}
+
+func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error) {
+	params := request.Params
+
+	log.FromContext(ctx).Info("list params", "params", params)
+
+	// Missing params become zero values, which NewPageRequest turns into the defaults.
+	page, err := shared.NewPageRequest(utils.SafeDeref(params.Page, 0), utils.SafeDeref(params.PageSize, 20))
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.queryHandlers.ListLedgerPeriods(ctx, queries.ListLedgerPeriods{
+		Page:   page,
+		Status: params.Status,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]LedgerPeriod, 0, len(result.Items))
+	for _, p := range result.Items {
+		items = append(items, toAPILedgerPeriod(p))
+	}
+
+	return ListLedgerPeriods200JSONResponse{
+		Items: items,
+		PageInfo: PageInfo{
+			Page:       result.Page.Page,
+			PageSize:   result.Page.PageSize,
+			TotalCount: result.Page.TotalCount,
+		},
+	}, nil
+}
+
+func toAPILedgerPeriod(p queries.LedgerPeriod) LedgerPeriod {
+	return LedgerPeriod{
+		Uuid:           domain.LedgerPeriodUUID{UUID: common.MustUUIDFromString(p.UUID)},
+		Name:           p.Name,
+		OpeningBalance: p.OpeningBalance,
+		ClosingBalance: p.ClosingBalance,
+		OpenDate:       p.OpenDate,
+		CloseDate:      p.CloseDate,
+		Status:         common.MustEnum[domain.LedgerStatus](p.Status),
+		ReopenReason:   p.ReopenReason,
+		ReopenedAt:     p.ReopenedAt,
+		ReconciledAt:   p.ReconciledAt,
+	}
 }
 
 func (h *Handlers) ListFundSources(ctx context.Context, _ ListFundSourcesRequestObject) (ListFundSourcesResponseObject, error) {

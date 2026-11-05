@@ -69,13 +69,17 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: replace the stub with a real bank account verifier.
 	fsFactory, err := domain.NewFundSourceFactory(m.bankAccountVerifier)
 	if err != nil {
 		return err
 	}
 
-	commandHandlers, err := commands.NewHandlers(fsRepo, fsFactory)
+	periodRepo, err := db.NewLedgerPeriodRepository(m.pgxDb)
+	if err != nil {
+		return err
+	}
+
+	commandHandlers, err := commands.NewHandlers(fsRepo, periodRepo, fsFactory)
 	if err != nil {
 		return err
 	}
@@ -85,7 +89,12 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	queryHandlers, err := queries.NewHandlers(fsReadModel)
+	periodReadModel, err := db.NewLedgerPeriodReadModel(m.pgxDb)
+	if err != nil {
+		return err
+	}
+
+	queryHandlers, err := queries.NewHandlers(fsReadModel, periodReadModel)
 	if err != nil {
 		return err
 	}

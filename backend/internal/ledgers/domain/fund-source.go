@@ -1,18 +1,11 @@
 package domain
 
 import (
-	"context"
-
 	common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 
 	"backend/internal/shared"
 )
-
-type FundSourceRepository interface {
-	CreateFundSource(ctx context.Context, fundSource *FundSource) error
-	// UpdateBalance(ctx context.Context, uuid FundSourceUUID, updateFn func(*FundSource) error) error
-}
 
 type FundSourceUUID struct {
 	common.UUID

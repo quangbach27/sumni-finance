@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"backend/internal/ledgers/domain"
+	golang_common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 )
 
@@ -101,6 +102,45 @@ ORDER BY created_at DESC
 
 func (q *Queries) ListFundSources(ctx context.Context) ([]LedgersFundSource, error) {
 	rows, err := q.db.Query(ctx, listFundSources)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LedgersFundSource{}
+	for rows.Next() {
+		var i LedgersFundSource
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Name,
+			&i.Type,
+			&i.Balance,
+			&i.Currency,
+			&i.OwnerName,
+			&i.BankCode,
+			&i.BankBin,
+			&i.BankShortName,
+			&i.AccountNumber,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFundSourcesByUUIDs = `-- name: ListFundSourcesByUUIDs :many
+SELECT uuid, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
+FROM ledgers.fund_sources
+WHERE uuid = ANY($1::uuid[])
+ORDER BY created_at
+`
+
+func (q *Queries) ListFundSourcesByUUIDs(ctx context.Context, uuids []golang_common.UUID) ([]LedgersFundSource, error) {
+	rows, err := q.db.Query(ctx, listFundSourcesByUUIDs, uuids)
 	if err != nil {
 		return nil, err
 	}
