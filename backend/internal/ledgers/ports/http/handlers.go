@@ -5,6 +5,7 @@ import (
 	"backend/internal/ledgers/apps/queries"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
+	"backend/internal/utils"
 	"context"
 	"errors"
 
@@ -63,10 +64,10 @@ func (h *Handlers) CreateFundSource(ctx context.Context, request CreateFundSourc
 	// Missing bank fields become zero values (0 for bin) so the domain factory reports them.
 	if body.Type == domain.FundSourceTypeBank {
 		cmd.Bank = &commands.BankInput{
-			BankCode:      deref(body.Details.BankCode, ""),
-			BankBin:       deref(body.Details.BankBin, 0),
-			BankShortName: deref(body.Details.BankShortName, ""),
-			AccountNumber: deref(body.Details.AccountNumber, ""),
+			BankCode:      utils.SafeDeref(body.Details.BankCode, ""),
+			BankBin:       utils.SafeDeref(body.Details.BankBin, 0),
+			BankShortName: utils.SafeDeref(body.Details.BankShortName, ""),
+			AccountNumber: utils.SafeDeref(body.Details.AccountNumber, ""),
 		}
 	}
 
@@ -109,13 +110,4 @@ func toAPIFundSource(fs queries.FundSource) FundSource {
 		Currency: common.MustEnum[shared.Currency](fs.Currency),
 		Details:  details,
 	}
-}
-
-// deref returns the pointed-to value, or fallbackValue when p is nil.
-func deref[T any](p *T, fallbackValue T) T {
-	if p == nil {
-		return fallbackValue
-	}
-
-	return *p
 }

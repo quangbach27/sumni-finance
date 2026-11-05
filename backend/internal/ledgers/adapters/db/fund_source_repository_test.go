@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +17,7 @@ import (
 	"backend/internal/ledgers/adapters/db/dbmodels"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
+	"backend/internal/utils"
 )
 
 func TestFundSourceRepository_CreateFundSource(t *testing.T) {
@@ -30,7 +30,7 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 	factory, err := domain.NewFundSourceFactory(bankverifier.NewBankAccountVerifierStub())
 	require.NoError(t, err)
 
-	vnd := common.MustEnum[shared.Currency]("VND")
+	vnd := shared.CurrencyVND
 
 	t.Run("bank", func(t *testing.T) {
 		t.Parallel()
@@ -49,10 +49,10 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 			Balance:       decimal.NewFromInt(15_000_000),
 			Currency:      "VND",
 			OwnerName:     "An",
-			BankCode:      ptr("VCB"),
-			BankBin:       ptr(int32(970436)),
-			BankShortName: ptr("Vietcombank"),
-			AccountNumber: ptr("123456"),
+			BankCode:      utils.Ptr("VCB"),
+			BankBin:       utils.Ptr(int32(970436)),
+			BankShortName: utils.Ptr("Vietcombank"),
+			AccountNumber: utils.Ptr("123456"),
 		}
 		assertFundSourceRow(t, ctx, fs.UUID(), want)
 	})
@@ -78,8 +78,6 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 		assertFundSourceRow(t, ctx, fs.UUID(), want)
 	})
 }
-
-func ptr[T any](v T) *T { return &v }
 
 // assertFundSourceRow compares the stored row with want; created_at is set by the database, so it is ignored.
 func assertFundSourceRow(t *testing.T, ctx context.Context, id domain.FundSourceUUID, want dbmodels.LedgersFundSource) {

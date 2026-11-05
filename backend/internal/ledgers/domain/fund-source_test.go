@@ -3,7 +3,6 @@ package domain_test
 import (
 	"testing"
 
-	common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +17,7 @@ func newFundSource(t *testing.T, balance int64) *domain.FundSource {
 	f, _ := newFactory(t)
 	details, err := f.CreateCashDetails("An")
 	require.NoError(t, err)
-	fs, err := f.CreateFundSource("An - Cash", decimal.NewFromInt(balance), common.MustEnum[shared.Currency]("VND"), details)
+	fs, err := f.CreateFundSource("An - Cash", decimal.NewFromInt(balance), shared.CurrencyVND, details)
 	require.NoError(t, err)
 
 	return fs

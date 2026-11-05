@@ -14,10 +14,9 @@ import (
 	"backend/internal/ledgers/domain"
 	ledgersClients "backend/internal/ledgers/ports/http/clients"
 	"backend/internal/shared"
+	apputils "backend/internal/utils"
 	"backend/tests/utils"
 )
-
-func ptr[T any](v T) *T { return &v }
 
 // newUserToken registers a session for a fresh user and returns its bearer token.
 func newUserToken() string {
@@ -38,17 +37,17 @@ func createFundSource(
 		Name:         "fund-source-" + common.NewUUIDv7().String(),
 		Type:         fsType,
 		StartBalance: decimal.NewFromInt(1_000_000),
-		Currency:     common.MustEnum[shared.Currency]("VND"),
+		Currency:     shared.CurrencyVND,
 	}
 
 	switch fsType {
 	case domain.FundSourceTypeBank:
 		body.Details = ledgersClients.FundSourceDetails{
 			OwnerName:     "An",
-			BankCode:      ptr("VCB"),
-			BankBin:       ptr(int32(970436)),
-			BankShortName: ptr("Vietcombank"),
-			AccountNumber: ptr("123456789"),
+			BankCode:      apputils.Ptr("VCB"),
+			BankBin:       apputils.Ptr(int32(970436)),
+			BankShortName: apputils.Ptr("Vietcombank"),
+			AccountNumber: apputils.Ptr("123456789"),
 		}
 	case domain.FundSourceTypeCash:
 		body.Details = ledgersClients.FundSourceDetails{OwnerName: "An"}

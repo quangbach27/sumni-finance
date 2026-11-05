@@ -146,7 +146,7 @@ func TestCreateFundSource(t *testing.T) {
 	f, _ := newFactory(t)
 	cash, err := f.CreateCashDetails("An")
 	require.NoError(t, err)
-	vnd := common.MustEnum[shared.Currency]("VND")
+	vnd := shared.CurrencyVND
 
 	tests := []struct {
 		name     string
@@ -245,7 +245,7 @@ func TestCreateFundSource_TrimsName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "An", cash.OwnerName())
 
-	fs, err := f.CreateFundSource("  Wallet ", decimal.Zero, common.MustEnum[shared.Currency]("VND"), cash)
+	fs, err := f.CreateFundSource("  Wallet ", decimal.Zero, shared.CurrencyVND, cash)
 	require.NoError(t, err)
 	assert.Equal(t, "Wallet", fs.Name())
 }

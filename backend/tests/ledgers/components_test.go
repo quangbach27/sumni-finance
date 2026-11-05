@@ -6,7 +6,6 @@ import (
 	"context"
 	"testing"
 
-	common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +46,7 @@ func TestCreateFundSource(t *testing.T) {
 				Name:         "unauthenticated",
 				Type:         domain.FundSourceTypeCash,
 				StartBalance: decimal.Zero,
-				Currency:     common.MustEnum[shared.Currency]("VND"),
+				Currency:     shared.CurrencyVND,
 				Details:      ledgersClients.FundSourceDetails{OwnerName: "An"},
 			},
 		)
@@ -59,7 +58,7 @@ func TestCreateFundSource(t *testing.T) {
 func TestCreateFundSource_Validation(t *testing.T) {
 	t.Parallel()
 
-	vnd := common.MustEnum[shared.Currency]("VND")
+	vnd := shared.CurrencyVND
 
 	tests := []struct {
 		name      string
