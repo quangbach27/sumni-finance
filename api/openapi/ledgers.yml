@@ -120,6 +120,46 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/ledger-periods/{ledger_period_uuid}/entries:
+    post:
+      tags: [ledger-periods]
+      operationId: postLedgerEntries
+      summary: Post ledger entries
+      description: >
+        Posts many entries of one period at once, all or nothing. Each entry is
+        applied to its fund source (inflow tops up, outflow withdraws) and
+        stores the fund source balance before and after. Fails with 409 when the
+        period is not opened.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostLedgerEntriesRequest"
+      responses:
+        "201":
+          description: Ledger entries posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostLedgerEntriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   schemas:
     FundSourceUUID:
@@ -307,6 +347,64 @@ components:
       properties:
         ledger_period_uuid:
           $ref: "#/components/schemas/LedgerPeriodUUID"
+
+    LedgerEntryUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.LedgerEntryUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    CategoryUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.CategoryUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    Direction:
+      type: string
+      enum: [inflow, outflow]
+      x-go-type: shared.Direction
+      x-go-type-import:
+        path: backend/internal/shared
+
+    LedgerEntryInput:
+      type: object
+      required: [fund_source_uuid, amount, direction, description, occurred_at]
+      properties:
+        fund_source_uuid:
+          $ref: "#/components/schemas/FundSourceUUID"
+        amount:
+          $ref: "#/components/schemas/Decimal"
+        direction:
+          $ref: "#/components/schemas/Direction"
+        description:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        category_uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+
+    PostLedgerEntriesRequest:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntryInput"
+
+    PostLedgerEntriesResponse:
+      type: object
+      required: [ledger_entry_uuids]
+      properties:
+        ledger_entry_uuids:
+          description: In the order of the request entries.
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntryUUID"
 
     ErrorDetail:
       type: object

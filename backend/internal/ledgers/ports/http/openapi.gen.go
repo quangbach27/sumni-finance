@@ -19,6 +19,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// CategoryUUID defines model for CategoryUUID.
+type CategoryUUID = domain.CategoryUUID
+
 // CreateFundSourceRequest defines model for CreateFundSourceRequest.
 type CreateFundSourceRequest struct {
 	Currency     Currency          `json:"currency"`
@@ -38,6 +41,9 @@ type Currency = shared.Currency
 
 // Decimal defines model for Decimal.
 type Decimal = decimal.Decimal
+
+// Direction defines model for Direction.
+type Direction = shared.Direction
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
@@ -85,6 +91,19 @@ type FundSourceType = domain.FundSourceType
 
 // FundSourceUUID defines model for FundSourceUUID.
 type FundSourceUUID = domain.FundSourceUUID
+
+// LedgerEntryInput defines model for LedgerEntryInput.
+type LedgerEntryInput struct {
+	Amount         Decimal        `json:"amount"`
+	CategoryUuid   *CategoryUUID  `json:"category_uuid,omitempty"`
+	Description    string         `json:"description"`
+	Direction      Direction      `json:"direction"`
+	FundSourceUuid FundSourceUUID `json:"fund_source_uuid"`
+	OccurredAt     time.Time      `json:"occurred_at"`
+}
+
+// LedgerEntryUUID defines model for LedgerEntryUUID.
+type LedgerEntryUUID = domain.LedgerEntryUUID
 
 // LedgerPeriod defines model for LedgerPeriod.
 type LedgerPeriod struct {
@@ -139,6 +158,17 @@ type PageInfo struct {
 	TotalCount int `json:"total_count"`
 }
 
+// PostLedgerEntriesRequest defines model for PostLedgerEntriesRequest.
+type PostLedgerEntriesRequest struct {
+	Entries []LedgerEntryInput `json:"entries"`
+}
+
+// PostLedgerEntriesResponse defines model for PostLedgerEntriesResponse.
+type PostLedgerEntriesResponse struct {
+	// LedgerEntryUuids In the order of the request entries.
+	LedgerEntryUuids []LedgerEntryUUID `json:"ledger_entry_uuids"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -167,6 +197,9 @@ type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
 // OpenLedgerPeriodJSONRequestBody defines body for OpenLedgerPeriod for application/json ContentType.
 type OpenLedgerPeriodJSONRequestBody = OpenLedgerPeriodRequest
 
+// PostLedgerEntriesJSONRequestBody defines body for PostLedgerEntries for application/json ContentType.
+type PostLedgerEntriesJSONRequestBody = PostLedgerEntriesRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ListFundSources List fund sources
@@ -181,6 +214,9 @@ type ServerInterface interface {
 	// OpenLedgerPeriod Open a ledger period
 	// (POST /api/v1/ledger-periods)
 	OpenLedgerPeriod(ctx *echo.Context) error
+	// PostLedgerEntries Post ledger entries
+	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/entries)
+	PostLedgerEntries(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -247,6 +283,22 @@ func (w *ServerInterfaceWrapper) OpenLedgerPeriod(ctx *echo.Context) error {
 	return err
 }
 
+// PostLedgerEntries converts echo context to params.
+func (w *ServerInterfaceWrapper) PostLedgerEntries(ctx *echo.Context) error {
+	var err error
+	// ------------- Path parameter "ledger_period_uuid" -------------
+	var ledgerPeriodUuid LedgerPeriodUUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ledger_period_uuid", ctx.Param("ledger_period_uuid"), &ledgerPeriodUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter ledger_period_uuid: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PostLedgerEntries(ctx, ledgerPeriodUuid)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -298,6 +350,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/api/v1/fund-sources", wrapper.CreateFundSource, options.OperationMiddlewares["createFundSource"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods", wrapper.ListLedgerPeriods, options.OperationMiddlewares["listLedgerPeriods"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods", wrapper.OpenLedgerPeriod, options.OperationMiddlewares["openLedgerPeriod"]...)
+	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/entries", wrapper.PostLedgerEntries, options.OperationMiddlewares["postLedgerEntries"]...)
 
 }
 
@@ -588,6 +641,101 @@ func (response OpenLedgerPeriod500JSONResponse) VisitOpenLedgerPeriodResponse(w 
 	return err
 }
 
+type PostLedgerEntriesRequestObject struct {
+	LedgerPeriodUuid LedgerPeriodUUID `json:"ledger_period_uuid"`
+	Body             *PostLedgerEntriesJSONRequestBody
+}
+
+type PostLedgerEntriesResponseObject interface {
+	VisitPostLedgerEntriesResponse(w http.ResponseWriter) error
+}
+
+type PostLedgerEntries201JSONResponse PostLedgerEntriesResponse
+
+func (response PostLedgerEntries201JSONResponse) VisitPostLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostLedgerEntries400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response PostLedgerEntries400JSONResponse) VisitPostLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostLedgerEntries401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response PostLedgerEntries401JSONResponse) VisitPostLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostLedgerEntries404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response PostLedgerEntries404JSONResponse) VisitPostLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostLedgerEntries409JSONResponse struct{ ConflictJSONResponse }
+
+func (response PostLedgerEntries409JSONResponse) VisitPostLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostLedgerEntries500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response PostLedgerEntries500JSONResponse) VisitPostLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListFundSources List fund sources
@@ -602,6 +750,9 @@ type StrictServerInterface interface {
 	// OpenLedgerPeriod Open a ledger period
 	// (POST /api/v1/ledger-periods)
 	OpenLedgerPeriod(ctx context.Context, request OpenLedgerPeriodRequestObject) (OpenLedgerPeriodResponseObject, error)
+	// PostLedgerEntries Post ledger entries
+	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/entries)
+	PostLedgerEntries(ctx context.Context, request PostLedgerEntriesRequestObject) (PostLedgerEntriesResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx *echo.Context, request any) (any, error)
@@ -750,6 +901,54 @@ func (sh *strictHandler) OpenLedgerPeriod(ctx *echo.Context) error {
 		return err
 	} else if validResponse, ok := response.(OpenLedgerPeriodResponseObject); ok {
 		return validResponse.VisitOpenLedgerPeriodResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PostLedgerEntries operation middleware
+func (sh *strictHandler) PostLedgerEntries(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error {
+	var request PostLedgerEntriesRequestObject
+
+	request.LedgerPeriodUuid = ledgerPeriodUuid
+
+	var body PostLedgerEntriesJSONRequestBody
+	var err error
+	if _, ok := ctx.Echo().Binder.(*echo.DefaultBinder); ok {
+		// A request validator built on kin-openapi's openapi3filter with
+		// KeepValidatedValue leaves the value it validated on the body. Bind
+		// that value, matching member names exactly, so the handler receives
+		// what was validated instead of a second, case-insensitive decode.
+		// Otherwise bind only the request body, so that path and query
+		// parameters are not also bound into the body struct.
+		if vb, ok := ctx.Request().Body.(interface{ ValidatedValue() any }); !ok || runtime.BindJSONValue(vb.ValidatedValue(), &body) != nil {
+			err = echo.BindBody(ctx, &body)
+		}
+	} else {
+		// A custom binder is installed on the Echo instance; defer to it
+		// entirely, since echo.Binder does not expose body-only binding and
+		// the binder may do more than decode (for example call ctx.Validate).
+		err = ctx.Bind(&body)
+	}
+	if err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PostLedgerEntries(ctx.Request().Context(), request.(PostLedgerEntriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostLedgerEntries")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PostLedgerEntriesResponseObject); ok {
+		return validResponse.VisitPostLedgerEntriesResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

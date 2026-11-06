@@ -49,11 +49,44 @@ func ledgerPeriodToCreateParams(p *domain.LedgerPeriod) dbmodels.CreateLedgerPer
 	}
 }
 
-func fundSourceStatementToCreateParams(s *domain.FundSourceStatement) dbmodels.CreateFundSourceStatementParams {
-	return dbmodels.CreateFundSourceStatementParams{
+func fundSourceStatementToInsertParams(s *domain.FundSourceStatement) dbmodels.InsertFundSourceStatementsParams {
+	return dbmodels.InsertFundSourceStatementsParams{
 		Uuid:             s.UUID(),
 		LedgerPeriodUuid: s.LedgerPeriodUUID(),
 		FundSourceUuid:   s.FundSourceUUID(),
 		OpeningBalance:   s.OpeningBalance(),
+	}
+}
+
+// ledgerPeriodToDomain rebuilds a ledger period from a row (trusted, no validation).
+func ledgerPeriodToDomain(row dbmodels.LedgersLedgerPeriod) *domain.LedgerPeriod {
+	return domain.UnmarshalLedgerPeriod(
+		row.Uuid,
+		row.Name,
+		row.OpeningBalance,
+		row.ClosingBalance,
+		row.OpenDate,
+		row.CloseDate,
+		row.Status,
+		row.ReopenReason,
+		row.ReopenedAt,
+		row.ReconciledAt,
+	)
+}
+
+func ledgerEntryToInsertParams(e *domain.LedgerEntry) dbmodels.InsertLedgerEntriesParams {
+	return dbmodels.InsertLedgerEntriesParams{
+		Uuid:             e.UUID(),
+		LedgerPeriodUuid: e.LedgerPeriodUUID(),
+		FundSourceUuid:   e.FundSourceUUID(),
+		Amount:           e.Amount(),
+		Direction:        e.Direction(),
+		Description:      e.Description(),
+		OccurredAt:       e.OccurredAt(),
+		CategoryUuid:     e.CategoryUUID(),
+		FsBalanceBefore:  e.FundSourceBalanceBefore(),
+		FsBalanceAfter:   e.FundSourceBalanceAfter(),
+		Status:           e.Status(),
+		Kind:             e.Kind(),
 	}
 }

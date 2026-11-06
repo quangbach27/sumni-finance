@@ -21,6 +21,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// CategoryUUID defines model for CategoryUUID.
+type CategoryUUID = domain.CategoryUUID
+
 // CreateFundSourceRequest defines model for CreateFundSourceRequest.
 type CreateFundSourceRequest struct {
 	Currency     Currency          `json:"currency"`
@@ -40,6 +43,9 @@ type Currency = shared.Currency
 
 // Decimal defines model for Decimal.
 type Decimal = decimal.Decimal
+
+// Direction defines model for Direction.
+type Direction = shared.Direction
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
@@ -87,6 +93,19 @@ type FundSourceType = domain.FundSourceType
 
 // FundSourceUUID defines model for FundSourceUUID.
 type FundSourceUUID = domain.FundSourceUUID
+
+// LedgerEntryInput defines model for LedgerEntryInput.
+type LedgerEntryInput struct {
+	Amount         Decimal        `json:"amount"`
+	CategoryUuid   *CategoryUUID  `json:"category_uuid,omitempty"`
+	Description    string         `json:"description"`
+	Direction      Direction      `json:"direction"`
+	FundSourceUuid FundSourceUUID `json:"fund_source_uuid"`
+	OccurredAt     time.Time      `json:"occurred_at"`
+}
+
+// LedgerEntryUUID defines model for LedgerEntryUUID.
+type LedgerEntryUUID = domain.LedgerEntryUUID
 
 // LedgerPeriod defines model for LedgerPeriod.
 type LedgerPeriod struct {
@@ -141,6 +160,17 @@ type PageInfo struct {
 	TotalCount int `json:"total_count"`
 }
 
+// PostLedgerEntriesRequest defines model for PostLedgerEntriesRequest.
+type PostLedgerEntriesRequest struct {
+	Entries []LedgerEntryInput `json:"entries"`
+}
+
+// PostLedgerEntriesResponse defines model for PostLedgerEntriesResponse.
+type PostLedgerEntriesResponse struct {
+	// LedgerEntryUuids In the order of the request entries.
+	LedgerEntryUuids []LedgerEntryUUID `json:"ledger_entry_uuids"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -168,6 +198,9 @@ type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
 
 // OpenLedgerPeriodJSONRequestBody defines body for OpenLedgerPeriod for application/json ContentType.
 type OpenLedgerPeriodJSONRequestBody = OpenLedgerPeriodRequest
+
+// PostLedgerEntriesJSONRequestBody defines body for PostLedgerEntries for application/json ContentType.
+type PostLedgerEntriesJSONRequestBody = PostLedgerEntriesRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -286,6 +319,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
 	OpenLedgerPeriod(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerEntriesWithBody Post ledger entries
+	//
+	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntriesWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerEntries Post ledger entries
+	//
+	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntries(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListFundSources List fund sources
@@ -382,6 +433,44 @@ func (c *Client) OpenLedgerPeriodWithBody(ctx context.Context, contentType strin
 // Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
 func (c *Client) OpenLedgerPeriod(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewOpenLedgerPeriodRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerEntriesWithBody Post ledger entries
+//
+// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *Client) PostLedgerEntriesWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerEntriesRequestWithBody(c.Server, ledgerPeriodUuid, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerEntries Post ledger entries
+//
+// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *Client) PostLedgerEntries(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerEntriesRequest(c.Server, ledgerPeriodUuid, body)
 	if err != nil {
 		return nil, err
 	}
@@ -577,6 +666,53 @@ func NewOpenLedgerPeriodRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewPostLedgerEntriesRequest calls the generic PostLedgerEntries builder with application/json body
+func NewPostLedgerEntriesRequest(server string, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostLedgerEntriesRequestWithBody(server, ledgerPeriodUuid, "application/json", bodyReader)
+}
+
+// NewPostLedgerEntriesRequestWithBody constructs an http.Request for the PostLedgerEntries method, with any body, and a specified content type
+func NewPostLedgerEntriesRequestWithBody(server string, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/entries", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -668,6 +804,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
 	OpenLedgerPeriodWithResponse(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*OpenLedgerPeriodClientResponse, error)
+
+	// PostLedgerEntriesWithBodyWithResponse Post ledger entries
+	//
+	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntriesWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error)
+
+	// PostLedgerEntriesWithResponse Post ledger entries
+	//
+	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntriesWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error)
 }
 
 type ListFundSourcesClientResponse struct {
@@ -925,6 +1079,82 @@ func (r OpenLedgerPeriodClientResponse) ContentType() string {
 	return ""
 }
 
+type PostLedgerEntriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *PostLedgerEntriesResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON201() *PostLedgerEntriesResponse {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostLedgerEntriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostLedgerEntriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostLedgerEntriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostLedgerEntriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListFundSourcesWithResponse List fund sources
 //
 // Returns a wrapper object for the known response body format(s).
@@ -1007,6 +1237,36 @@ func (c *ClientWithResponses) OpenLedgerPeriodWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseOpenLedgerPeriodClientResponse(rsp)
+}
+
+// PostLedgerEntriesWithBodyWithResponse Post ledger entries
+//
+// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *ClientWithResponses) PostLedgerEntriesWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error) {
+	rsp, err := c.PostLedgerEntriesWithBody(ctx, ledgerPeriodUuid, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerEntriesClientResponse(rsp)
+}
+
+// PostLedgerEntriesWithResponse Post ledger entries
+//
+// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *ClientWithResponses) PostLedgerEntriesWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error) {
+	rsp, err := c.PostLedgerEntries(ctx, ledgerPeriodUuid, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerEntriesClientResponse(rsp)
 }
 
 // ParseListFundSourcesClientResponse parses an HTTP response from a ListFundSourcesWithResponse call
@@ -1159,6 +1419,67 @@ func ParseOpenLedgerPeriodClientResponse(rsp *http.Response) (*OpenLedgerPeriodC
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest OpenLedgerPeriodResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostLedgerEntriesClientResponse parses an HTTP response from a PostLedgerEntriesWithResponse call
+func ParsePostLedgerEntriesClientResponse(rsp *http.Response) (*PostLedgerEntriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostLedgerEntriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest PostLedgerEntriesResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

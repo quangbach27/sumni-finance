@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 
 	"backend/internal/shared"
@@ -42,4 +44,28 @@ func UnmarshalBankDetails(
 
 func UnmarshalCashDetails(ownerName string) *CashDetails {
 	return &CashDetails{ownerName: ownerName}
+}
+
+func UnmarshalLedgerPeriod(
+	uuid LedgerPeriodUUID,
+	name string,
+	openingBalance decimal.Decimal,
+	closingBalance *decimal.Decimal,
+	openDate, closeDate time.Time,
+	status LedgerStatus,
+	reopenReason *string,
+	reopenedAt, reconciledAt *time.Time,
+) *LedgerPeriod {
+	return &LedgerPeriod{
+		uuid:           uuid,
+		name:           name,
+		openingBalance: openingBalance,
+		closingBalance: closingBalance,
+		openDate:       openDate,
+		closeDate:      closeDate,
+		status:         status,
+		reopenReason:   reopenReason,
+		reopenedAt:     reopenedAt,
+		reconciledAt:   reconciledAt,
+	}
 }

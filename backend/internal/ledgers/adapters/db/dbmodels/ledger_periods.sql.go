@@ -26,38 +26,6 @@ func (q *Queries) CountLedgerPeriods(ctx context.Context, status *string) (int64
 	return count, err
 }
 
-const createFundSourceStatement = `-- name: CreateFundSourceStatement :exec
-INSERT INTO ledgers.fund_source_statements (
-    uuid,
-    ledger_period_uuid,
-    fund_source_uuid,
-    opening_balance
-)
-VALUES (
-    $1,
-    $2,
-    $3,
-    $4
-)
-`
-
-type CreateFundSourceStatementParams struct {
-	Uuid             domain.FundSourceStatementUUID
-	LedgerPeriodUuid domain.LedgerPeriodUUID
-	FundSourceUuid   domain.FundSourceUUID
-	OpeningBalance   decimal.Decimal
-}
-
-func (q *Queries) CreateFundSourceStatement(ctx context.Context, arg CreateFundSourceStatementParams) error {
-	_, err := q.db.Exec(ctx, createFundSourceStatement,
-		arg.Uuid,
-		arg.LedgerPeriodUuid,
-		arg.FundSourceUuid,
-		arg.OpeningBalance,
-	)
-	return err
-}
-
 const createLedgerPeriod = `-- name: CreateLedgerPeriod :exec
 INSERT INTO ledgers.ledger_periods (
     uuid,
@@ -111,6 +79,38 @@ func (q *Queries) ExistsUnlockedLedgerPeriod(ctx context.Context) (bool, error) 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const getLedgerPeriodByUUID = `-- name: GetLedgerPeriodByUUID :one
+SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at
+FROM ledgers.ledger_periods
+WHERE uuid = $1
+`
+
+func (q *Queries) GetLedgerPeriodByUUID(ctx context.Context, uuid domain.LedgerPeriodUUID) (LedgersLedgerPeriod, error) {
+	row := q.db.QueryRow(ctx, getLedgerPeriodByUUID, uuid)
+	var i LedgersLedgerPeriod
+	err := row.Scan(
+		&i.Uuid,
+		&i.Name,
+		&i.OpeningBalance,
+		&i.ClosingBalance,
+		&i.OpenDate,
+		&i.CloseDate,
+		&i.Status,
+		&i.ReopenReason,
+		&i.ReopenedAt,
+		&i.ReconciledAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+type InsertFundSourceStatementsParams struct {
+	Uuid             domain.FundSourceStatementUUID
+	LedgerPeriodUuid domain.LedgerPeriodUUID
+	FundSourceUuid   domain.FundSourceUUID
+	OpeningBalance   decimal.Decimal
 }
 
 const listLedgerPeriods = `-- name: ListLedgerPeriods :many

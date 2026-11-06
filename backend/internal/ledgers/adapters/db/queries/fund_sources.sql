@@ -39,3 +39,16 @@ SELECT *
 FROM ledgers.fund_sources
 WHERE uuid = ANY(@uuids::uuid[])
 ORDER BY created_at;
+
+-- name: ListFundSourcesByUUIDsInPeriod :many
+SELECT fs.*
+FROM ledgers.fund_sources fs
+JOIN ledgers.fund_source_statements st ON st.fund_source_uuid = fs.uuid
+WHERE st.ledger_period_uuid = @ledger_period_uuid
+  AND fs.uuid = ANY(@uuids::uuid[])
+ORDER BY fs.created_at;
+
+-- name: UpdateFundSourceBalance :batchexec
+UPDATE ledgers.fund_sources
+SET balance = @balance
+WHERE uuid = @uuid;

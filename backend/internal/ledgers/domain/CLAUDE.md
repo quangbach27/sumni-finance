@@ -17,7 +17,7 @@ A fund source is a place money is held: a **bank** account or **cash**. Fields: 
 - **Balance operations**: `TopUp(amount)` and `Withdraw(amount)` require a positive amount; `Withdraw` fails with `insufficient-balance` if it would go below zero. Both return a `FundSourceSnapshot` (fund source UUID, `Balance` before, `BalanceAfter`); on error the snapshot is zero-valued. Balance can never be negative (also enforced by DB `CHECK (balance >= 0)`). The repository's `UpdateBalance` (load-modify-save callback) is stubbed/commented out; not yet implemented.
 
 ### LedgerEntry aggregate (`domain/ledger_entry.go`)
-A ledger entry is one immutable money movement against a fund source. Fields are private; create with `NewLedgerEntry`. Fields: uuid (UUIDv7), `ledgerPeriodUUID` (required, `ledger-period-required`; `Void` copies it onto the reversal), `fundSourceUUID`, amount, direction (`shared.Direction`: inflow | outflow), description, `occurredAt` (when the transaction happened), optional `categoryUUID` / `subCategoryUUID`, status, kind, and link/void fields.
+A ledger entry is one immutable money movement against a fund source. Fields are private; create with `NewLedgerEntry`. Fields: uuid (UUIDv7), `ledgerPeriodUUID` (required, `ledger-period-required`; `Void` copies it onto the reversal), `fundSourceUUID`, amount, direction (`shared.Direction`: inflow | outflow), description, `occurredAt` (when the transaction happened), optional `categoryUUID`, status, kind, and link/void fields.
 
 - **Status** (`EntryStatus`): `posted | voided`. **Kind** (`EntryKind`): `normal | reversal`.
 
@@ -27,12 +27,13 @@ A ledger entry is one immutable money movement against a fund source. Fields are
   | Voided original | voided | normal | `reversedByEntryID` → reversal, plus `voidedReason`, `voidedBy`, `voidedAt` |
   | Reversal (created by the void) | posted | reversal | `reversesEntryID` → original |
 
-- **Immutability**: entries are never edited. To fix a mistake, the user voids the entry via `Void(reason, voidedBy)`, which marks the original `voided` and returns a new reversal entry (same fund source, amount and category/sub-category; opposite direction; `occurredAt` = void time; description "Reversal of <uuid>"). Applying the entries to the fund source balance and persisting both is the command handler's job, not the aggregate's.
-- **`NewLedgerEntry` validation** (aggregated into `invalid-ledger-entry` details): `fund-source-required`, `amount-must-be-positive`, `direction-required`, `description-required` (trimmed), `occurred-at-required`, `sub-category-requires-category`.
+- **Immutability**: entries are never edited. To fix a mistake, the user voids the entry via `Void(reason, voidedBy)`, which marks the original `voided` and returns a new reversal entry (same fund source, amount and category; opposite direction; `occurredAt` = void time; description "Reversal of <uuid>"). Applying the entries to the fund source balance and persisting both is the command handler's job, not the aggregate's.
+- **`NewLedgerEntry` validation** (aggregated into `invalid-ledger-entry` details): `fund-source-required`, `amount-must-be-positive`, `direction-required`, `description-required` (trimmed), `occurred-at-required`.
 - **`Void` errors**: `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided`, and `invalid-void` details `void-reason-required` / `voided-by-required`. On error the entry is left unchanged.
 - **Status checks**: `IsVoided()` (status is voided), `IsReversed()` (a reversal has been linked), `IsReversal()` (kind is reversal).
-- **Category / sub-category**: a category has many sub-categories; the entry only stores optional IDs. A sub-category requires a category. Existence and parent/child consistency checks belong in the command handler (needs the Category aggregate). `SubCategory` itself is not modelled yet (only `SubCategoryUUID`).
-- `voidedBy` is a plain string user ID for now (no user type in the domain). Repository, use cases and HTTP API for entries are not implemented yet.
+- **Category**: the entry stores one optional `categoryUUID`. A sub-category is a category in the same tree (the relationship is two-way), so the entry needs no separate sub-category reference. Existence and tree rules belong to the Category aggregate / command handler (not modelled yet).
+- **Fund source snapshot**: each entry stores `fsBalanceBefore` / `fsBalanceAfter`, the fund source balance around it. `RecordFundSourceSnapshot(FundSourceSnapshot)` sets them once (errors `fund-source-snapshot-already-recorded`, `snapshot-fund-source-mismatch`); the command handler passes the snapshot returned by `TopUp`/`Withdraw`. This per-entry trail is why `FundSourceStatement` is not reused for it: a statement is one row per period and fund source.
+- `voidedBy` is a plain string user ID for now (no user type in the domain). Posting is implemented (see below); void is not (`LedgerPeriodRepo.VoidJournalEntry` is a stub).
 
 ### LedgerPeriod aggregate (`domain/ledger_period.go`)
 A ledger period is a book with an open date and a close date for the whole ledger. Fields: uuid, name, `openingBalance` (total, summed by the service from the period's fund sources), `closingBalance` (nil until reconciled), `openDate`, `closeDate` (both set at creation), status, `reopenReason`, `reopenedAt`, `reconciledAt`. Entries and `FundSourceStatement` reference it by `LedgerPeriodUUID`.
@@ -60,6 +61,7 @@ One fund source's balances within a period (the rows of the reconcile screen). F
 - Repositories, use cases and HTTP for periods are not implemented yet.
 
 ### Use cases
+- `PostLedgerEntries` command (`POST /api/v1/ledger-periods/{ledger_period_uuid}/entries`, body `{entries: [...]}`, 201 `ledger_entry_uuids` in request order): posts many entries of one period all or nothing. Entries are validated first (`entries-required`; `invalid-ledger-entries` with each detail's `EntityID` = entry index). `LedgerPeriodRepo.PostJournalEntries(ctx, periodUUID, fundSourceUUIDs, postFn)` runs in a serializable tx (with `commonDb` retry, so `postFn` rebuilds its entries each call): loads the period and its fund sources (404 `ledger-period-not-found`, 400 `fund-source-not-in-period`), `postFn` checks `CanPostEntries()` (409 `period-not-open`), tops up / withdraws per direction and records snapshots (`insufficient-balance` fails the batch), then entries are inserted with sqlc `:copyfrom` and balances updated with `:batchexec`. Table `ledgers.ledger_entries` (migration 00004).
 - `CreateFundSource` command: builds details by type (bank requires the `Bank` input; unknown type -> `unsupported-type`), then the aggregate, then persists; returns the new UUID.
 - `ListFundSources` query: returns all fund sources via the read model (no pagination/filtering/user scoping yet).
 

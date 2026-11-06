@@ -35,15 +35,6 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 	fundSourceUUIDs []domain.FundSourceUUID,
 	createFn func(fundSources []*domain.FundSource) (*domain.LedgerPeriod, error),
 ) error {
-	if err := validateFundSourceUUIDs(fundSourceUUIDs); err != nil {
-		return err
-	}
-
-	uuids := make([]common.UUID, 0, len(fundSourceUUIDs))
-	for _, id := range fundSourceUUIDs {
-		uuids = append(uuids, id.UUID)
-	}
-
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
@@ -55,22 +46,9 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 			return common.NewConflictError("unlocked-period-exists", "an unlocked ledger period already exists")
 		}
 
-		rows, err := q.ListFundSourcesByUUIDs(ctx, uuids)
+		fundSources, err := listFundSourcesByUUIDs(ctx, q, fundSourceUUIDs)
 		if err != nil {
 			return err
-		}
-		if len(rows) != len(uuids) {
-			return common.NewNotFoundError("fund-source-not-found", "one or more fund sources were not found")
-		}
-
-		fundSources := make([]*domain.FundSource, 0, len(rows))
-		for _, row := range rows {
-			fs, err := fundSourceToDomain(row)
-			if err != nil {
-				return err
-			}
-
-			fundSources = append(fundSources, fs)
 		}
 
 		period, err := createFn(fundSources)
@@ -81,26 +59,11 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 			return errors.New("createFn returned a nil ledger period")
 		}
 
-		statements := make([]*domain.FundSourceStatement, 0, len(fundSources))
-		for _, fs := range fundSources {
-			pfs, err := domain.NewFundSourceStatement(period.UUID(), fs.UUID(), fs.Balance())
-			if err != nil {
-				return err
-			}
-
-			statements = append(statements, pfs)
-		}
-
-		if err := q.CreateLedgerPeriod(ctx, ledgerPeriodToCreateParams(period)); err != nil {
+		if err := saveLedgerPeriod(ctx, q, period); err != nil {
 			return err
 		}
-		for _, pfs := range statements {
-			if err := q.CreateFundSourceStatement(ctx, fundSourceStatementToCreateParams(pfs)); err != nil {
-				return err
-			}
-		}
 
-		return nil
+		return saveFundSourceStatements(ctx, q, period, fundSources)
 	})
 	if err != nil {
 		var cerr common.Error
@@ -112,6 +75,219 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 	}
 
 	return nil
+}
+
+func (r *LedgerPeriodRepo) PostJournalEntries(
+	ctx context.Context,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+	fundSourceUUIDs []domain.FundSourceUUID,
+	postFn func(period *domain.LedgerPeriod, fundSources map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error),
+) error {
+	if ledgerPeriodUUID.IsZero() {
+		return common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+	}
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+
+		fundSources, err := listFundSourcesInPeriod(ctx, q, ledgerPeriodUUID, fundSourceUUIDs)
+		if err != nil {
+			return err
+		}
+
+		entries, err := postFn(period, fundSources)
+		if err != nil {
+			return err
+		}
+
+		if err := saveJournalEntries(ctx, q, entries); err != nil {
+			return err
+		}
+
+		return updateFundSourceBalances(ctx, q, fundSources)
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return err
+		}
+
+		return fmt.Errorf("post journal entries: %w", err)
+	}
+
+	return nil
+}
+
+func getLedgerPeriodByUUID(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+) (*domain.LedgerPeriod, error) {
+	row, err := q.GetLedgerPeriodByUUID(ctx, ledgerPeriodUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
+		}
+
+		return nil, err
+	}
+
+	return ledgerPeriodToDomain(row), nil
+}
+
+// listFundSourcesByUUIDs validates the UUIDs (not empty, not zero, no
+// duplicates) and loads the fund sources, failing if any is missing.
+func listFundSourcesByUUIDs(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	fundSourceUUIDs []domain.FundSourceUUID,
+) ([]*domain.FundSource, error) {
+	if err := validateFundSourceUUIDs(fundSourceUUIDs); err != nil {
+		return nil, err
+	}
+
+	uuids := toCommonUUIDs(fundSourceUUIDs)
+
+	rows, err := q.ListFundSourcesByUUIDs(ctx, uuids)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != len(uuids) {
+		return nil, common.NewNotFoundError("fund-source-not-found", "one or more fund sources were not found")
+	}
+
+	fundSources := make([]*domain.FundSource, 0, len(rows))
+	for _, row := range rows {
+		fs, err := fundSourceToDomain(row)
+		if err != nil {
+			return nil, err
+		}
+
+		fundSources = append(fundSources, fs)
+	}
+
+	return fundSources, nil
+}
+
+func toCommonUUIDs(ids []domain.FundSourceUUID) []common.UUID {
+	uuids := make([]common.UUID, 0, len(ids))
+	for _, id := range ids {
+		uuids = append(uuids, id.UUID)
+	}
+
+	return uuids
+}
+
+func saveLedgerPeriod(ctx context.Context, q *dbmodels.Queries, period *domain.LedgerPeriod) error {
+	return q.CreateLedgerPeriod(ctx, ledgerPeriodToCreateParams(period))
+}
+
+// saveFundSourceStatements inserts one statement per fund source, opening at
+// the fund source's current balance, in a single batch.
+func saveFundSourceStatements(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	period *domain.LedgerPeriod,
+	fundSources []*domain.FundSource,
+) error {
+	params := make([]dbmodels.InsertFundSourceStatementsParams, 0, len(fundSources))
+	for _, fs := range fundSources {
+		st, err := domain.NewFundSourceStatement(period.UUID(), fs.UUID(), fs.Balance())
+		if err != nil {
+			return err
+		}
+
+		params = append(params, fundSourceStatementToInsertParams(st))
+	}
+
+	_, err := q.InsertFundSourceStatements(ctx, params)
+
+	return err
+}
+
+// listFundSourcesInPeriod validates the UUIDs (not empty, not zero, no
+// duplicates) and loads the fund sources, failing unless each one has a
+// statement in the period.
+func listFundSourcesInPeriod(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+	fundSourceUUIDs []domain.FundSourceUUID,
+) (map[domain.FundSourceUUID]*domain.FundSource, error) {
+	if err := validateFundSourceUUIDs(fundSourceUUIDs); err != nil {
+		return nil, err
+	}
+
+	uuids := toCommonUUIDs(fundSourceUUIDs)
+
+	rows, err := q.ListFundSourcesByUUIDsInPeriod(ctx, dbmodels.ListFundSourcesByUUIDsInPeriodParams{
+		LedgerPeriodUuid: ledgerPeriodUUID,
+		Uuids:            uuids,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != len(uuids) {
+		return nil, common.NewInvalidInputError("fund-source-not-in-period", "one or more fund sources do not belong to the ledger period")
+	}
+
+	fundSources := make(map[domain.FundSourceUUID]*domain.FundSource, len(rows))
+	for _, row := range rows {
+		fs, err := fundSourceToDomain(row)
+		if err != nil {
+			return nil, err
+		}
+
+		fundSources[fs.UUID()] = fs
+	}
+
+	return fundSources, nil
+}
+
+// saveJournalEntries inserts the entries. Each entry must have its fund source
+// snapshot recorded.
+func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, entries []*domain.LedgerEntry) error {
+	if len(entries) == 0 {
+		return errors.New("postFn returned no ledger entries")
+	}
+
+	params := make([]dbmodels.InsertLedgerEntriesParams, 0, len(entries))
+	for _, e := range entries {
+		if e == nil {
+			return errors.New("postFn returned a nil ledger entry")
+		}
+		if !e.HasFundSourceSnapshot() {
+			return fmt.Errorf("ledger entry %s has no fund source snapshot", e.UUID().String())
+		}
+
+		params = append(params, ledgerEntryToInsertParams(e))
+	}
+
+	_, err := q.InsertLedgerEntries(ctx, params)
+
+	return err
+}
+
+func updateFundSourceBalances(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	fundSources map[domain.FundSourceUUID]*domain.FundSource,
+) error {
+	balances := make([]dbmodels.UpdateFundSourceBalanceParams, 0, len(fundSources))
+	for _, fs := range fundSources {
+		balances = append(balances, dbmodels.UpdateFundSourceBalanceParams{Balance: fs.Balance(), Uuid: fs.UUID()})
+	}
+
+	var batchErr error
+	q.UpdateFundSourceBalance(ctx, balances).Exec(func(_ int, err error) {
+		batchErr = errors.Join(batchErr, err)
+	})
+
+	return batchErr
 }
 
 func validateFundSourceUUIDs(uuids []domain.FundSourceUUID) error {
@@ -132,6 +308,18 @@ func validateFundSourceUUIDs(uuids []domain.FundSourceUUID) error {
 	}
 
 	return nil
+}
+
+// TODO: in a serializable tx, lock the entry row (FOR UPDATE), call voidFn,
+// insert the reversal entry, mark the original voided and update the fund
+// source balance.
+func (r *LedgerPeriodRepo) VoidJournalEntry(
+	ctx context.Context,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+	ledgerEntryUUID domain.LedgerEntryUUID,
+	voidFn func(period *domain.LedgerPeriod, entry *domain.LedgerEntry, fundSource *domain.FundSource) (*domain.LedgerEntry, error),
+) error {
+	return errNotImplemented
 }
 
 // TODO: lock the period row (FOR UPDATE), call Close, save.

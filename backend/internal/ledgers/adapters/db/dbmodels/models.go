@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"backend/internal/ledgers/domain"
+	"backend/internal/shared"
 	"github.com/shopspring/decimal"
 )
 
@@ -35,6 +36,27 @@ type LedgersFundSourceStatement struct {
 	ReconciledBy     *string
 	ReconciledAt     *time.Time
 	CreatedAt        time.Time
+}
+
+type LedgersLedgerEntry struct {
+	Uuid                domain.LedgerEntryUUID
+	LedgerPeriodUuid    domain.LedgerPeriodUUID
+	FundSourceUuid      domain.FundSourceUUID
+	Amount              decimal.Decimal
+	Direction           shared.Direction
+	Description         string
+	OccurredAt          time.Time
+	CategoryUuid        *domain.CategoryUUID
+	FsBalanceBefore     decimal.Decimal
+	FsBalanceAfter      decimal.Decimal
+	Status              domain.EntryStatus
+	Kind                domain.EntryKind
+	ReversedByEntryUuid *domain.LedgerEntryUUID
+	ReversesEntryUuid   *domain.LedgerEntryUUID
+	VoidedReason        *string
+	VoidedBy            *string
+	VoidedAt            *time.Time
+	CreatedAt           time.Time
 }
 
 type LedgersLedgerPeriod struct {

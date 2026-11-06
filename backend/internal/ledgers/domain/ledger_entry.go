@@ -54,8 +54,13 @@ type LedgerEntry struct {
 	description string
 	occurredAt  time.Time
 
-	categoryUUID    *CategoryUUID
-	subCategoryUUID *SubCategoryUUID
+	categoryUUID *CategoryUUID
+
+	// fund source balance around this entry, recorded when the entry is
+	// applied to the fund source
+	fsBalanceBefore           decimal.Decimal
+	fsBalanceAfter            decimal.Decimal
+	fsBalanceSnapshotRecorded bool
 
 	status EntryStatus
 	kind   EntryKind
@@ -78,7 +83,6 @@ func NewLedgerEntry(
 	description string,
 	occurredAt time.Time,
 	categoryUUID *CategoryUUID,
-	subCategoryUUID *SubCategoryUUID,
 ) (*LedgerEntry, error) {
 	description = strings.TrimSpace(description)
 
@@ -109,9 +113,6 @@ func NewLedgerEntry(
 	if occurredAt.IsZero() {
 		add("occurred-at-required", "occurred at is required")
 	}
-	if subCategoryUUID != nil && categoryUUID == nil {
-		add("sub-category-requires-category", "sub-category requires a category")
-	}
 	if len(errDetails) > 0 {
 		return nil, common.NewInvalidInputError("invalid-ledger-entry", "invalid ledger entry").WithDetails(errDetails)
 	}
@@ -125,7 +126,6 @@ func NewLedgerEntry(
 		description:      description,
 		occurredAt:       occurredAt,
 		categoryUUID:     categoryUUID,
-		subCategoryUUID:  subCategoryUUID,
 		status:           EntryStatusPosted,
 		kind:             EntryKindNormal,
 	}, nil
@@ -139,7 +139,6 @@ func (e *LedgerEntry) Direction() shared.Direction         { return e.direction 
 func (e *LedgerEntry) Description() string                 { return e.description }
 func (e *LedgerEntry) OccurredAt() time.Time               { return e.occurredAt }
 func (e *LedgerEntry) CategoryUUID() *CategoryUUID         { return e.categoryUUID }
-func (e *LedgerEntry) SubCategoryUUID() *SubCategoryUUID   { return e.subCategoryUUID }
 func (e *LedgerEntry) Status() EntryStatus                 { return e.status }
 func (e *LedgerEntry) Kind() EntryKind                     { return e.kind }
 func (e *LedgerEntry) ReversedByEntryID() *LedgerEntryUUID { return e.reversedByEntryID }
@@ -147,6 +146,32 @@ func (e *LedgerEntry) ReversesEntryID() *LedgerEntryUUID   { return e.reversesEn
 func (e *LedgerEntry) VoidedReason() *string               { return e.voidedReason }
 func (e *LedgerEntry) VoidedBy() *string                   { return e.voidedBy }
 func (e *LedgerEntry) VoidedAt() *time.Time                { return e.voidedAt }
+
+func (e *LedgerEntry) FundSourceBalanceBefore() decimal.Decimal { return e.fsBalanceBefore }
+func (e *LedgerEntry) FundSourceBalanceAfter() decimal.Decimal  { return e.fsBalanceAfter }
+
+// HasFundSourceSnapshot reports whether the fund source balance snapshot was recorded.
+func (e *LedgerEntry) HasFundSourceSnapshot() bool { return e.fsBalanceSnapshotRecorded }
+
+// RecordFundSourceSnapshot stores the fund source balance before and after this
+// entry was applied. It can be recorded once, and only for the entry's own fund source.
+func (e *LedgerEntry) RecordFundSourceSnapshot(snapshot FundSourceSnapshot) error {
+	if e.fsBalanceSnapshotRecorded {
+		return common.NewInvalidInputError("fund-source-snapshot-already-recorded", "fund source snapshot is already recorded")
+	}
+	if snapshot.FundSourceUUID != e.fundSourceUUID {
+		return common.NewInvalidInputError("snapshot-fund-source-mismatch", "snapshot belongs to a different fund source")
+	}
+
+	e.fsBalanceBefore = snapshot.Balance
+	e.fsBalanceAfter = snapshot.BalanceAfter
+	e.fsBalanceSnapshotRecorded = true
+
+	return nil
+}
+
+func (e *LedgerEntry) IsInflow() bool  { return e.direction.Equal(shared.DirectionInflow.Enum) }
+func (e *LedgerEntry) IsOutflow() bool { return e.direction.Equal(shared.DirectionOutflow.Enum) }
 
 func (e *LedgerEntry) IsVoided() bool   { return e.status.Equal(EntryStatusVoided.Enum) }
 func (e *LedgerEntry) IsReversed() bool { return e.reversedByEntryID != nil }
@@ -187,7 +212,7 @@ func (e *LedgerEntry) Void(reason, voidedBy string) (*LedgerEntry, error) {
 	now := time.Now().UTC()
 
 	direction := shared.DirectionInflow
-	if e.direction.Equal(shared.DirectionInflow.Enum) {
+	if e.IsInflow() {
 		direction = shared.DirectionOutflow
 	}
 
@@ -201,7 +226,6 @@ func (e *LedgerEntry) Void(reason, voidedBy string) (*LedgerEntry, error) {
 		description:      "Reversal of " + originalUUID.String(),
 		occurredAt:       now,
 		categoryUUID:     e.categoryUUID,
-		subCategoryUUID:  e.subCategoryUUID,
 		status:           EntryStatusPosted,
 		kind:             EntryKindReversal,
 		reversesEntryID:  &originalUUID,

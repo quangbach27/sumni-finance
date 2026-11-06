@@ -11,7 +11,3 @@ type Category struct {
 
 	name string
 }
-
-type SubCategoryUUID struct {
-	common.UUID
-}

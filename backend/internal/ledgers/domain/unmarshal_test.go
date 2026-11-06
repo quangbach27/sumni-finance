@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -33,4 +34,18 @@ func TestUnmarshalFundSource(t *testing.T) {
 
 	cash := domain.UnmarshalFundSource(src.UUID(), "Cash", decimal.Zero, shared.CurrencyVND, domain.UnmarshalCashDetails("An"))
 	assert.True(t, cash.Type().Equal(domain.FundSourceTypeCash.Enum))
+}
+
+func TestUnmarshalLedgerPeriod(t *testing.T) {
+	t.Parallel()
+
+	p, err := domain.NewLedgerPeriod("Nov", decimal.NewFromInt(10), time.Now(), time.Now().AddDate(0, 1, 0))
+	require.NoError(t, err)
+
+	got := domain.UnmarshalLedgerPeriod(
+		p.UUID(), p.Name(), p.OpeningBalance(), nil, p.OpenDate(), p.CloseDate(), p.Status(), nil, nil, nil,
+	)
+
+	assert.Equal(t, p, got)
+	assert.True(t, got.CanPostEntries())
 }

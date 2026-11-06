@@ -24,7 +24,7 @@ VALUES (
     @status
 );
 
--- name: CreateFundSourceStatement :exec
+-- name: InsertFundSourceStatements :copyfrom
 INSERT INTO ledgers.fund_source_statements (
     uuid,
     ledger_period_uuid,
@@ -50,3 +50,8 @@ OFFSET @page_offset;
 SELECT count(*)
 FROM ledgers.ledger_periods
 WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text);
+
+-- name: GetLedgerPeriodByUUID :one
+SELECT *
+FROM ledgers.ledger_periods
+WHERE uuid = @uuid;

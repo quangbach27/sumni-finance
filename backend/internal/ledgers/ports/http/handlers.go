@@ -97,6 +97,32 @@ func (h *Handlers) OpenLedgerPeriod(ctx context.Context, request OpenLedgerPerio
 	return OpenLedgerPeriod201JSONResponse{LedgerPeriodUuid: periodUUID}, nil
 }
 
+func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntriesRequestObject) (PostLedgerEntriesResponseObject, error) {
+	body := request.Body
+
+	entries := make([]commands.LedgerEntryInput, 0, len(body.Entries))
+	for _, e := range body.Entries {
+		entries = append(entries, commands.LedgerEntryInput{
+			FundSourceUUID:  e.FundSourceUuid,
+			Amount:          e.Amount,
+			Direction:       e.Direction,
+			Description:     e.Description,
+			OccurredAt:      e.OccurredAt,
+			CategoryUUID:    e.CategoryUuid,
+		})
+	}
+
+	entryUUIDs, err := h.commandHandlers.PostLedgerEntries(ctx, commands.PostLedgerEntries{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+		Entries:          entries,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return PostLedgerEntries201JSONResponse{LedgerEntryUuids: entryUUIDs}, nil
+}
+
 func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error) {
 	params := request.Params
 

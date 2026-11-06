@@ -23,7 +23,9 @@ import (
 func resetPeriods(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	_, err := pgxDb.Exec(ctx, "DELETE FROM ledgers.fund_source_statements")
+	_, err := pgxDb.Exec(ctx, "DELETE FROM ledgers.ledger_entries")
+	require.NoError(t, err)
+	_, err = pgxDb.Exec(ctx, "DELETE FROM ledgers.fund_source_statements")
 	require.NoError(t, err)
 	_, err = pgxDb.Exec(ctx, "DELETE FROM ledgers.ledger_periods")
 	require.NoError(t, err)
@@ -140,5 +142,213 @@ func TestLedgerPeriodRepo_OpenLedgerPeriod(t *testing.T) {
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "fund-source-not-found", cerr.ErrorSlug)
+	})
+}
+
+func openPeriodFor(t *testing.T, ctx context.Context, fundSources ...*domain.FundSource) *domain.LedgerPeriod {
+	t.Helper()
+
+	repo, err := ledgerdb.NewLedgerPeriodRepository(pgxDb)
+	require.NoError(t, err)
+
+	uuids := make([]domain.FundSourceUUID, 0, len(fundSources))
+	for _, fs := range fundSources {
+		uuids = append(uuids, fs.UUID())
+	}
+
+	open := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+
+	var period *domain.LedgerPeriod
+	require.NoError(t, repo.OpenLedgerPeriod(ctx, uuids, func(fss []*domain.FundSource) (*domain.LedgerPeriod, error) {
+		p, err := domain.NewLedgerPeriod("Nov", sumBalances(fss), open, open.AddDate(0, 1, -1))
+		period = p
+
+		return p, err
+	}))
+
+	return period
+}
+
+// postFn builds one entry per (fund source, direction, amount) and applies it, like the command handler.
+type entrySpec struct {
+	fs        *domain.FundSource
+	direction shared.Direction
+	amount    int64
+}
+
+func postFnFor(t *testing.T, specs []entrySpec) func(*domain.LedgerPeriod, map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {
+	t.Helper()
+
+	return func(period *domain.LedgerPeriod, fss map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {
+		entries := make([]*domain.LedgerEntry, 0, len(specs))
+		for _, s := range specs {
+			e, err := domain.NewLedgerEntry(period.UUID(), s.fs.UUID(), decimal.NewFromInt(s.amount), s.direction,
+				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), nil)
+			if err != nil {
+				return nil, err
+			}
+
+			fs := fss[s.fs.UUID()]
+
+			var snap domain.FundSourceSnapshot
+			if s.direction.Equal(shared.DirectionInflow.Enum) {
+				snap, err = fs.TopUp(e.Amount())
+			} else {
+				snap, err = fs.Withdraw(e.Amount())
+			}
+			if err != nil {
+				return nil, err
+			}
+			if err := e.RecordFundSourceSnapshot(snap); err != nil {
+				return nil, err
+			}
+
+			entries = append(entries, e)
+		}
+
+		return entries, nil
+	}
+}
+
+func fsBalance(t *testing.T, ctx context.Context, fs *domain.FundSource) decimal.Decimal {
+	t.Helper()
+
+	var b decimal.Decimal
+	require.NoError(t, pgxDb.QueryRow(ctx, "SELECT balance FROM ledgers.fund_sources WHERE uuid = $1", fs.UUID()).Scan(&b))
+
+	return b
+}
+
+func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
+	ctx := context.Background()
+	repo, err := ledgerdb.NewLedgerPeriodRepository(pgxDb)
+	require.NoError(t, err)
+
+	t.Run("stores the batch with a chained balance snapshot and updates balances", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		fs1 := createCashFundSource(t, ctx, 1_000)
+		fs2 := createCashFundSource(t, ctx, 500)
+		period := openPeriodFor(t, ctx, fs1, fs2)
+
+		specs := []entrySpec{
+			{fs1, shared.DirectionOutflow, 300},
+			{fs1, shared.DirectionInflow, 100},
+			{fs2, shared.DirectionInflow, 50},
+		}
+		require.NoError(t, repo.PostJournalEntries(ctx, period.UUID(),
+			[]domain.FundSourceUUID{fs1.UUID(), fs2.UUID()}, postFnFor(t, specs)))
+
+		assert.True(t, fsBalance(t, ctx, fs1).Equal(decimal.NewFromInt(800)))
+		assert.True(t, fsBalance(t, ctx, fs2).Equal(decimal.NewFromInt(550)))
+
+		rows, err := pgxDb.Query(ctx,
+			"SELECT fs_balance_before, fs_balance_after FROM ledgers.ledger_entries WHERE fund_source_uuid = $1 ORDER BY fs_balance_before DESC", fs1.UUID())
+		require.NoError(t, err)
+		defer rows.Close()
+
+		type pair struct{ before, after decimal.Decimal }
+		var got []pair
+		for rows.Next() {
+			var p pair
+			require.NoError(t, rows.Scan(&p.before, &p.after))
+			got = append(got, p)
+		}
+		require.Len(t, got, 2)
+		// 1000 -> 700 (outflow 300), 700 -> 800 (inflow 100)
+		assert.True(t, got[0].before.Equal(decimal.NewFromInt(1000)) && got[0].after.Equal(decimal.NewFromInt(700)))
+		assert.True(t, got[1].before.Equal(decimal.NewFromInt(700)) && got[1].after.Equal(decimal.NewFromInt(800)))
+	})
+
+	t.Run("insufficient balance rolls back the whole batch", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		fs1 := createCashFundSource(t, ctx, 1_000)
+		fs2 := createCashFundSource(t, ctx, 10)
+		period := openPeriodFor(t, ctx, fs1, fs2)
+
+		specs := []entrySpec{
+			{fs1, shared.DirectionOutflow, 100},
+			{fs2, shared.DirectionOutflow, 999},
+		}
+		err := repo.PostJournalEntries(ctx, period.UUID(),
+			[]domain.FundSourceUUID{fs1.UUID(), fs2.UUID()}, postFnFor(t, specs))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "insufficient-balance")
+
+		assert.True(t, fsBalance(t, ctx, fs1).Equal(decimal.NewFromInt(1000)))
+
+		var n int
+		require.NoError(t, pgxDb.QueryRow(ctx, "SELECT count(*) FROM ledgers.ledger_entries WHERE ledger_period_uuid = $1", period.UUID()).Scan(&n))
+		assert.Zero(t, n)
+	})
+
+	t.Run("unknown period is not found", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		fs := createCashFundSource(t, ctx, 100)
+		openPeriodFor(t, ctx, fs)
+
+		err := repo.PostJournalEntries(ctx, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()}, []domain.FundSourceUUID{fs.UUID()},
+			postFnFor(t, []entrySpec{{fs, shared.DirectionInflow, 1}}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ledger-period-not-found")
+	})
+
+	t.Run("fund source outside the period is rejected", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		inPeriod := createCashFundSource(t, ctx, 100)
+		outside := createCashFundSource(t, ctx, 100)
+		period := openPeriodFor(t, ctx, inPeriod)
+
+		err := repo.PostJournalEntries(ctx, period.UUID(), []domain.FundSourceUUID{outside.UUID()},
+			postFnFor(t, []entrySpec{{outside, shared.DirectionInflow, 1}}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "fund-source-not-in-period")
+	})
+
+	t.Run("invalid fund source list is rejected", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		fs := createCashFundSource(t, ctx, 100)
+		period := openPeriodFor(t, ctx, fs)
+		postFn := postFnFor(t, []entrySpec{{fs, shared.DirectionInflow, 1}})
+
+		cases := map[string]struct {
+			uuids []domain.FundSourceUUID
+			slug  string
+		}{
+			"empty":     {nil, "fund-sources-required"},
+			"zero":      {[]domain.FundSourceUUID{{}}, "fund-source-required"},
+			"duplicate": {[]domain.FundSourceUUID{fs.UUID(), fs.UUID()}, "duplicate-fund-source"},
+		}
+		for name, tc := range cases {
+			t.Run(name, func(t *testing.T) {
+				err := repo.PostJournalEntries(ctx, period.UUID(), tc.uuids, postFn)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.slug)
+			})
+		}
+	})
+
+	t.Run("concurrent posts keep the balance chain consistent", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		fs := createCashFundSource(t, ctx, 0)
+		period := openPeriodFor(t, ctx, fs)
+
+		const workers = 8
+		errs := make(chan error, workers)
+		for i := 0; i < workers; i++ {
+			go func() {
+				errs <- repo.PostJournalEntries(ctx, period.UUID(), []domain.FundSourceUUID{fs.UUID()},
+					postFnFor(t, []entrySpec{{fs, shared.DirectionInflow, 10}}))
+			}()
+		}
+		for i := 0; i < workers; i++ {
+			require.NoError(t, <-errs)
+		}
+
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(80)))
+
+		var distinct int
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT count(DISTINCT fs_balance_before) FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs.UUID()).Scan(&distinct))
+		assert.Equal(t, workers, distinct)
 	})
 }

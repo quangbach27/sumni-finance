@@ -22,7 +22,7 @@ func newEntry(t *testing.T) *domain.LedgerEntry {
 	cat.UUID = fs.UUID().UUID // any non-zero uuid
 	e, err := domain.NewLedgerEntry(
 		period, fs.UUID(), decimal.NewFromInt(50), shared.DirectionOutflow,
-		"  lunch  ", time.Now().Add(-time.Hour), &cat, nil,
+		"  lunch  ", time.Now().Add(-time.Hour), &cat,
 	)
 	require.NoError(t, err)
 
@@ -49,14 +49,25 @@ func TestNewLedgerEntry(t *testing.T) {
 
 	t.Run("invalid inputs", func(t *testing.T) {
 		t.Parallel()
-		sub := domain.SubCategoryUUID{}
-
 		_, err := domain.NewLedgerEntry(
 			domain.LedgerPeriodUUID{}, domain.FundSourceUUID{}, decimal.Zero, shared.Direction{},
-			"  ", time.Time{}, nil, &sub,
+			"  ", time.Time{}, nil,
 		)
 		require.Error(t, err)
 	})
+}
+
+func TestLedgerEntry_IsInflowOutflow(t *testing.T) {
+	t.Parallel()
+
+	e := newEntry(t) // outflow
+	assert.True(t, e.IsOutflow())
+	assert.False(t, e.IsInflow())
+
+	reversal, err := e.Void("mistake", "user-1")
+	require.NoError(t, err)
+	assert.True(t, reversal.IsInflow())
+	assert.False(t, reversal.IsOutflow())
 }
 
 func TestLedgerEntry_Void(t *testing.T) {
@@ -121,4 +132,63 @@ func TestLedgerEntry_Void(t *testing.T) {
 
 func newPeriodUUID() domain.LedgerPeriodUUID {
 	return domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()}
+}
+
+func TestLedgerEntry_RecordFundSourceSnapshot(t *testing.T) {
+	t.Parallel()
+
+	t.Run("records the snapshot once", func(t *testing.T) {
+		t.Parallel()
+		e := newEntry(t)
+		assert.False(t, e.HasFundSourceSnapshot())
+
+		snap := domain.FundSourceSnapshot{
+			FundSourceUUID: e.FundSourceUUID(),
+			Balance:        decimal.NewFromInt(100),
+			BalanceAfter:   decimal.NewFromInt(50),
+		}
+		require.NoError(t, e.RecordFundSourceSnapshot(snap))
+
+		assert.True(t, e.HasFundSourceSnapshot())
+		assert.True(t, e.FundSourceBalanceBefore().Equal(decimal.NewFromInt(100)))
+		assert.True(t, e.FundSourceBalanceAfter().Equal(decimal.NewFromInt(50)))
+
+		err := e.RecordFundSourceSnapshot(snap)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "fund-source-snapshot-already-recorded")
+	})
+
+	t.Run("rejects a snapshot of another fund source", func(t *testing.T) {
+		t.Parallel()
+		e := newEntry(t)
+		other := newFundSource(t, 100)
+
+		err := e.RecordFundSourceSnapshot(domain.FundSourceSnapshot{
+			FundSourceUUID: other.UUID(),
+			Balance:        decimal.NewFromInt(100),
+			BalanceAfter:   decimal.NewFromInt(50),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "snapshot-fund-source-mismatch")
+		assert.False(t, e.HasFundSourceSnapshot())
+	})
+
+	t.Run("works with the snapshot returned by Withdraw", func(t *testing.T) {
+		t.Parallel()
+		fs := newFundSource(t, 100)
+		period := newPeriodUUID()
+
+		e, err := domain.NewLedgerEntry(
+			period, fs.UUID(), decimal.NewFromInt(30), shared.DirectionOutflow,
+			"lunch", time.Now().Add(-time.Hour), nil,
+		)
+		require.NoError(t, err)
+
+		snap, err := fs.Withdraw(e.Amount())
+		require.NoError(t, err)
+		require.NoError(t, e.RecordFundSourceSnapshot(snap))
+
+		assert.True(t, e.FundSourceBalanceBefore().Equal(decimal.NewFromInt(100)))
+		assert.True(t, e.FundSourceBalanceAfter().Equal(decimal.NewFromInt(70)))
+	})
 }
