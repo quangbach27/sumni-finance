@@ -5,6 +5,7 @@ package ledgers_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	common "github.com/quangbach27/golang-common"
@@ -121,4 +122,59 @@ func requireFundSourceMatches(
 	diff := cmp.Diff(want, got)
 
 	require.Empty(t, diff)
+}
+
+// openLedgerPeriod opens a period as the user owning token and returns the raw response.
+func openLedgerPeriod(
+	t *testing.T,
+	clients *utils.TestClients,
+	token string,
+	body ledgersClients.OpenLedgerPeriodRequest,
+) *ledgersClients.OpenLedgerPeriodClientResponse {
+	t.Helper()
+
+	resp, err := clients.Ledgers.OpenLedgerPeriodWithResponse(context.Background(), body, utils.AuthEditorFn(token))
+	require.NoError(t, err)
+
+	return resp
+}
+
+// novemberPeriodRequest is a valid request opening a November 2026 style period (month = 1..12).
+func novemberPeriodRequest(month time.Month, fundSourceUUIDs ...domain.FundSourceUUID) ledgersClients.OpenLedgerPeriodRequest {
+	open := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
+
+	return ledgersClients.OpenLedgerPeriodRequest{
+		Name:            "period-" + open.Format("2006-01"),
+		OpenDate:        open,
+		CloseDate:       open.AddDate(0, 1, -1),
+		FundSourceUuids: fundSourceUUIDs,
+	}
+}
+
+// listLedgerPeriods lists periods as the user owning token and requires a 200.
+func listLedgerPeriods(
+	t *testing.T,
+	clients *utils.TestClients,
+	token string,
+	params *ledgersClients.ListLedgerPeriodsParams,
+) *ledgersClients.ListLedgerPeriodsResponse {
+	t.Helper()
+
+	resp, err := clients.Ledgers.ListLedgerPeriodsWithResponse(context.Background(), params, utils.AuthEditorFn(token))
+	require.NoError(t, err)
+	require.Equal(t, 200, resp.StatusCode(), "body: %s", string(resp.Body))
+	require.NotNil(t, resp.JSON200)
+
+	return resp.JSON200
+}
+
+// markPeriodReconciled locks a period directly in the DB (no HTTP endpoint reconciles yet).
+func markPeriodReconciled(t *testing.T, periodUUID domain.LedgerPeriodUUID) {
+	t.Helper()
+
+	_, err := utils.DB.Exec(context.Background(),
+		"UPDATE ledgers.ledger_periods SET status = 'reconciled', closing_balance = opening_balance, reconciled_at = now() WHERE uuid = $1",
+		periodUUID,
+	)
+	require.NoError(t, err)
 }
