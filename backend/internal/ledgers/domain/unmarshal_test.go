@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,4 +49,24 @@ func TestUnmarshalLedgerPeriod(t *testing.T) {
 
 	assert.Equal(t, p, got)
 	assert.True(t, got.CanPostEntries())
+}
+
+func TestUnmarshalFundSourceStatement(t *testing.T) {
+	t.Parallel()
+
+	st, err := domain.NewFundSourceStatement(
+		domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()},
+		domain.FundSourceUUID{UUID: common.NewUUIDv7()},
+		decimal.NewFromInt(10),
+	)
+	require.NoError(t, err)
+	require.NoError(t, st.Close(decimal.NewFromInt(12)))
+
+	got := domain.UnmarshalFundSourceStatement(
+		st.UUID(), st.LedgerPeriodUUID(), st.FundSourceUUID(), st.OpeningBalance(), st.ClosingBalance(), nil, nil, nil,
+	)
+
+	assert.Equal(t, st, got)
+	assert.True(t, got.IsClosed())
+	assert.False(t, got.IsReconciled())
 }

@@ -90,3 +90,17 @@ func ledgerEntryToInsertParams(e *domain.LedgerEntry) dbmodels.InsertLedgerEntri
 		Kind:             e.Kind(),
 	}
 }
+
+// fundSourceStatementToDomain rebuilds a statement from a row (trusted, no validation).
+func fundSourceStatementToDomain(row dbmodels.LedgersFundSourceStatement) *domain.FundSourceStatement {
+	return domain.UnmarshalFundSourceStatement(
+		row.Uuid,
+		row.LedgerPeriodUuid,
+		row.FundSourceUuid,
+		row.OpeningBalance,
+		row.ClosingBalance,
+		row.ActualBalance,
+		row.ReconciledBy,
+		row.ReconciledAt,
+	)
+}

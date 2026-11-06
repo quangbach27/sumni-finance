@@ -15,19 +15,34 @@ type LedgerPeriodRepository interface {
 		fundSourceUUIDs []FundSourceUUID,
 		createFn func(fundSources []*FundSource) (*LedgerPeriod, error),
 	) error
+	// CloseLedgerPeriod closes the period and sets the closing balance of every
+	// fund source statement to the current balance of its fund source, all or
+	// nothing.
 	CloseLedgerPeriod(
 		ctx context.Context,
 		ledgerPeriodUUID LedgerPeriodUUID,
+	) error
+	// ReconcileFundSourceStatements reconciles the given statements of a closed
+	// period: each actual balance must match the statement's closing balance.
+	// All statements are reconciled or none is; failures are returned together
+	// with one detail per statement.
+	ReconcileFundSourceStatements(
+		ctx context.Context,
+		ledgerPeriodUUID LedgerPeriodUUID,
+		reconciledBy string,
+		balances []StatementActualBalance,
 	) error
 	ReopenLedgerPeriod(
 		ctx context.Context,
 		ledgerPeriodUUID LedgerPeriodUUID,
 		updateFn func(period *LedgerPeriod) error,
 	) error
+	// ReconcileLedgerPeriod locks a closed period once every fund source
+	// statement is reconciled. The period closing balance becomes the total of
+	// the statements' closing balances.
 	ReconcileLedgerPeriod(
 		ctx context.Context,
 		ledgerPeriodUUID LedgerPeriodUUID,
-		updateFn func(period *LedgerPeriod) error,
 	) error
 	// PostJournalEntries posts many entries of one period at once. It loads the
 	// period and the fund sources in a serializable transaction and passes them

@@ -160,6 +160,127 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/ledger-periods/{ledger_period_uuid}/close:
+    post:
+      tags: [ledger-periods]
+      operationId: closeLedgerPeriod
+      summary: Close a ledger period
+      description: >
+        Closes an opened period and sets the closing balance of every fund
+        source statement to the current balance of its fund source. Fails with
+        400 `period-not-open` when the period is not opened.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "204":
+          description: Ledger period closed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/statements:
+    get:
+      tags: [ledger-periods]
+      operationId: listFundSourceStatements
+      summary: List the fund source statements of a ledger period
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "200":
+          description: Fund source statements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFundSourceStatementsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile:
+    post:
+      tags: [ledger-periods]
+      operationId: reconcileFundSourceStatements
+      summary: Reconcile fund source statements
+      description: >
+        Compares the actual balance of each statement with its closing balance,
+        all or nothing. A mismatch fails with 400 and per-statement details
+        (entity_id is the statement uuid). Fails with 409 when the period is
+        not closed.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconcileFundSourceStatementsRequest"
+      responses:
+        "204":
+          description: Fund source statements reconciled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/reconcile:
+    post:
+      tags: [ledger-periods]
+      operationId: reconcileLedgerPeriod
+      summary: Reconcile a ledger period
+      description: >
+        Locks a closed period once every fund source statement is reconciled.
+        The period closing balance becomes the total of the statements' closing
+        balances. Fails with 409 `period-not-closed` when the period is not
+        closed, or `statements-not-reconciled` (details list the statements)
+        when any statement is not reconciled.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "204":
+          description: Ledger period reconciled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   schemas:
     FundSourceUUID:
@@ -405,6 +526,65 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LedgerEntryUUID"
+
+    FundSourceStatementUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.FundSourceStatementUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    FundSourceStatement:
+      type: object
+      required: [uuid, fund_source_uuid, opening_balance]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/FundSourceStatementUUID"
+        fund_source_uuid:
+          $ref: "#/components/schemas/FundSourceUUID"
+        opening_balance:
+          $ref: "#/components/schemas/Decimal"
+        closing_balance:
+          description: Set when the period is closed.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        actual_balance:
+          description: Set when reconciled.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        reconciled_by:
+          type: string
+        reconciled_at:
+          type: string
+          format: date-time
+
+    ListFundSourceStatementsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FundSourceStatement"
+
+    ReconcileStatementInput:
+      type: object
+      required: [statement_uuid, actual_balance]
+      properties:
+        statement_uuid:
+          $ref: "#/components/schemas/FundSourceStatementUUID"
+        actual_balance:
+          $ref: "#/components/schemas/Decimal"
+
+    ReconcileFundSourceStatementsRequest:
+      type: object
+      required: [statements]
+      properties:
+        statements:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ReconcileStatementInput"
 
     ErrorDetail:
       type: object

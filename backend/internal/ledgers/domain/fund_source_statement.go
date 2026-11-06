@@ -7,10 +7,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type FundSourceStatementRepository interface{}
-
 type FundSourceStatementUUID struct {
 	common.UUID
+}
+
+// StatementActualBalance is the counted balance of one statement, used to reconcile it.
+type StatementActualBalance struct {
+	StatementUUID FundSourceStatementUUID
+	ActualBalance decimal.Decimal
 }
 
 // FundSourceStatement is one fund source's balances within a ledger period.
@@ -65,7 +69,7 @@ func NewFundSourceStatement(
 	}, nil
 }
 
-func (s *FundSourceStatement) UUID() FundSourceStatementUUID         { return s.uuid }
+func (s *FundSourceStatement) UUID() FundSourceStatementUUID      { return s.uuid }
 func (s *FundSourceStatement) LedgerPeriodUUID() LedgerPeriodUUID { return s.ledgerPeriodUUID }
 func (s *FundSourceStatement) FundSourceUUID() FundSourceUUID     { return s.fundSourceUUID }
 func (s *FundSourceStatement) OpeningBalance() decimal.Decimal    { return s.openingBalance }

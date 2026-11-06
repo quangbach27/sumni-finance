@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	common "github.com/quangbach27/golang-common"
 	commonDb "github.com/quangbach27/golang-common/db"
+	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
 	"backend/internal/ledgers/domain"
@@ -290,6 +291,65 @@ func updateFundSourceBalances(
 	return batchErr
 }
 
+// closeFundSourceStatements sets the closing balance of every statement of the
+// period to the current balance of its fund source.
+func closeFundSourceStatements(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+) error {
+	rows, err := q.ListFundSourceStatementsByPeriod(ctx, ledgerPeriodUUID)
+	if err != nil {
+		return err
+	}
+
+	statements := make([]*domain.FundSourceStatement, 0, len(rows))
+	fundSourceUUIDs := make([]domain.FundSourceUUID, 0, len(rows))
+	for _, row := range rows {
+		statements = append(statements, fundSourceStatementToDomain(row))
+		fundSourceUUIDs = append(fundSourceUUIDs, row.FundSourceUuid)
+	}
+
+	fundSources, err := listFundSourcesInPeriod(ctx, q, ledgerPeriodUUID, fundSourceUUIDs)
+	if err != nil {
+		return err
+	}
+
+	params := make([]dbmodels.UpdateFundSourceStatementParams, 0, len(statements))
+	for _, st := range statements {
+		fs, ok := fundSources[st.FundSourceUUID()]
+		if !ok {
+			return fmt.Errorf("fund source %s of statement %s was not loaded", st.FundSourceUUID().String(), st.UUID().String())
+		}
+
+		if err := st.Close(fs.Balance()); err != nil {
+			return err
+		}
+
+		params = append(params, dbmodels.UpdateFundSourceStatementParams{
+			ClosingBalance: st.ClosingBalance(),
+			Uuid:           st.UUID(),
+		})
+	}
+
+	return updateFundSourceStatements(ctx, q, params)
+}
+
+// updateFundSourceStatements runs the statement updates as one batch and
+// returns all failures joined.
+func updateFundSourceStatements(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	params []dbmodels.UpdateFundSourceStatementParams,
+) error {
+	var batchErr error
+	q.UpdateFundSourceStatement(ctx, params).Exec(func(_ int, err error) {
+		batchErr = errors.Join(batchErr, err)
+	})
+
+	return batchErr
+}
+
 func validateFundSourceUUIDs(uuids []domain.FundSourceUUID) error {
 	if len(uuids) == 0 {
 		return common.NewInvalidInputError("fund-sources-required", "at least one fund source is required")
@@ -322,12 +382,185 @@ func (r *LedgerPeriodRepo) VoidJournalEntry(
 	return errNotImplemented
 }
 
-// TODO: lock the period row (FOR UPDATE), call Close, save.
 func (r *LedgerPeriodRepo) CloseLedgerPeriod(
 	ctx context.Context,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) error {
-	return errNotImplemented
+	if ledgerPeriodUUID.IsZero() {
+		return common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+	}
+
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+
+		if err := period.Close(); err != nil {
+			return err
+		}
+
+		if err := closeFundSourceStatements(ctx, q, ledgerPeriodUUID); err != nil {
+			return err
+		}
+
+		return q.UpdateLedgerPeriod(ctx, dbmodels.UpdateLedgerPeriodParams{
+			Status: period.Status(),
+			Uuid:   period.UUID(),
+		})
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return err
+		}
+
+		return fmt.Errorf("close ledger period: %w", err)
+	}
+
+	return nil
+}
+
+func (r *LedgerPeriodRepo) ReconcileFundSourceStatements(
+	ctx context.Context,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+	reconciledBy string,
+	balances []domain.StatementActualBalance,
+) error {
+	if ledgerPeriodUUID.IsZero() {
+		return common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+	}
+
+	statementUUIDs := make([]domain.FundSourceStatementUUID, 0, len(balances))
+	for _, b := range balances {
+		statementUUIDs = append(statementUUIDs, b.StatementUUID)
+	}
+	if err := validateStatementUUIDs(statementUUIDs); err != nil {
+		return err
+	}
+
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+		if !period.IsClosed() {
+			return common.NewConflictError("period-not-closed", "ledger period %s is not closed", ledgerPeriodUUID.String())
+		}
+
+		uuids := make([]common.UUID, 0, len(statementUUIDs))
+		for _, id := range statementUUIDs {
+			uuids = append(uuids, id.UUID)
+		}
+
+		rows, err := q.ListFundSourceStatementsByUUIDsInPeriod(ctx, dbmodels.ListFundSourceStatementsByUUIDsInPeriodParams{
+			LedgerPeriodUuid: ledgerPeriodUUID,
+			Uuids:            uuids,
+		})
+		if err != nil {
+			return err
+		}
+		if len(rows) != len(uuids) {
+			return common.NewNotFoundError("fund-source-statement-not-found", "one or more fund source statements were not found in the ledger period")
+		}
+
+		statements := make(map[domain.FundSourceStatementUUID]*domain.FundSourceStatement, len(rows))
+		for _, row := range rows {
+			st := fundSourceStatementToDomain(row)
+			statements[st.UUID()] = st
+		}
+
+		if err := reconcileStatements(statements, balances, reconciledBy); err != nil {
+			return err
+		}
+
+		params := make([]dbmodels.UpdateFundSourceStatementParams, 0, len(statements))
+		for _, st := range statements {
+			params = append(params, dbmodels.UpdateFundSourceStatementParams{
+				ActualBalance: st.ActualBalance(),
+				ReconciledBy:  st.ReconciledBy(),
+				ReconciledAt:  st.ReconciledAt(),
+				Uuid:          st.UUID(),
+			})
+		}
+
+		return updateFundSourceStatements(ctx, q, params)
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return err
+		}
+
+		return fmt.Errorf("reconcile fund source statements: %w", err)
+	}
+
+	return nil
+}
+
+// reconcileStatements reconciles each statement with its actual balance, in
+// request order. Failures of all statements are returned together, each detail
+// tagged with the statement UUID.
+func reconcileStatements(
+	statements map[domain.FundSourceStatementUUID]*domain.FundSourceStatement,
+	balances []domain.StatementActualBalance,
+	reconciledBy string,
+) error {
+	var details []common.ErrorDetails
+
+	for _, b := range balances {
+		st, ok := statements[b.StatementUUID]
+		if !ok {
+			return common.NewNotFoundError("fund-source-statement-not-found", "fund source statement %s was not found", b.StatementUUID.String())
+		}
+
+		err := st.Reconcile(b.ActualBalance, reconciledBy)
+		if err == nil {
+			continue
+		}
+
+		var cerr common.Error
+		if !errors.As(err, &cerr) {
+			return err
+		}
+
+		details = append(details, common.ErrorDetails{
+			EntityType: "FundSourceStatement",
+			EntityID:   b.StatementUUID.String(),
+			ErrorSlug:  cerr.ErrorSlug,
+			Message:    cerr.PublicError,
+		})
+	}
+
+	if len(details) > 0 {
+		return common.NewInvalidInputError("invalid-statement-reconciliation", "fund source statements could not be reconciled").WithDetails(details)
+	}
+
+	return nil
+}
+
+func validateStatementUUIDs(uuids []domain.FundSourceStatementUUID) error {
+	if len(uuids) == 0 {
+		return common.NewInvalidInputError("statements-required", "at least one fund source statement is required")
+	}
+
+	seen := make(map[domain.FundSourceStatementUUID]struct{}, len(uuids))
+	for _, id := range uuids {
+		if id.IsZero() {
+			return common.NewInvalidInputError("statement-required", "fund source statement is required")
+		}
+		if _, dup := seen[id]; dup {
+			return common.NewInvalidInputError("duplicate-statement", "duplicate fund source statement id %s", id.String())
+		}
+
+		seen[id] = struct{}{}
+	}
+
+	return nil
 }
 
 // TODO: lock the period row (FOR UPDATE), call updateFn, save.
@@ -339,11 +572,75 @@ func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 	return errNotImplemented
 }
 
-// TODO: lock the period row (FOR UPDATE), call updateFn, save.
 func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(
 	ctx context.Context,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
-	updateFn func(period *domain.LedgerPeriod) error,
 ) error {
-	return errNotImplemented
+	if ledgerPeriodUUID.IsZero() {
+		return common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+	}
+
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+		if !period.IsClosed() {
+			return common.NewConflictError("period-not-closed", "ledger period %s is not closed", ledgerPeriodUUID.String())
+		}
+
+		rows, err := q.ListFundSourceStatementsByPeriod(ctx, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return common.NewConflictError("statements-not-reconciled", "ledger period %s has no fund source statements", ledgerPeriodUUID.String())
+		}
+
+		var details []common.ErrorDetails
+		total := decimal.Zero
+
+		for _, row := range rows {
+			st := fundSourceStatementToDomain(row)
+			if !st.IsReconciled() || st.ClosingBalance() == nil {
+				details = append(details, common.ErrorDetails{
+					EntityType: "FundSourceStatement",
+					EntityID:   st.UUID().String(),
+					ErrorSlug:  "fund-source-statement-not-reconciled",
+					Message:    "fund source statement is not reconciled",
+				})
+
+				continue
+			}
+
+			total = total.Add(*st.ClosingBalance())
+		}
+
+		if len(details) > 0 {
+			return common.NewConflictError("statements-not-reconciled", "all fund source statements must be reconciled").WithDetails(details)
+		}
+
+		if err := period.Reconcile(total); err != nil {
+			return err
+		}
+
+		return q.UpdateLedgerPeriod(ctx, dbmodels.UpdateLedgerPeriodParams{
+			Status:         period.Status(),
+			ClosingBalance: period.ClosingBalance(),
+			ReconciledAt:   period.ReconciledAt(),
+			Uuid:           period.UUID(),
+		})
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return err
+		}
+
+		return fmt.Errorf("reconcile ledger period: %w", err)
+	}
+
+	return nil
 }

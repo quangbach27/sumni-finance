@@ -352,3 +352,210 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		assert.Equal(t, workers, distinct)
 	})
 }
+
+func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
+	ctx := context.Background()
+	repo, err := ledgerdb.NewLedgerPeriodRepository(pgxDb)
+	require.NoError(t, err)
+
+	statementUUIDs := func(t *testing.T, period *domain.LedgerPeriod) []domain.FundSourceStatementUUID {
+		t.Helper()
+
+		rows, err := pgxDb.Query(ctx,
+			"SELECT uuid FROM ledgers.fund_source_statements WHERE ledger_period_uuid = $1 ORDER BY uuid", period.UUID())
+		require.NoError(t, err)
+		defer rows.Close()
+
+		var ids []domain.FundSourceStatementUUID
+		for rows.Next() {
+			var id domain.FundSourceStatementUUID
+			require.NoError(t, rows.Scan(&id))
+			ids = append(ids, id)
+		}
+		require.NoError(t, rows.Err())
+
+		return ids
+	}
+
+	balancesFor := func(ids []domain.FundSourceStatementUUID, actual int64) []domain.StatementActualBalance {
+		out := make([]domain.StatementActualBalance, 0, len(ids))
+		for _, id := range ids {
+			out = append(out, domain.StatementActualBalance{StatementUUID: id, ActualBalance: decimal.NewFromInt(actual)})
+		}
+
+		return out
+	}
+
+	t.Run("close stores closing balances and status", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		fs := createCashFundSource(t, ctx, 1_000)
+		period := openPeriodFor(t, ctx, fs)
+
+		_, err := pgxDb.Exec(ctx, "UPDATE ledgers.fund_sources SET balance = 1500 WHERE uuid = $1", fs.UUID())
+		require.NoError(t, err)
+
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+
+		var status string
+		var closing decimal.Decimal
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			`SELECT p.status, s.closing_balance FROM ledgers.ledger_periods p
+			 JOIN ledgers.fund_source_statements s ON s.ledger_period_uuid = p.uuid WHERE p.uuid = $1`, period.UUID(),
+		).Scan(&status, &closing))
+		assert.Equal(t, "closed", status)
+		assert.True(t, closing.Equal(decimal.NewFromInt(1_500)))
+
+		err = repo.CloseLedgerPeriod(ctx, period.UUID())
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "period-not-open", cerr.ErrorSlug)
+	})
+
+	t.Run("close of an unknown period is not found", func(t *testing.T) {
+		resetPeriods(t, ctx)
+
+		err := repo.CloseLedgerPeriod(ctx, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()})
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "ledger-period-not-found", cerr.ErrorSlug)
+	})
+
+	t.Run("reconcile stores all statements", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+
+		ids := statementUUIDs(t, period)
+		require.NoError(t, repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balancesFor(ids, 1_000)))
+
+		var n int
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT count(*) FROM ledgers.fund_source_statements WHERE ledger_period_uuid = $1 AND reconciled_by = 'user-1' AND actual_balance = 1000 AND reconciled_at IS NOT NULL",
+			period.UUID()).Scan(&n))
+		assert.Equal(t, 2, n)
+	})
+
+	t.Run("a mismatch persists nothing and reports the statement", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		ids := statementUUIDs(t, period)
+
+		balances := balancesFor(ids, 1_000)
+		balances[1].ActualBalance = decimal.NewFromInt(999)
+
+		err := repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balances)
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "invalid-statement-reconciliation", cerr.ErrorSlug)
+		require.Len(t, cerr.Details, 1)
+		assert.Equal(t, "balance-mismatch", cerr.Details[0].ErrorSlug)
+		assert.Equal(t, ids[1].String(), cerr.Details[0].EntityID)
+
+		var n int
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT count(*) FROM ledgers.fund_source_statements WHERE ledger_period_uuid = $1 AND reconciled_at IS NOT NULL",
+			period.UUID()).Scan(&n))
+		assert.Zero(t, n)
+	})
+
+	t.Run("an open period conflicts", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000))
+
+		err := repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balancesFor(statementUUIDs(t, period), 1_000))
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "period-not-closed", cerr.ErrorSlug)
+	})
+
+	t.Run("unknown and duplicate statements are rejected", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		ids := statementUUIDs(t, period)
+
+		err := repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1",
+			balancesFor([]domain.FundSourceStatementUUID{{UUID: common.NewUUIDv7()}}, 1_000))
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "fund-source-statement-not-found", cerr.ErrorSlug)
+
+		err = repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balancesFor(append(ids, ids...), 1_000))
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "duplicate-statement", cerr.ErrorSlug)
+
+		err = repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", nil)
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "statements-required", cerr.ErrorSlug)
+	})
+}
+
+func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
+	ctx := context.Background()
+	repo, err := ledgerdb.NewLedgerPeriodRepository(pgxDb)
+	require.NoError(t, err)
+
+	reconcileAllStatements := func(t *testing.T, period *domain.LedgerPeriod, actual int64) {
+		t.Helper()
+
+		_, err := pgxDb.Exec(ctx,
+			"UPDATE ledgers.fund_source_statements SET actual_balance = $2, reconciled_by = 'user-1', reconciled_at = now() WHERE ledger_period_uuid = $1",
+			period.UUID(), actual)
+		require.NoError(t, err)
+	}
+
+	t.Run("stores status, closing balance and reconciled_at", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		reconcileAllStatements(t, period, 1_000)
+
+		require.NoError(t, repo.ReconcileLedgerPeriod(ctx, period.UUID()))
+
+		var status string
+		var closing decimal.Decimal
+		var reconciledAt *time.Time
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT status, closing_balance, reconciled_at FROM ledgers.ledger_periods WHERE uuid = $1", period.UUID(),
+		).Scan(&status, &closing, &reconciledAt))
+		assert.Equal(t, "reconciled", status)
+		assert.True(t, closing.Equal(decimal.NewFromInt(2_000)))
+		assert.NotNil(t, reconciledAt)
+	})
+
+	t.Run("an unreconciled statement fails and the period stays closed", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+
+		err := repo.ReconcileLedgerPeriod(ctx, period.UUID())
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "statements-not-reconciled", cerr.ErrorSlug)
+		assert.Len(t, cerr.Details, 2)
+
+		var status string
+		require.NoError(t, pgxDb.QueryRow(ctx, "SELECT status FROM ledgers.ledger_periods WHERE uuid = $1", period.UUID()).Scan(&status))
+		assert.Equal(t, "closed", status)
+	})
+
+	t.Run("an open period conflicts", func(t *testing.T) {
+		resetPeriods(t, ctx)
+		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000))
+
+		err := repo.ReconcileLedgerPeriod(ctx, period.UUID())
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "period-not-closed", cerr.ErrorSlug)
+	})
+
+	t.Run("unknown period is not found", func(t *testing.T) {
+		resetPeriods(t, ctx)
+
+		err := repo.ReconcileLedgerPeriod(ctx, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()})
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		assert.Equal(t, "ledger-period-not-found", cerr.ErrorSlug)
+	})
+}

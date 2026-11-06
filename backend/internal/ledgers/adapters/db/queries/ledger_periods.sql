@@ -55,3 +55,12 @@ WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text);
 SELECT *
 FROM ledgers.ledger_periods
 WHERE uuid = @uuid;
+
+-- name: UpdateLedgerPeriod :exec
+UPDATE ledgers.ledger_periods
+SET status = @status,
+    closing_balance = COALESCE(sqlc.narg('closing_balance'), closing_balance),
+    reopen_reason = COALESCE(sqlc.narg('reopen_reason'), reopen_reason),
+    reopened_at = COALESCE(sqlc.narg('reopened_at'), reopened_at),
+    reconciled_at = COALESCE(sqlc.narg('reconciled_at'), reconciled_at)
+WHERE uuid = @uuid;

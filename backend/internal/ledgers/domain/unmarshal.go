@@ -69,3 +69,24 @@ func UnmarshalLedgerPeriod(
 		reconciledAt:   reconciledAt,
 	}
 }
+
+func UnmarshalFundSourceStatement(
+	uuid FundSourceStatementUUID,
+	ledgerPeriodUUID LedgerPeriodUUID,
+	fundSourceUUID FundSourceUUID,
+	openingBalance decimal.Decimal,
+	closingBalance, actualBalance *decimal.Decimal,
+	reconciledBy *string,
+	reconciledAt *time.Time,
+) *FundSourceStatement {
+	return &FundSourceStatement{
+		uuid:             uuid,
+		ledgerPeriodUUID: ledgerPeriodUUID,
+		fundSourceUUID:   fundSourceUUID,
+		openingBalance:   openingBalance,
+		closingBalance:   closingBalance,
+		actualBalance:    actualBalance,
+		reconciledBy:     reconciledBy,
+		reconciledAt:     reconciledAt,
+	}
+}

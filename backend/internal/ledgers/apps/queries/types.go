@@ -39,3 +39,13 @@ type LedgerPeriod struct {
 	ReopenedAt     *time.Time
 	ReconciledAt   *time.Time
 }
+
+type FundSourceStatement struct {
+	UUID           string
+	FundSourceUUID string
+	OpeningBalance decimal.Decimal
+	ClosingBalance *decimal.Decimal // nil until the period is closed
+	ActualBalance  *decimal.Decimal // nil until reconciled
+	ReconciledBy   *string
+	ReconciledAt   *time.Time
+}

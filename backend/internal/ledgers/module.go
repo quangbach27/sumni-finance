@@ -94,7 +94,12 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	queryHandlers, err := queries.NewHandlers(fsReadModel, periodReadModel)
+	statementReadModel, err := db.NewFundSourceStatementReadModel(m.pgxDb)
+	if err != nil {
+		return err
+	}
+
+	queryHandlers, err := queries.NewHandlers(fsReadModel, periodReadModel, statementReadModel)
 	if err != nil {
 		return err
 	}

@@ -159,3 +159,34 @@ func (q *Queries) ListLedgerPeriods(ctx context.Context, arg ListLedgerPeriodsPa
 	}
 	return items, nil
 }
+
+const updateLedgerPeriod = `-- name: UpdateLedgerPeriod :exec
+UPDATE ledgers.ledger_periods
+SET status = $1,
+    closing_balance = COALESCE($2, closing_balance),
+    reopen_reason = COALESCE($3, reopen_reason),
+    reopened_at = COALESCE($4, reopened_at),
+    reconciled_at = COALESCE($5, reconciled_at)
+WHERE uuid = $6
+`
+
+type UpdateLedgerPeriodParams struct {
+	Status         domain.LedgerStatus
+	ClosingBalance *decimal.Decimal
+	ReopenReason   *string
+	ReopenedAt     *time.Time
+	ReconciledAt   *time.Time
+	Uuid           domain.LedgerPeriodUUID
+}
+
+func (q *Queries) UpdateLedgerPeriod(ctx context.Context, arg UpdateLedgerPeriodParams) error {
+	_, err := q.db.Exec(ctx, updateLedgerPeriod,
+		arg.Status,
+		arg.ClosingBalance,
+		arg.ReopenReason,
+		arg.ReopenedAt,
+		arg.ReconciledAt,
+		arg.Uuid,
+	)
+	return err
+}

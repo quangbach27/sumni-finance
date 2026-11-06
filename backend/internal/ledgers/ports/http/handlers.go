@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/http/auth"
 	"github.com/quangbach27/golang-common/log"
 
 	"backend/internal/ledgers/apps/commands"
@@ -103,12 +104,12 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntr
 	entries := make([]commands.LedgerEntryInput, 0, len(body.Entries))
 	for _, e := range body.Entries {
 		entries = append(entries, commands.LedgerEntryInput{
-			FundSourceUUID:  e.FundSourceUuid,
-			Amount:          e.Amount,
-			Direction:       e.Direction,
-			Description:     e.Description,
-			OccurredAt:      e.OccurredAt,
-			CategoryUUID:    e.CategoryUuid,
+			FundSourceUUID: e.FundSourceUuid,
+			Amount:         e.Amount,
+			Direction:      e.Direction,
+			Description:    e.Description,
+			OccurredAt:     e.OccurredAt,
+			CategoryUUID:   e.CategoryUuid,
 		})
 	}
 
@@ -121,6 +122,75 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntr
 	}
 
 	return PostLedgerEntries201JSONResponse{LedgerEntryUuids: entryUUIDs}, nil
+}
+
+func (h *Handlers) CloseLedgerPeriod(ctx context.Context, request CloseLedgerPeriodRequestObject) (CloseLedgerPeriodResponseObject, error) {
+	if err := h.commandHandlers.CloseLedgerPeriod(ctx, commands.CloseLedgerPeriod{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+	}); err != nil {
+		return nil, err
+	}
+
+	return CloseLedgerPeriod204Response{}, nil
+}
+
+func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, request ReconcileLedgerPeriodRequestObject) (ReconcileLedgerPeriodResponseObject, error) {
+	if err := h.commandHandlers.ReconcileLedgerPeriod(ctx, commands.ReconcileLedgerPeriod{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+	}); err != nil {
+		return nil, err
+	}
+
+	return ReconcileLedgerPeriod204Response{}, nil
+}
+
+func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, request ReconcileFundSourceStatementsRequestObject) (ReconcileFundSourceStatementsResponseObject, error) {
+	session, ok := auth.SessionFromContext(ctx)
+	if !ok || session == nil {
+		return nil, common.NewUnauthorizedError("session-required", "an authenticated session is required")
+	}
+
+	statements := make([]domain.StatementActualBalance, 0, len(request.Body.Statements))
+	for _, s := range request.Body.Statements {
+		statements = append(statements, domain.StatementActualBalance{
+			StatementUUID: s.StatementUuid,
+			ActualBalance: s.ActualBalance,
+		})
+	}
+
+	if err := h.commandHandlers.ReconcileFundSourceStatements(ctx, commands.ReconcileFundSourceStatements{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+		ReconciledBy:     session.Subject,
+		Statements:       statements,
+	}); err != nil {
+		return nil, err
+	}
+
+	return ReconcileFundSourceStatements204Response{}, nil
+}
+
+func (h *Handlers) ListFundSourceStatements(ctx context.Context, request ListFundSourceStatementsRequestObject) (ListFundSourceStatementsResponseObject, error) {
+	statements, err := h.queryHandlers.ListFundSourceStatements(ctx, queries.ListFundSourceStatements{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]FundSourceStatement, 0, len(statements))
+	for _, st := range statements {
+		items = append(items, FundSourceStatement{
+			Uuid:           domain.FundSourceStatementUUID{UUID: common.MustUUIDFromString(st.UUID)},
+			FundSourceUuid: domain.FundSourceUUID{UUID: common.MustUUIDFromString(st.FundSourceUUID)},
+			OpeningBalance: st.OpeningBalance,
+			ClosingBalance: st.ClosingBalance,
+			ActualBalance:  st.ActualBalance,
+			ReconciledBy:   st.ReconciledBy,
+			ReconciledAt:   st.ReconciledAt,
+		})
+	}
+
+	return ListFundSourceStatements200JSONResponse{Items: items}, nil
 }
 
 func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error) {

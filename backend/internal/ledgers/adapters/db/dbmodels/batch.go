@@ -8,6 +8,7 @@ package dbmodels
 import (
 	"context"
 	"errors"
+	"time"
 
 	"backend/internal/ledgers/domain"
 	"github.com/jackc/pgx/v5"
@@ -65,6 +66,66 @@ func (b *UpdateFundSourceBalanceBatchResults) Exec(f func(int, error)) {
 }
 
 func (b *UpdateFundSourceBalanceBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const updateFundSourceStatement = `-- name: UpdateFundSourceStatement :batchexec
+UPDATE ledgers.fund_source_statements
+SET closing_balance = COALESCE($1, closing_balance),
+    actual_balance = COALESCE($2, actual_balance),
+    reconciled_by = COALESCE($3, reconciled_by),
+    reconciled_at = COALESCE($4, reconciled_at)
+WHERE uuid = $5
+`
+
+type UpdateFundSourceStatementBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpdateFundSourceStatementParams struct {
+	ClosingBalance *decimal.Decimal
+	ActualBalance  *decimal.Decimal
+	ReconciledBy   *string
+	ReconciledAt   *time.Time
+	Uuid           domain.FundSourceStatementUUID
+}
+
+func (q *Queries) UpdateFundSourceStatement(ctx context.Context, arg []UpdateFundSourceStatementParams) *UpdateFundSourceStatementBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ClosingBalance,
+			a.ActualBalance,
+			a.ReconciledBy,
+			a.ReconciledAt,
+			a.Uuid,
+		}
+		batch.Queue(updateFundSourceStatement, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpdateFundSourceStatementBatchResults{br, len(arg), false}
+}
+
+func (b *UpdateFundSourceStatementBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpdateFundSourceStatementBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
