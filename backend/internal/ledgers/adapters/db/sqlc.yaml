@@ -27,6 +27,17 @@ sql:
               import: "backend/internal/ledgers/domain"
               type: "LedgerPeriodUUID"
 
+          - column: "ledgers.ledger_periods.report_uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "ReportUUID"
+              pointer: true
+
+          - column: "ledgers.ledger_period_reports.uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "ReportUUID"
+
           - column: "ledgers.ledger_periods.status"
             go_type:
               import: "backend/internal/ledgers/domain"

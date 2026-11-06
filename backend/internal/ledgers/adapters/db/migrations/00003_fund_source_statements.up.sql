@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE ledgers.fund_source_statements (
     uuid               uuid PRIMARY KEY,
     ledger_period_uuid uuid NOT NULL REFERENCES ledgers.ledger_periods (uuid),
@@ -14,3 +16,5 @@ CREATE TABLE ledgers.fund_source_statements (
         AND (reconciled_at IS NULL OR closing_balance IS NOT NULL)
     )
 );
+
+COMMIT;

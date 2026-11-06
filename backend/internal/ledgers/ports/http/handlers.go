@@ -8,6 +8,7 @@ import (
 	"github.com/quangbach27/golang-common/http/auth"
 
 	"backend/internal/ledgers/apps/commands"
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/apps/queries"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
@@ -144,6 +145,17 @@ func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, request ReopenLedgerP
 	return ReopenLedgerPeriod204Response{}, nil
 }
 
+func (h *Handlers) GenerateLedgerPeriodReport(ctx context.Context, request GenerateLedgerPeriodReportRequestObject) (GenerateLedgerPeriodReportResponseObject, error) {
+	reportUUID, err := h.commandHandlers.GenerateLedgerPeriodReport(ctx, commands.GenerateLedgerPeriodReport{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return GenerateLedgerPeriodReport200JSONResponse{ReportUuid: reportUUID}, nil
+}
+
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, request ReconcileLedgerPeriodRequestObject) (ReconcileLedgerPeriodResponseObject, error) {
 	if err := h.commandHandlers.ReconcileLedgerPeriod(ctx, commands.ReconcileLedgerPeriod{
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
@@ -235,15 +247,28 @@ func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeri
 	}, nil
 }
 
+func (h *Handlers) GetLedgerPeriod(ctx context.Context, request GetLedgerPeriodRequestObject) (GetLedgerPeriodResponseObject, error) {
+	period, err := h.queryHandlers.GetLedgerPeriod(ctx, queries.GetLedgerPeriod{LedgerPeriodUUID: request.LedgerPeriodUuid})
+	if err != nil {
+		return nil, err
+	}
+
+	return GetLedgerPeriod200JSONResponse{LedgerPeriod: toAPILedgerPeriodDetail(period)}, nil
+}
+
 func (h *Handlers) GetUnlockedLedgerPeriod(ctx context.Context, _ GetUnlockedLedgerPeriodRequestObject) (GetUnlockedLedgerPeriodResponseObject, error) {
 	period, err := h.queryHandlers.GetUnlockedLedgerPeriod(ctx, queries.GetUnlockedLedgerPeriod{})
 	if err != nil {
 		return nil, err
 	}
 
-	statements := make([]UnlockedLedgerStatement, 0, len(period.Statements))
+	return GetUnlockedLedgerPeriod200JSONResponse{LedgerPeriod: toAPILedgerPeriodDetail(period)}, nil
+}
+
+func toAPILedgerPeriodDetail(period queries.LedgerPeriodDetail) LedgerPeriodDetail {
+	statements := make([]LedgerStatementDetail, 0, len(period.Statements))
 	for _, st := range period.Statements {
-		statements = append(statements, UnlockedLedgerStatement{
+		statements = append(statements, LedgerStatementDetail{
 			Uuid:           domain.FundSourceStatementUUID{UUID: common.MustUUIDFromString(st.UUID)},
 			FundSourceUuid: domain.FundSourceUUID{UUID: common.MustUUIDFromString(st.FundSourceUUID)},
 			OpeningBalance: st.OpeningBalance,
@@ -257,24 +282,23 @@ func (h *Handlers) GetUnlockedLedgerPeriod(ctx context.Context, _ GetUnlockedLed
 
 	base := toAPILedgerPeriod(period.LedgerPeriod)
 
-	return GetUnlockedLedgerPeriod200JSONResponse{
-		LedgerPeriod: UnlockedLedgerPeriod{
-			Uuid:           base.Uuid,
-			Name:           base.Name,
-			OpeningBalance: base.OpeningBalance,
-			ClosingBalance: base.ClosingBalance,
-			OpenDate:       base.OpenDate,
-			CloseDate:      base.CloseDate,
-			Status:         base.Status,
-			ReopenReason:   base.ReopenReason,
-			ReopenedAt:     base.ReopenedAt,
-			ReconciledAt:   base.ReconciledAt,
-			TotalInflow:    period.TotalInflow,
-			TotalOutflow:   period.TotalOutflow,
-			EntryCount:     period.EntryCount,
-			Statements:     statements,
-		},
-	}, nil
+	return LedgerPeriodDetail{
+		Uuid:           base.Uuid,
+		Name:           base.Name,
+		OpeningBalance: base.OpeningBalance,
+		ClosingBalance: base.ClosingBalance,
+		OpenDate:       base.OpenDate,
+		CloseDate:      base.CloseDate,
+		Status:         base.Status,
+		ReopenReason:   base.ReopenReason,
+		ReopenedAt:     base.ReopenedAt,
+		ReconciledAt:   base.ReconciledAt,
+		ReportUuid:     base.ReportUuid,
+		TotalInflow:    period.TotalInflow,
+		TotalOutflow:   period.TotalOutflow,
+		EntryCount:     period.EntryCount,
+		Statements:     statements,
+	}
 }
 
 func toAPILedgerPeriod(p queries.LedgerPeriod) LedgerPeriod {
@@ -289,7 +313,16 @@ func toAPILedgerPeriod(p queries.LedgerPeriod) LedgerPeriod {
 		ReopenReason:   p.ReopenReason,
 		ReopenedAt:     p.ReopenedAt,
 		ReconciledAt:   p.ReconciledAt,
+		ReportUuid:     toAPIReportUUID(p.ReportUUID),
 	}
+}
+
+func toAPIReportUUID(id *string) *models.ReportUUID {
+	if id == nil {
+		return nil
+	}
+
+	return &models.ReportUUID{UUID: common.MustUUIDFromString(*id)}
 }
 
 func (h *Handlers) ListFundSources(ctx context.Context, _ ListFundSourcesRequestObject) (ListFundSourcesResponseObject, error) {

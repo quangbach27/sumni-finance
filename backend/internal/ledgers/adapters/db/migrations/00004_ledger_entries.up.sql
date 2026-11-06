@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE ledgers.ledger_entries (
     uuid                  uuid PRIMARY KEY,
     ledger_period_uuid    uuid NOT NULL REFERENCES ledgers.ledger_periods (uuid),
@@ -35,3 +37,5 @@ CREATE INDEX ledger_entries_fund_source_occurred_at_idx
 
 CREATE INDEX ledger_entries_ledger_period_idx
     ON ledgers.ledger_entries (ledger_period_uuid);
+
+COMMIT;

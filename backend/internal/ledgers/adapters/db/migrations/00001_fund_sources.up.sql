@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE SCHEMA IF NOT EXISTS ledgers;
 
 CREATE TABLE ledgers.fund_sources (
@@ -22,3 +24,5 @@ CREATE TABLE ledgers.fund_sources (
         )
     )
 );
+
+COMMIT;

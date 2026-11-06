@@ -38,6 +38,7 @@ type LedgerPeriod struct {
 	ReopenReason   *string
 	ReopenedAt     *time.Time
 	ReconciledAt   *time.Time
+	ReportUUID     *string
 }
 
 type FundSourceStatement struct {
@@ -50,17 +51,17 @@ type FundSourceStatement struct {
 	ReconciledAt   *time.Time
 }
 
-// UnlockedLedgerStatement is a fund source statement plus the fund source's live balance.
-type UnlockedLedgerStatement struct {
+// LedgerStatementDetail is a fund source statement plus the fund source's live balance.
+type LedgerStatementDetail struct {
 	FundSourceStatement
 	CurrentBalance decimal.Decimal
 }
 
-// UnlockedLedgerPeriod is the single non-reconciled period with its statements and entry totals.
-type UnlockedLedgerPeriod struct {
+// LedgerPeriodDetail is a ledger period with its statements and entry totals.
+type LedgerPeriodDetail struct {
 	LedgerPeriod
 	TotalInflow  decimal.Decimal
 	TotalOutflow decimal.Decimal
 	EntryCount   int64
-	Statements   []UnlockedLedgerStatement
+	Statements   []LedgerStatementDetail
 }

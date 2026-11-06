@@ -7,6 +7,7 @@ package dbmodels
 import (
 	"time"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 	"github.com/shopspring/decimal"
@@ -71,4 +72,10 @@ type LedgersLedgerPeriod struct {
 	ReopenedAt     *time.Time
 	ReconciledAt   *time.Time
 	CreatedAt      time.Time
+	ReportUuid     *models.ReportUUID
+}
+
+type LedgersLedgerPeriodReport struct {
+	Uuid      models.ReportUUID
+	CreatedAt time.Time
 }

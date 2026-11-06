@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 
@@ -109,9 +110,14 @@ type FundSourceType = domain.FundSourceType
 // FundSourceUUID defines model for FundSourceUUID.
 type FundSourceUUID = domain.FundSourceUUID
 
-// GetUnlockedLedgerPeriodResponse defines model for GetUnlockedLedgerPeriodResponse.
-type GetUnlockedLedgerPeriodResponse struct {
-	LedgerPeriod UnlockedLedgerPeriod `json:"ledger_period"`
+// GenerateLedgerPeriodReportResponse defines model for GenerateLedgerPeriodReportResponse.
+type GenerateLedgerPeriodReportResponse struct {
+	ReportUuid ReportUUID `json:"report_uuid"`
+}
+
+// GetLedgerPeriodResponse defines model for GetLedgerPeriodResponse.
+type GetLedgerPeriodResponse struct {
+	LedgerPeriod LedgerPeriodDetail `json:"ledger_period"`
 }
 
 // LedgerEntryInput defines model for LedgerEntryInput.
@@ -139,12 +145,53 @@ type LedgerPeriod struct {
 	ReconciledAt   *time.Time       `json:"reconciled_at,omitempty"`
 	ReopenReason   *string          `json:"reopen_reason,omitempty"`
 	ReopenedAt     *time.Time       `json:"reopened_at,omitempty"`
+	ReportUuid     *ReportUUID      `json:"report_uuid,omitempty"`
 	Status         LedgerStatus     `json:"status"`
 	Uuid           LedgerPeriodUUID `json:"uuid"`
 }
 
+// LedgerPeriodDetail defines model for LedgerPeriodDetail.
+type LedgerPeriodDetail struct {
+	CloseDate time.Time `json:"close_date"`
+
+	// ClosingBalance Set once the period is reconciled.
+	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
+
+	// EntryCount Number of posted ledger entries in the period.
+	EntryCount     int64                   `json:"entry_count"`
+	Name           string                  `json:"name"`
+	OpenDate       time.Time               `json:"open_date"`
+	OpeningBalance Decimal                 `json:"opening_balance"`
+	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
+	ReopenReason   *string                 `json:"reopen_reason,omitempty"`
+	ReopenedAt     *time.Time              `json:"reopened_at,omitempty"`
+	ReportUuid     *ReportUUID             `json:"report_uuid,omitempty"`
+	Statements     []LedgerStatementDetail `json:"statements"`
+	Status         LedgerStatus            `json:"status"`
+	TotalInflow    Decimal                 `json:"total_inflow"`
+	TotalOutflow   Decimal                 `json:"total_outflow"`
+	Uuid           LedgerPeriodUUID        `json:"uuid"`
+}
+
 // LedgerPeriodUUID defines model for LedgerPeriodUUID.
 type LedgerPeriodUUID = domain.LedgerPeriodUUID
+
+// LedgerStatementDetail defines model for LedgerStatementDetail.
+type LedgerStatementDetail struct {
+	// ActualBalance Set when reconciled.
+	ActualBalance *Decimal `json:"actual_balance,omitempty"`
+
+	// ClosingBalance Set when the period is closed.
+	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
+
+	// CurrentBalance Live balance of the fund source.
+	CurrentBalance Decimal                 `json:"current_balance"`
+	FundSourceUuid FundSourceUUID          `json:"fund_source_uuid"`
+	OpeningBalance Decimal                 `json:"opening_balance"`
+	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
+	ReconciledBy   *string                 `json:"reconciled_by,omitempty"`
+	Uuid           FundSourceStatementUUID `json:"uuid"`
+}
 
 // LedgerStatus defines model for LedgerStatus.
 type LedgerStatus = domain.LedgerStatus
@@ -212,44 +259,8 @@ type ReopenLedgerPeriodRequest struct {
 	Reason string `json:"reason"`
 }
 
-// UnlockedLedgerPeriod defines model for UnlockedLedgerPeriod.
-type UnlockedLedgerPeriod struct {
-	CloseDate time.Time `json:"close_date"`
-
-	// ClosingBalance Set once the period is reconciled.
-	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
-
-	// EntryCount Number of posted ledger entries in the period.
-	EntryCount     int64                     `json:"entry_count"`
-	Name           string                    `json:"name"`
-	OpenDate       time.Time                 `json:"open_date"`
-	OpeningBalance Decimal                   `json:"opening_balance"`
-	ReconciledAt   *time.Time                `json:"reconciled_at,omitempty"`
-	ReopenReason   *string                   `json:"reopen_reason,omitempty"`
-	ReopenedAt     *time.Time                `json:"reopened_at,omitempty"`
-	Statements     []UnlockedLedgerStatement `json:"statements"`
-	Status         LedgerStatus              `json:"status"`
-	TotalInflow    Decimal                   `json:"total_inflow"`
-	TotalOutflow   Decimal                   `json:"total_outflow"`
-	Uuid           LedgerPeriodUUID          `json:"uuid"`
-}
-
-// UnlockedLedgerStatement defines model for UnlockedLedgerStatement.
-type UnlockedLedgerStatement struct {
-	// ActualBalance Set when reconciled.
-	ActualBalance *Decimal `json:"actual_balance,omitempty"`
-
-	// ClosingBalance Set when the period is closed.
-	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
-
-	// CurrentBalance Live balance of the fund source.
-	CurrentBalance Decimal                 `json:"current_balance"`
-	FundSourceUuid FundSourceUUID          `json:"fund_source_uuid"`
-	OpeningBalance Decimal                 `json:"opening_balance"`
-	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
-	ReconciledBy   *string                 `json:"reconciled_by,omitempty"`
-	Uuid           FundSourceStatementUUID `json:"uuid"`
-}
+// ReportUUID defines model for ReportUUID.
+type ReportUUID = models.ReportUUID
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
@@ -305,6 +316,9 @@ type ServerInterface interface {
 	// GetUnlockedLedgerPeriod Get the unlocked ledger period
 	// (GET /api/v1/ledger-periods/unlocked)
 	GetUnlockedLedgerPeriod(ctx *echo.Context) error
+	// GetLedgerPeriod Get a ledger period
+	// (GET /api/v1/ledger-periods/{ledger_period_uuid})
+	GetLedgerPeriod(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error
 	// CloseLedgerPeriod Close a ledger period
 	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/close)
 	CloseLedgerPeriod(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error
@@ -317,6 +331,9 @@ type ServerInterface interface {
 	// ReopenLedgerPeriod Reopen a closed ledger period
 	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen)
 	ReopenLedgerPeriod(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error
+	// GenerateLedgerPeriodReport Generate a report for a ledger period
+	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/report)
+	GenerateLedgerPeriodReport(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error
 	// ListFundSourceStatements List the fund source statements of a ledger period
 	// (GET /api/v1/ledger-periods/{ledger_period_uuid}/statements)
 	ListFundSourceStatements(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error
@@ -398,6 +415,22 @@ func (w *ServerInterfaceWrapper) GetUnlockedLedgerPeriod(ctx *echo.Context) erro
 	return err
 }
 
+// GetLedgerPeriod converts echo context to params.
+func (w *ServerInterfaceWrapper) GetLedgerPeriod(ctx *echo.Context) error {
+	var err error
+	// ------------- Path parameter "ledger_period_uuid" -------------
+	var ledgerPeriodUuid LedgerPeriodUUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ledger_period_uuid", ctx.Param("ledger_period_uuid"), &ledgerPeriodUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter ledger_period_uuid: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetLedgerPeriod(ctx, ledgerPeriodUuid)
+	return err
+}
+
 // CloseLedgerPeriod converts echo context to params.
 func (w *ServerInterfaceWrapper) CloseLedgerPeriod(ctx *echo.Context) error {
 	var err error
@@ -459,6 +492,22 @@ func (w *ServerInterfaceWrapper) ReopenLedgerPeriod(ctx *echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ReopenLedgerPeriod(ctx, ledgerPeriodUuid)
+	return err
+}
+
+// GenerateLedgerPeriodReport converts echo context to params.
+func (w *ServerInterfaceWrapper) GenerateLedgerPeriodReport(ctx *echo.Context) error {
+	var err error
+	// ------------- Path parameter "ledger_period_uuid" -------------
+	var ledgerPeriodUuid LedgerPeriodUUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ledger_period_uuid", ctx.Param("ledger_period_uuid"), &ledgerPeriodUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter ledger_period_uuid: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GenerateLedgerPeriodReport(ctx, ledgerPeriodUuid)
 	return err
 }
 
@@ -544,11 +593,13 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/api/v1/fund-sources", wrapper.ListFundSources, options.OperationMiddlewares["listFundSources"]...)
 	router.POST(options.BaseURL+"/api/v1/fund-sources", wrapper.CreateFundSource, options.OperationMiddlewares["createFundSource"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods/unlocked", wrapper.GetUnlockedLedgerPeriod, options.OperationMiddlewares["getUnlockedLedgerPeriod"]...)
+	router.GET(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid", wrapper.GetLedgerPeriod, options.OperationMiddlewares["getLedgerPeriod"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods", wrapper.ListLedgerPeriods, options.OperationMiddlewares["listLedgerPeriods"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods", wrapper.OpenLedgerPeriod, options.OperationMiddlewares["openLedgerPeriod"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/entries", wrapper.PostLedgerEntries, options.OperationMiddlewares["postLedgerEntries"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/close", wrapper.CloseLedgerPeriod, options.OperationMiddlewares["closeLedgerPeriod"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/reopen", wrapper.ReopenLedgerPeriod, options.OperationMiddlewares["reopenLedgerPeriod"]...)
+	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/report", wrapper.GenerateLedgerPeriodReport, options.OperationMiddlewares["generateLedgerPeriodReport"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/statements", wrapper.ListFundSourceStatements, options.OperationMiddlewares["listFundSourceStatements"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/statements/reconcile", wrapper.ReconcileFundSourceStatements, options.OperationMiddlewares["reconcileFundSourceStatements"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/reconcile", wrapper.ReconcileLedgerPeriod, options.OperationMiddlewares["reconcileLedgerPeriod"]...)
@@ -849,7 +900,7 @@ type GetUnlockedLedgerPeriodResponseObject interface {
 	VisitGetUnlockedLedgerPeriodResponse(w http.ResponseWriter) error
 }
 
-type GetUnlockedLedgerPeriod200JSONResponse GetUnlockedLedgerPeriodResponse
+type GetUnlockedLedgerPeriod200JSONResponse GetLedgerPeriodResponse
 
 func (response GetUnlockedLedgerPeriod200JSONResponse) VisitGetUnlockedLedgerPeriodResponse(w http.ResponseWriter) error {
 
@@ -896,6 +947,72 @@ type GetUnlockedLedgerPeriod500JSONResponse struct {
 }
 
 func (response GetUnlockedLedgerPeriod500JSONResponse) VisitGetUnlockedLedgerPeriodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerPeriodRequestObject struct {
+	LedgerPeriodUuid LedgerPeriodUUID `json:"ledger_period_uuid"`
+}
+
+type GetLedgerPeriodResponseObject interface {
+	VisitGetLedgerPeriodResponse(w http.ResponseWriter) error
+}
+
+type GetLedgerPeriod200JSONResponse GetLedgerPeriodResponse
+
+func (response GetLedgerPeriod200JSONResponse) VisitGetLedgerPeriodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerPeriod401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetLedgerPeriod401JSONResponse) VisitGetLedgerPeriodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerPeriod404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetLedgerPeriod404JSONResponse) VisitGetLedgerPeriodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerPeriod500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetLedgerPeriod500JSONResponse) VisitGetLedgerPeriodResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1267,6 +1384,86 @@ func (response ReopenLedgerPeriod500JSONResponse) VisitReopenLedgerPeriodRespons
 	return err
 }
 
+type GenerateLedgerPeriodReportRequestObject struct {
+	LedgerPeriodUuid LedgerPeriodUUID `json:"ledger_period_uuid"`
+}
+
+type GenerateLedgerPeriodReportResponseObject interface {
+	VisitGenerateLedgerPeriodReportResponse(w http.ResponseWriter) error
+}
+
+type GenerateLedgerPeriodReport200JSONResponse GenerateLedgerPeriodReportResponse
+
+func (response GenerateLedgerPeriodReport200JSONResponse) VisitGenerateLedgerPeriodReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateLedgerPeriodReport400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GenerateLedgerPeriodReport400JSONResponse) VisitGenerateLedgerPeriodReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateLedgerPeriodReport401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GenerateLedgerPeriodReport401JSONResponse) VisitGenerateLedgerPeriodReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateLedgerPeriodReport404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GenerateLedgerPeriodReport404JSONResponse) VisitGenerateLedgerPeriodReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateLedgerPeriodReport500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GenerateLedgerPeriodReport500JSONResponse) VisitGenerateLedgerPeriodReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFundSourceStatementsRequestObject struct {
 	LedgerPeriodUuid LedgerPeriodUUID `json:"ledger_period_uuid"`
 }
@@ -1439,6 +1636,9 @@ type StrictServerInterface interface {
 	// GetUnlockedLedgerPeriod Get the unlocked ledger period
 	// (GET /api/v1/ledger-periods/unlocked)
 	GetUnlockedLedgerPeriod(ctx context.Context, request GetUnlockedLedgerPeriodRequestObject) (GetUnlockedLedgerPeriodResponseObject, error)
+	// GetLedgerPeriod Get a ledger period
+	// (GET /api/v1/ledger-periods/{ledger_period_uuid})
+	GetLedgerPeriod(ctx context.Context, request GetLedgerPeriodRequestObject) (GetLedgerPeriodResponseObject, error)
 	// CloseLedgerPeriod Close a ledger period
 	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/close)
 	CloseLedgerPeriod(ctx context.Context, request CloseLedgerPeriodRequestObject) (CloseLedgerPeriodResponseObject, error)
@@ -1451,6 +1651,9 @@ type StrictServerInterface interface {
 	// ReopenLedgerPeriod Reopen a closed ledger period
 	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen)
 	ReopenLedgerPeriod(ctx context.Context, request ReopenLedgerPeriodRequestObject) (ReopenLedgerPeriodResponseObject, error)
+	// GenerateLedgerPeriodReport Generate a report for a ledger period
+	// (POST /api/v1/ledger-periods/{ledger_period_uuid}/report)
+	GenerateLedgerPeriodReport(ctx context.Context, request GenerateLedgerPeriodReportRequestObject) (GenerateLedgerPeriodReportResponseObject, error)
 	// ListFundSourceStatements List the fund source statements of a ledger period
 	// (GET /api/v1/ledger-periods/{ledger_period_uuid}/statements)
 	ListFundSourceStatements(ctx context.Context, request ListFundSourceStatementsRequestObject) (ListFundSourceStatementsResponseObject, error)
@@ -1634,6 +1837,31 @@ func (sh *strictHandler) GetUnlockedLedgerPeriod(ctx *echo.Context) error {
 	return nil
 }
 
+// GetLedgerPeriod operation middleware
+func (sh *strictHandler) GetLedgerPeriod(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error {
+	var request GetLedgerPeriodRequestObject
+
+	request.LedgerPeriodUuid = ledgerPeriodUuid
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLedgerPeriod(ctx.Request().Context(), request.(GetLedgerPeriodRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLedgerPeriod")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetLedgerPeriodResponseObject); ok {
+		return validResponse.VisitGetLedgerPeriodResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // CloseLedgerPeriod operation middleware
 func (sh *strictHandler) CloseLedgerPeriod(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error {
 	var request CloseLedgerPeriodRequestObject
@@ -1774,6 +2002,31 @@ func (sh *strictHandler) ReopenLedgerPeriod(ctx *echo.Context, ledgerPeriodUuid 
 		return err
 	} else if validResponse, ok := response.(ReopenLedgerPeriodResponseObject); ok {
 		return validResponse.VisitReopenLedgerPeriodResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GenerateLedgerPeriodReport operation middleware
+func (sh *strictHandler) GenerateLedgerPeriodReport(ctx *echo.Context, ledgerPeriodUuid LedgerPeriodUUID) error {
+	var request GenerateLedgerPeriodReportRequestObject
+
+	request.LedgerPeriodUuid = ledgerPeriodUuid
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GenerateLedgerPeriodReport(ctx.Request().Context(), request.(GenerateLedgerPeriodReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GenerateLedgerPeriodReport")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GenerateLedgerPeriodReportResponseObject); ok {
+		return validResponse.VisitGenerateLedgerPeriodReportResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

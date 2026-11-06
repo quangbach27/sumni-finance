@@ -54,16 +54,44 @@ paths:
       operationId: getUnlockedLedgerPeriod
       summary: Get the unlocked ledger period
       description: >-
-        The single period that is not reconciled yet (opened or closed), with its
-        fund source statements (including each fund source's current balance) and
-        the total inflow and outflow of its posted entries.
+        The single period that is not reconciled yet (opened or closed). The
+        response is the same as getLedgerPeriod.
       responses:
         "200":
           description: The unlocked ledger period.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetUnlockedLedgerPeriodResponse"
+                $ref: "#/components/schemas/GetLedgerPeriodResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}:
+    get:
+      tags: [ledger-periods]
+      operationId: getLedgerPeriod
+      summary: Get a ledger period
+      description: >-
+        A ledger period of any status, with its fund source statements
+        (including each fund source's current balance) and the total inflow and
+        outflow of its posted entries.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "200":
+          description: The ledger period.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetLedgerPeriodResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -247,6 +275,36 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/report:
+    post:
+      tags: [ledger-periods]
+      operationId: generateLedgerPeriodReport
+      summary: Generate a report for a ledger period
+      description: >
+        Generates a report for the period and stores its UUID on the period.
+        Currently the report UUID is a placeholder random value.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "200":
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateLedgerPeriodReportResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -446,6 +504,20 @@ components:
       x-go-type-import:
         path: backend/internal/ledgers/domain
 
+    ReportUUID:
+      type: string
+      format: uuid
+      x-go-type: models.ReportUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/apps/models
+
+    GenerateLedgerPeriodReportResponse:
+      type: object
+      required: [report_uuid]
+      properties:
+        report_uuid:
+          $ref: "#/components/schemas/ReportUUID"
+
     LedgerStatus:
       type: string
       enum: [opened, closed, reconciled]
@@ -494,6 +566,8 @@ components:
         reconciled_at:
           type: string
           format: date-time
+        report_uuid:
+          $ref: "#/components/schemas/ReportUUID"
 
     ListLedgerPeriodsResponse:
       type: object
@@ -626,7 +700,7 @@ components:
           type: string
           format: date-time
 
-    UnlockedLedgerStatement:
+    LedgerStatementDetail:
       allOf:
         - $ref: "#/components/schemas/FundSourceStatement"
         - type: object
@@ -637,7 +711,7 @@ components:
               allOf:
                 - $ref: "#/components/schemas/Decimal"
 
-    UnlockedLedgerPeriod:
+    LedgerPeriodDetail:
       allOf:
         - $ref: "#/components/schemas/LedgerPeriod"
         - type: object
@@ -654,14 +728,14 @@ components:
             statements:
               type: array
               items:
-                $ref: "#/components/schemas/UnlockedLedgerStatement"
+                $ref: "#/components/schemas/LedgerStatementDetail"
 
-    GetUnlockedLedgerPeriodResponse:
+    GetLedgerPeriodResponse:
       type: object
       required: [ledger_period]
       properties:
         ledger_period:
-          $ref: "#/components/schemas/UnlockedLedgerPeriod"
+          $ref: "#/components/schemas/LedgerPeriodDetail"
 
     ListFundSourceStatementsResponse:
       type: object

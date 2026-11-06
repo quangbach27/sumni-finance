@@ -79,7 +79,7 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	commandHandlers, err := commands.NewHandlers(fsRepo, periodRepo, fsFactory)
+	commandHandlers, err := commands.NewHandlers(fsRepo, periodRepo, periodRepo, fsFactory)
 	if err != nil {
 		return err
 	}

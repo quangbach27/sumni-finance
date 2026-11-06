@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	common "github.com/quangbach27/golang-common"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
 	"backend/internal/ledgers/apps/queries"
+	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
 
@@ -66,25 +68,39 @@ func (r *LedgerPeriodReadModel) ListLedgerPeriods(
 			ReopenReason:   row.ReopenReason,
 			ReopenedAt:     row.ReopenedAt,
 			ReconciledAt:   row.ReconciledAt,
+			ReportUUID:     uuidPtrToString(row.ReportUuid),
 		})
 	}
 
 	return shared.NewPagedResult(items, query.Page, int(total)), nil
 }
 
-func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (queries.UnlockedLedgerPeriod, error) {
-	rows, err := dbmodels.New(r.db).GetUnlockedLedgerPeriodWithStatements(ctx)
+func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (queries.LedgerPeriodDetail, error) {
+	periodUUID, err := dbmodels.New(r.db).GetUnlockedLedgerPeriodUUID(ctx)
 	if err != nil {
-		return queries.UnlockedLedgerPeriod{}, fmt.Errorf("get unlocked ledger period: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return queries.LedgerPeriodDetail{}, common.NewNotFoundError("open-ledger-not-found", "no unlocked ledger period was found")
+		}
+
+		return queries.LedgerPeriodDetail{}, fmt.Errorf("get unlocked ledger period: %w", err)
+	}
+
+	return r.GetLedgerPeriod(ctx, periodUUID)
+}
+
+func (r *LedgerPeriodReadModel) GetLedgerPeriod(ctx context.Context, ledgerPeriodUUID domain.LedgerPeriodUUID) (queries.LedgerPeriodDetail, error) {
+	rows, err := dbmodels.New(r.db).GetLedgerPeriodWithStatements(ctx, ledgerPeriodUUID)
+	if err != nil {
+		return queries.LedgerPeriodDetail{}, fmt.Errorf("get ledger period: %w", err)
 	}
 
 	if len(rows) == 0 {
-		return queries.UnlockedLedgerPeriod{}, common.NewNotFoundError("open-ledger-not-found", "no unlocked ledger period was found")
+		return queries.LedgerPeriodDetail{}, common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
 	}
 
 	// Period columns and totals repeat on every row, so the first row describes the period.
 	first := rows[0]
-	result := queries.UnlockedLedgerPeriod{
+	result := queries.LedgerPeriodDetail{
 		LedgerPeriod: queries.LedgerPeriod{
 			UUID:           first.Uuid.String(),
 			Name:           first.Name,
@@ -96,11 +112,12 @@ func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (qu
 			ReopenReason:   first.ReopenReason,
 			ReopenedAt:     first.ReopenedAt,
 			ReconciledAt:   first.ReconciledAt,
+			ReportUUID:     uuidPtrToString(first.ReportUuid),
 		},
 		TotalInflow:  first.TotalInflow,
 		TotalOutflow: first.TotalOutflow,
 		EntryCount:   first.EntryCount,
-		Statements:   make([]queries.UnlockedLedgerStatement, 0, len(rows)),
+		Statements:   make([]queries.LedgerStatementDetail, 0, len(rows)),
 	}
 
 	for _, row := range rows {
@@ -109,7 +126,7 @@ func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (qu
 			continue
 		}
 
-		st := queries.UnlockedLedgerStatement{
+		st := queries.LedgerStatementDetail{
 			FundSourceStatement: queries.FundSourceStatement{
 				UUID:           row.StatementUuid,
 				FundSourceUUID: row.FundSourceUuid,
@@ -130,4 +147,14 @@ func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (qu
 	}
 
 	return result, nil
+}
+
+func uuidPtrToString[T fmt.Stringer](id *T) *string {
+	if id == nil {
+		return nil
+	}
+
+	s := (*id).String()
+
+	return &s
 }

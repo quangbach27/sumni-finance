@@ -12,6 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 )
 
@@ -621,6 +622,60 @@ func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 	}
 
 	return nil
+}
+
+// GenerateLedgerPeriodReport generates the period's report and links it to the period.
+// A period gets one report: when it already has one, that report UUID is returned.
+// TODO: the report is an empty placeholder row until real generation is implemented.
+func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
+	ctx context.Context,
+	ledgerPeriodUUID domain.LedgerPeriodUUID,
+) (models.ReportUUID, error) {
+	if ledgerPeriodUUID.IsZero() {
+		return models.ReportUUID{}, common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+	}
+
+	var reportUUID models.ReportUUID
+
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		existing, err := q.GetLedgerPeriodReportUUID(ctx, ledgerPeriodUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
+			}
+
+			return err
+		}
+
+		if existing != nil {
+			reportUUID = *existing
+
+			return nil
+		}
+
+		reportUUID = models.ReportUUID{UUID: common.NewUUIDv7()}
+
+		if err := q.CreateLedgerPeriodReport(ctx, reportUUID); err != nil {
+			return err
+		}
+
+		return q.UpdateLedgerPeriodReportUUID(ctx, dbmodels.UpdateLedgerPeriodReportUUIDParams{
+			ReportUuid: &reportUUID,
+			Uuid:       ledgerPeriodUUID,
+		})
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return models.ReportUUID{}, err
+		}
+
+		return models.ReportUUID{}, fmt.Errorf("generate ledger period report: %w", err)
+	}
+
+	return reportUUID, nil
 }
 
 func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(

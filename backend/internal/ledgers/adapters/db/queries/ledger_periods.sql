@@ -65,13 +65,28 @@ SET status = @status,
     reconciled_at = COALESCE(sqlc.narg('reconciled_at'), reconciled_at)
 WHERE uuid = @uuid;
 
--- name: GetUnlockedLedgerPeriodWithStatements :many
+-- name: GetUnlockedLedgerPeriodUUID :one
+SELECT uuid
+FROM ledgers.ledger_periods
+WHERE status <> 'reconciled'
+ORDER BY open_date DESC
+LIMIT 1;
+
+-- name: GetLedgerPeriodReportUUID :one
+SELECT report_uuid
+FROM ledgers.ledger_periods
+WHERE uuid = @uuid;
+
+-- name: UpdateLedgerPeriodReportUUID :exec
+UPDATE ledgers.ledger_periods
+SET report_uuid = @report_uuid
+WHERE uuid = @uuid;
+
+-- name: GetLedgerPeriodWithStatements :many
 WITH p AS (
     SELECT *
     FROM ledgers.ledger_periods
-    WHERE status <> 'reconciled'
-    ORDER BY open_date DESC
-    LIMIT 1
+    WHERE ledger_periods.uuid = @ledger_period_uuid
 )
 SELECT
     p.uuid,
@@ -84,6 +99,7 @@ SELECT
     p.reopen_reason,
     p.reopened_at,
     p.reconciled_at,
+    p.report_uuid,
     (SELECT COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)
        FROM ledgers.ledger_entries e
       WHERE e.ledger_period_uuid = p.uuid AND e.status = 'posted')::numeric(20, 2) AS total_inflow,

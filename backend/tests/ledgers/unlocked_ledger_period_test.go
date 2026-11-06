@@ -84,6 +84,24 @@ func TestGetUnlockedLedgerPeriod(t *testing.T) {
 		assert.Equal(t, period.String(), got.JSON200.LedgerPeriod.Uuid.String())
 	})
 
+	t.Run("response matches get by uuid", func(t *testing.T) {
+		utils.ResetLedgerPeriods(t)
+		clients, token := utils.NewTestClients(t), newUserToken()
+		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		period := openPeriod(t, clients, token, fs)
+		require.Equal(t, 201, postLedgerEntries(t, clients, token, period,
+			entryInput(fs, shared.DirectionOutflow, 1_000)).StatusCode())
+
+		unlocked := getUnlockedLedgerPeriod(t, clients, token)
+		require.Equal(t, 200, unlocked.StatusCode(), "body: %s", string(unlocked.Body))
+
+		byUUID, err := clients.Ledgers.GetLedgerPeriodWithResponse(context.Background(), period, utils.AuthEditorFn(token))
+		require.NoError(t, err)
+		require.Equal(t, 200, byUUID.StatusCode(), "body: %s", string(byUUID.Body))
+
+		assert.JSONEq(t, string(byUUID.Body), string(unlocked.Body))
+	})
+
 	t.Run("404 when every period is reconciled or none exists", func(t *testing.T) {
 		utils.ResetLedgerPeriods(t)
 		clients, token := utils.NewTestClients(t), newUserToken()

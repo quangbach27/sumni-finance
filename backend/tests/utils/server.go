@@ -41,6 +41,8 @@ func ResetLedgerPeriods(t *testing.T) {
 	require.NoError(t, err)
 	_, err = DB.Exec(ctx, "DELETE FROM ledgers.ledger_periods")
 	require.NoError(t, err)
+	_, err = DB.Exec(ctx, "DELETE FROM ledgers.ledger_period_reports")
+	require.NoError(t, err)
 }
 
 func StartServer(ctx context.Context) {

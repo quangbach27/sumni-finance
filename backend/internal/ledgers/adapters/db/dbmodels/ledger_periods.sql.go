@@ -9,6 +9,7 @@ import (
 	"context"
 	"time"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	golang_common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
@@ -83,7 +84,7 @@ func (q *Queries) ExistsUnlockedLedgerPeriod(ctx context.Context) (bool, error) 
 }
 
 const getLedgerPeriodByUUID = `-- name: GetLedgerPeriodByUUID :one
-SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at
+SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at, report_uuid
 FROM ledgers.ledger_periods
 WHERE uuid = $1
 `
@@ -103,17 +104,29 @@ func (q *Queries) GetLedgerPeriodByUUID(ctx context.Context, uuid domain.LedgerP
 		&i.ReopenedAt,
 		&i.ReconciledAt,
 		&i.CreatedAt,
+		&i.ReportUuid,
 	)
 	return i, err
 }
 
-const getUnlockedLedgerPeriodWithStatements = `-- name: GetUnlockedLedgerPeriodWithStatements :many
+const getLedgerPeriodReportUUID = `-- name: GetLedgerPeriodReportUUID :one
+SELECT report_uuid
+FROM ledgers.ledger_periods
+WHERE uuid = $1
+`
+
+func (q *Queries) GetLedgerPeriodReportUUID(ctx context.Context, uuid domain.LedgerPeriodUUID) (*models.ReportUUID, error) {
+	row := q.db.QueryRow(ctx, getLedgerPeriodReportUUID, uuid)
+	var report_uuid *models.ReportUUID
+	err := row.Scan(&report_uuid)
+	return report_uuid, err
+}
+
+const getLedgerPeriodWithStatements = `-- name: GetLedgerPeriodWithStatements :many
 WITH p AS (
-    SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at
+    SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at, report_uuid
     FROM ledgers.ledger_periods
-    WHERE status <> 'reconciled'
-    ORDER BY open_date DESC
-    LIMIT 1
+    WHERE ledger_periods.uuid = $1
 )
 SELECT
     p.uuid,
@@ -126,6 +139,7 @@ SELECT
     p.reopen_reason,
     p.reopened_at,
     p.reconciled_at,
+    p.report_uuid,
     (SELECT COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)
        FROM ledgers.ledger_entries e
       WHERE e.ledger_period_uuid = p.uuid AND e.status = 'posted')::numeric(20, 2) AS total_inflow,
@@ -149,7 +163,7 @@ LEFT JOIN ledgers.fund_sources fs ON fs.uuid = st.fund_source_uuid
 ORDER BY st.created_at, st.uuid
 `
 
-type GetUnlockedLedgerPeriodWithStatementsRow struct {
+type GetLedgerPeriodWithStatementsRow struct {
 	Uuid                    golang_common.UUID
 	Name                    string
 	OpeningBalance          decimal.Decimal
@@ -160,6 +174,7 @@ type GetUnlockedLedgerPeriodWithStatementsRow struct {
 	ReopenReason            *string
 	ReopenedAt              *time.Time
 	ReconciledAt            *time.Time
+	ReportUuid              *golang_common.UUID
 	TotalInflow             decimal.Decimal
 	TotalOutflow            decimal.Decimal
 	EntryCount              int64
@@ -173,15 +188,15 @@ type GetUnlockedLedgerPeriodWithStatementsRow struct {
 	CurrentBalance          *decimal.Decimal
 }
 
-func (q *Queries) GetUnlockedLedgerPeriodWithStatements(ctx context.Context) ([]GetUnlockedLedgerPeriodWithStatementsRow, error) {
-	rows, err := q.db.Query(ctx, getUnlockedLedgerPeriodWithStatements)
+func (q *Queries) GetLedgerPeriodWithStatements(ctx context.Context, ledgerPeriodUuid domain.LedgerPeriodUUID) ([]GetLedgerPeriodWithStatementsRow, error) {
+	rows, err := q.db.Query(ctx, getLedgerPeriodWithStatements, ledgerPeriodUuid)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetUnlockedLedgerPeriodWithStatementsRow{}
+	items := []GetLedgerPeriodWithStatementsRow{}
 	for rows.Next() {
-		var i GetUnlockedLedgerPeriodWithStatementsRow
+		var i GetLedgerPeriodWithStatementsRow
 		if err := rows.Scan(
 			&i.Uuid,
 			&i.Name,
@@ -193,6 +208,7 @@ func (q *Queries) GetUnlockedLedgerPeriodWithStatements(ctx context.Context) ([]
 			&i.ReopenReason,
 			&i.ReopenedAt,
 			&i.ReconciledAt,
+			&i.ReportUuid,
 			&i.TotalInflow,
 			&i.TotalOutflow,
 			&i.EntryCount,
@@ -215,6 +231,21 @@ func (q *Queries) GetUnlockedLedgerPeriodWithStatements(ctx context.Context) ([]
 	return items, nil
 }
 
+const getUnlockedLedgerPeriodUUID = `-- name: GetUnlockedLedgerPeriodUUID :one
+SELECT uuid
+FROM ledgers.ledger_periods
+WHERE status <> 'reconciled'
+ORDER BY open_date DESC
+LIMIT 1
+`
+
+func (q *Queries) GetUnlockedLedgerPeriodUUID(ctx context.Context) (domain.LedgerPeriodUUID, error) {
+	row := q.db.QueryRow(ctx, getUnlockedLedgerPeriodUUID)
+	var uuid domain.LedgerPeriodUUID
+	err := row.Scan(&uuid)
+	return uuid, err
+}
+
 type InsertFundSourceStatementsParams struct {
 	Uuid             domain.FundSourceStatementUUID
 	LedgerPeriodUuid domain.LedgerPeriodUUID
@@ -223,7 +254,7 @@ type InsertFundSourceStatementsParams struct {
 }
 
 const listLedgerPeriods = `-- name: ListLedgerPeriods :many
-SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at
+SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at, report_uuid
 FROM ledgers.ledger_periods
 WHERE ($1::text IS NULL OR status = $1::text)
 ORDER BY open_date DESC, created_at DESC
@@ -258,6 +289,7 @@ func (q *Queries) ListLedgerPeriods(ctx context.Context, arg ListLedgerPeriodsPa
 			&i.ReopenedAt,
 			&i.ReconciledAt,
 			&i.CreatedAt,
+			&i.ReportUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -297,5 +329,21 @@ func (q *Queries) UpdateLedgerPeriod(ctx context.Context, arg UpdateLedgerPeriod
 		arg.ReconciledAt,
 		arg.Uuid,
 	)
+	return err
+}
+
+const updateLedgerPeriodReportUUID = `-- name: UpdateLedgerPeriodReportUUID :exec
+UPDATE ledgers.ledger_periods
+SET report_uuid = $1
+WHERE uuid = $2
+`
+
+type UpdateLedgerPeriodReportUUIDParams struct {
+	ReportUuid *models.ReportUUID
+	Uuid       domain.LedgerPeriodUUID
+}
+
+func (q *Queries) UpdateLedgerPeriodReportUUID(ctx context.Context, arg UpdateLedgerPeriodReportUUIDParams) error {
+	_, err := q.db.Exec(ctx, updateLedgerPeriodReportUUID, arg.ReportUuid, arg.Uuid)
 	return err
 }
