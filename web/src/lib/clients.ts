@@ -77,7 +77,10 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  config.headers.set('Authorization', `Bearer token-1`);
+  config.headers.set(
+    'Authorization',
+    `Bearer pQL8eP0T4ZZc376pOy9X8GA/mP9Ln8PzVC534Jrb/JY=`,
+  );
   return config;
 });
 
