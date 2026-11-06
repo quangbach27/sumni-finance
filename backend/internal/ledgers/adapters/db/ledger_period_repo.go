@@ -563,13 +563,64 @@ func validateStatementUUIDs(uuids []domain.FundSourceStatementUUID) error {
 	return nil
 }
 
-// TODO: lock the period row (FOR UPDATE), call updateFn, save.
+// ReopenLedgerPeriod reopens a closed period and clears the closing balance of
+// its statements. It fails with a conflict when any statement is reconciled.
 func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 	ctx context.Context,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
-	updateFn func(period *domain.LedgerPeriod) error,
+	reason string,
 ) error {
-	return errNotImplemented
+	if ledgerPeriodUUID.IsZero() {
+		return common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+	}
+
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+
+		if err := period.Reopen(reason); err != nil {
+			return err
+		}
+
+		rows, err := q.ListFundSourceStatementsByPeriod(ctx, ledgerPeriodUUID)
+		if err != nil {
+			return err
+		}
+
+		for _, row := range rows {
+			if fundSourceStatementToDomain(row).IsReconciled() {
+				return common.NewConflictError(
+					"fund-source-statement-reconciled",
+					"fund source statement %s is already reconciled", row.Uuid.String(),
+				)
+			}
+		}
+
+		if err := q.ClearFundSourceStatementClosingBalances(ctx, ledgerPeriodUUID); err != nil {
+			return err
+		}
+
+		return q.UpdateLedgerPeriod(ctx, dbmodels.UpdateLedgerPeriodParams{
+			Status:       period.Status(),
+			ReopenReason: period.ReopenReason(),
+			ReopenedAt:   period.ReopenedAt(),
+			Uuid:         period.UUID(),
+		})
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return err
+		}
+
+		return fmt.Errorf("reopen ledger period: %w", err)
+	}
+
+	return nil
 }
 
 func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(

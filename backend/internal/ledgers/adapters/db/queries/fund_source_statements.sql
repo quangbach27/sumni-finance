@@ -17,3 +17,8 @@ SET closing_balance = COALESCE(sqlc.narg('closing_balance'), closing_balance),
     reconciled_by = COALESCE(sqlc.narg('reconciled_by'), reconciled_by),
     reconciled_at = COALESCE(sqlc.narg('reconciled_at'), reconciled_at)
 WHERE uuid = @uuid;
+
+-- name: ClearFundSourceStatementClosingBalances :exec
+UPDATE ledgers.fund_source_statements
+SET closing_balance = NULL
+WHERE ledger_period_uuid = @ledger_period_uuid;

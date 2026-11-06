@@ -12,6 +12,17 @@ import (
 	golang_common "github.com/quangbach27/golang-common"
 )
 
+const clearFundSourceStatementClosingBalances = `-- name: ClearFundSourceStatementClosingBalances :exec
+UPDATE ledgers.fund_source_statements
+SET closing_balance = NULL
+WHERE ledger_period_uuid = $1
+`
+
+func (q *Queries) ClearFundSourceStatementClosingBalances(ctx context.Context, ledgerPeriodUuid domain.LedgerPeriodUUID) error {
+	_, err := q.db.Exec(ctx, clearFundSourceStatementClosingBalances, ledgerPeriodUuid)
+	return err
+}
+
 const listFundSourceStatementsByPeriod = `-- name: ListFundSourceStatementsByPeriod :many
 SELECT uuid, ledger_period_uuid, fund_source_uuid, opening_balance, closing_balance, actual_balance, reconciled_by, reconciled_at, created_at
 FROM ledgers.fund_source_statements

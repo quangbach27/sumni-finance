@@ -133,6 +133,17 @@ func (h *Handlers) CloseLedgerPeriod(ctx context.Context, request CloseLedgerPer
 	return CloseLedgerPeriod204Response{}, nil
 }
 
+func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, request ReopenLedgerPeriodRequestObject) (ReopenLedgerPeriodResponseObject, error) {
+	if err := h.commandHandlers.ReopenLedgerPeriod(ctx, commands.ReopenLedgerPeriod{
+		LedgerPeriodUUID: request.LedgerPeriodUuid,
+		Reason:           request.Body.Reason,
+	}); err != nil {
+		return nil, err
+	}
+
+	return ReopenLedgerPeriod204Response{}, nil
+}
+
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, request ReconcileLedgerPeriodRequestObject) (ReconcileLedgerPeriodResponseObject, error) {
 	if err := h.commandHandlers.ReconcileLedgerPeriod(ctx, commands.ReconcileLedgerPeriod{
 		LedgerPeriodUUID: request.LedgerPeriodUuid,

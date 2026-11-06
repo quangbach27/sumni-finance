@@ -212,6 +212,44 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/ledger-periods/{ledger_period_uuid}/reopen:
+    post:
+      tags: [ledger-periods]
+      operationId: reopenLedgerPeriod
+      summary: Reopen a closed ledger period
+      description: >
+        Reopens a closed period and clears the closing balance of its fund
+        source statements. Fails with 400 `period-not-closed` when the period
+        is not closed, 400 `period-locked` when it is reconciled, 400
+        `reopen-reason-required` when the reason is blank, and 409
+        `fund-source-statement-reconciled` when any statement is already
+        reconciled.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReopenLedgerPeriodRequest"
+      responses:
+        "204":
+          description: Ledger period reopened
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/ledger-periods/{ledger_period_uuid}/statements:
     get:
       tags: [ledger-periods]
@@ -467,6 +505,13 @@ components:
             $ref: "#/components/schemas/LedgerPeriod"
         page_info:
           $ref: "#/components/schemas/PageInfo"
+
+    ReopenLedgerPeriodRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
 
     OpenLedgerPeriodRequest:
       type: object

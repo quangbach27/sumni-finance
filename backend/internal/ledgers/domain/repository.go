@@ -35,7 +35,7 @@ type LedgerPeriodRepository interface {
 	ReopenLedgerPeriod(
 		ctx context.Context,
 		ledgerPeriodUUID LedgerPeriodUUID,
-		updateFn func(period *LedgerPeriod) error,
+		reason string,
 	) error
 	// ReconcileLedgerPeriod locks a closed period once every fund source
 	// statement is reconciled. The period closing balance becomes the total of
