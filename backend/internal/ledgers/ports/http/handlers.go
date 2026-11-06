@@ -224,6 +224,48 @@ func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeri
 	}, nil
 }
 
+func (h *Handlers) GetUnlockedLedgerPeriod(ctx context.Context, _ GetUnlockedLedgerPeriodRequestObject) (GetUnlockedLedgerPeriodResponseObject, error) {
+	period, err := h.queryHandlers.GetUnlockedLedgerPeriod(ctx, queries.GetUnlockedLedgerPeriod{})
+	if err != nil {
+		return nil, err
+	}
+
+	statements := make([]UnlockedLedgerStatement, 0, len(period.Statements))
+	for _, st := range period.Statements {
+		statements = append(statements, UnlockedLedgerStatement{
+			Uuid:           domain.FundSourceStatementUUID{UUID: common.MustUUIDFromString(st.UUID)},
+			FundSourceUuid: domain.FundSourceUUID{UUID: common.MustUUIDFromString(st.FundSourceUUID)},
+			OpeningBalance: st.OpeningBalance,
+			ClosingBalance: st.ClosingBalance,
+			ActualBalance:  st.ActualBalance,
+			ReconciledBy:   st.ReconciledBy,
+			ReconciledAt:   st.ReconciledAt,
+			CurrentBalance: st.CurrentBalance,
+		})
+	}
+
+	base := toAPILedgerPeriod(period.LedgerPeriod)
+
+	return GetUnlockedLedgerPeriod200JSONResponse{
+		LedgerPeriod: UnlockedLedgerPeriod{
+			Uuid:           base.Uuid,
+			Name:           base.Name,
+			OpeningBalance: base.OpeningBalance,
+			ClosingBalance: base.ClosingBalance,
+			OpenDate:       base.OpenDate,
+			CloseDate:      base.CloseDate,
+			Status:         base.Status,
+			ReopenReason:   base.ReopenReason,
+			ReopenedAt:     base.ReopenedAt,
+			ReconciledAt:   base.ReconciledAt,
+			TotalInflow:    period.TotalInflow,
+			TotalOutflow:   period.TotalOutflow,
+			EntryCount:     period.EntryCount,
+			Statements:     statements,
+		},
+	}, nil
+}
+
 func toAPILedgerPeriod(p queries.LedgerPeriod) LedgerPeriod {
 	return LedgerPeriod{
 		Uuid:           domain.LedgerPeriodUUID{UUID: common.MustUUIDFromString(p.UUID)},

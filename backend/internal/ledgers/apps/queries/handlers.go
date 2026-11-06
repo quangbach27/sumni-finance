@@ -14,6 +14,7 @@ type FundSourceReadModel interface {
 
 type LedgerPeriodReadModel interface {
 	ListLedgerPeriods(ctx context.Context, query ListLedgerPeriods) (shared.PagedResult[LedgerPeriod], error)
+	GetUnlockedLedgerPeriod(ctx context.Context) (UnlockedLedgerPeriod, error)
 }
 
 type FundSourceStatementReadModel interface {

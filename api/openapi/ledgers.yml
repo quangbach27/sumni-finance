@@ -48,6 +48,29 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/ledger-periods/unlocked:
+    get:
+      tags: [ledger-periods]
+      operationId: getUnlockedLedgerPeriod
+      summary: Get the unlocked ledger period
+      description: >-
+        The single period that is not reconciled yet (opened or closed), with its
+        fund source statements (including each fund source's current balance) and
+        the total inflow and outflow of its posted entries.
+      responses:
+        "200":
+          description: The unlocked ledger period.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetUnlockedLedgerPeriodResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/ledger-periods:
     get:
       tags: [ledger-periods]
@@ -557,6 +580,43 @@ components:
         reconciled_at:
           type: string
           format: date-time
+
+    UnlockedLedgerStatement:
+      allOf:
+        - $ref: "#/components/schemas/FundSourceStatement"
+        - type: object
+          required: [current_balance]
+          properties:
+            current_balance:
+              description: Live balance of the fund source.
+              allOf:
+                - $ref: "#/components/schemas/Decimal"
+
+    UnlockedLedgerPeriod:
+      allOf:
+        - $ref: "#/components/schemas/LedgerPeriod"
+        - type: object
+          required: [total_inflow, total_outflow, entry_count, statements]
+          properties:
+            total_inflow:
+              $ref: "#/components/schemas/Decimal"
+            total_outflow:
+              $ref: "#/components/schemas/Decimal"
+            entry_count:
+              type: integer
+              format: int64
+              description: Number of posted ledger entries in the period.
+            statements:
+              type: array
+              items:
+                $ref: "#/components/schemas/UnlockedLedgerStatement"
+
+    GetUnlockedLedgerPeriodResponse:
+      type: object
+      required: [ledger_period]
+      properties:
+        ledger_period:
+          $ref: "#/components/schemas/UnlockedLedgerPeriod"
 
     ListFundSourceStatementsResponse:
       type: object

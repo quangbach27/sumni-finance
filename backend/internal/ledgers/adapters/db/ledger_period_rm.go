@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	common "github.com/quangbach27/golang-common"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
 	"backend/internal/ledgers/apps/queries"
@@ -69,4 +70,64 @@ func (r *LedgerPeriodReadModel) ListLedgerPeriods(
 	}
 
 	return shared.NewPagedResult(items, query.Page, int(total)), nil
+}
+
+func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (queries.UnlockedLedgerPeriod, error) {
+	rows, err := dbmodels.New(r.db).GetUnlockedLedgerPeriodWithStatements(ctx)
+	if err != nil {
+		return queries.UnlockedLedgerPeriod{}, fmt.Errorf("get unlocked ledger period: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return queries.UnlockedLedgerPeriod{}, common.NewNotFoundError("open-ledger-not-found", "no unlocked ledger period was found")
+	}
+
+	// Period columns and totals repeat on every row, so the first row describes the period.
+	first := rows[0]
+	result := queries.UnlockedLedgerPeriod{
+		LedgerPeriod: queries.LedgerPeriod{
+			UUID:           first.Uuid.String(),
+			Name:           first.Name,
+			OpeningBalance: first.OpeningBalance,
+			ClosingBalance: first.ClosingBalance,
+			OpenDate:       first.OpenDate,
+			CloseDate:      first.CloseDate,
+			Status:         first.Status,
+			ReopenReason:   first.ReopenReason,
+			ReopenedAt:     first.ReopenedAt,
+			ReconciledAt:   first.ReconciledAt,
+		},
+		TotalInflow:  first.TotalInflow,
+		TotalOutflow: first.TotalOutflow,
+		EntryCount:   first.EntryCount,
+		Statements:   make([]queries.UnlockedLedgerStatement, 0, len(rows)),
+	}
+
+	for _, row := range rows {
+		// The LEFT JOIN yields one all-empty statement row for a period without statements.
+		if row.StatementUuid == "" {
+			continue
+		}
+
+		st := queries.UnlockedLedgerStatement{
+			FundSourceStatement: queries.FundSourceStatement{
+				UUID:           row.StatementUuid,
+				FundSourceUUID: row.FundSourceUuid,
+				ClosingBalance: row.StatementClosingBalance,
+				ActualBalance:  row.ActualBalance,
+				ReconciledBy:   row.ReconciledBy,
+				ReconciledAt:   row.StatementReconciledAt,
+			},
+		}
+		if row.StatementOpeningBalance != nil {
+			st.OpeningBalance = *row.StatementOpeningBalance
+		}
+		if row.CurrentBalance != nil {
+			st.CurrentBalance = *row.CurrentBalance
+		}
+
+		result.Statements = append(result.Statements, st)
+	}
+
+	return result, nil
 }

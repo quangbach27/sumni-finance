@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"backend/internal/ledgers/domain"
+	golang_common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 )
 
@@ -104,6 +105,114 @@ func (q *Queries) GetLedgerPeriodByUUID(ctx context.Context, uuid domain.LedgerP
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getUnlockedLedgerPeriodWithStatements = `-- name: GetUnlockedLedgerPeriodWithStatements :many
+WITH p AS (
+    SELECT uuid, name, opening_balance, closing_balance, open_date, close_date, status, reopen_reason, reopened_at, reconciled_at, created_at
+    FROM ledgers.ledger_periods
+    WHERE status <> 'reconciled'
+    ORDER BY open_date DESC
+    LIMIT 1
+)
+SELECT
+    p.uuid,
+    p.name,
+    p.opening_balance,
+    p.closing_balance,
+    p.open_date,
+    p.close_date,
+    p.status,
+    p.reopen_reason,
+    p.reopened_at,
+    p.reconciled_at,
+    (SELECT COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)
+       FROM ledgers.ledger_entries e
+      WHERE e.ledger_period_uuid = p.uuid AND e.status = 'posted')::numeric(20, 2) AS total_inflow,
+    (SELECT COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'outflow'), 0)
+       FROM ledgers.ledger_entries e
+      WHERE e.ledger_period_uuid = p.uuid AND e.status = 'posted')::numeric(20, 2) AS total_outflow,
+    (SELECT COUNT(*)
+       FROM ledgers.ledger_entries e
+      WHERE e.ledger_period_uuid = p.uuid AND e.status = 'posted')::bigint AS entry_count,
+    COALESCE(st.uuid::text, '')::text AS statement_uuid,
+    COALESCE(st.fund_source_uuid::text, '')::text AS fund_source_uuid,
+    st.opening_balance AS statement_opening_balance,
+    st.closing_balance AS statement_closing_balance,
+    st.actual_balance,
+    st.reconciled_by,
+    st.reconciled_at AS statement_reconciled_at,
+    fs.balance AS current_balance
+FROM p
+LEFT JOIN ledgers.fund_source_statements st ON st.ledger_period_uuid = p.uuid
+LEFT JOIN ledgers.fund_sources fs ON fs.uuid = st.fund_source_uuid
+ORDER BY st.created_at, st.uuid
+`
+
+type GetUnlockedLedgerPeriodWithStatementsRow struct {
+	Uuid                    golang_common.UUID
+	Name                    string
+	OpeningBalance          decimal.Decimal
+	ClosingBalance          *decimal.Decimal
+	OpenDate                time.Time
+	CloseDate               time.Time
+	Status                  string
+	ReopenReason            *string
+	ReopenedAt              *time.Time
+	ReconciledAt            *time.Time
+	TotalInflow             decimal.Decimal
+	TotalOutflow            decimal.Decimal
+	EntryCount              int64
+	StatementUuid           string
+	FundSourceUuid          string
+	StatementOpeningBalance *decimal.Decimal
+	StatementClosingBalance *decimal.Decimal
+	ActualBalance           *decimal.Decimal
+	ReconciledBy            *string
+	StatementReconciledAt   *time.Time
+	CurrentBalance          *decimal.Decimal
+}
+
+func (q *Queries) GetUnlockedLedgerPeriodWithStatements(ctx context.Context) ([]GetUnlockedLedgerPeriodWithStatementsRow, error) {
+	rows, err := q.db.Query(ctx, getUnlockedLedgerPeriodWithStatements)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUnlockedLedgerPeriodWithStatementsRow{}
+	for rows.Next() {
+		var i GetUnlockedLedgerPeriodWithStatementsRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Name,
+			&i.OpeningBalance,
+			&i.ClosingBalance,
+			&i.OpenDate,
+			&i.CloseDate,
+			&i.Status,
+			&i.ReopenReason,
+			&i.ReopenedAt,
+			&i.ReconciledAt,
+			&i.TotalInflow,
+			&i.TotalOutflow,
+			&i.EntryCount,
+			&i.StatementUuid,
+			&i.FundSourceUuid,
+			&i.StatementOpeningBalance,
+			&i.StatementClosingBalance,
+			&i.ActualBalance,
+			&i.ReconciledBy,
+			&i.StatementReconciledAt,
+			&i.CurrentBalance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 type InsertFundSourceStatementsParams struct {

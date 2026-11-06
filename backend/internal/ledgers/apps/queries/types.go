@@ -49,3 +49,18 @@ type FundSourceStatement struct {
 	ReconciledBy   *string
 	ReconciledAt   *time.Time
 }
+
+// UnlockedLedgerStatement is a fund source statement plus the fund source's live balance.
+type UnlockedLedgerStatement struct {
+	FundSourceStatement
+	CurrentBalance decimal.Decimal
+}
+
+// UnlockedLedgerPeriod is the single non-reconciled period with its statements and entry totals.
+type UnlockedLedgerPeriod struct {
+	LedgerPeriod
+	TotalInflow  decimal.Decimal
+	TotalOutflow decimal.Decimal
+	EntryCount   int64
+	Statements   []UnlockedLedgerStatement
+}
