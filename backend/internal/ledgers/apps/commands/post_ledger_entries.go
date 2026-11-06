@@ -7,6 +7,7 @@ import (
 	"time"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/log"
 	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/domain"
@@ -93,6 +94,8 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 	if err != nil {
 		return nil, err
 	}
+
+	log.FromContext(ctx).With("periodUUID", cmd.LedgerPeriodUUID.String(), "entryCount", len(entryUUIDs)).Info("journal entries posted")
 
 	return entryUUIDs, nil
 }

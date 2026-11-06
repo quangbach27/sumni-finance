@@ -6,7 +6,6 @@ import (
 
 	common "github.com/quangbach27/golang-common"
 	"github.com/quangbach27/golang-common/http/auth"
-	"github.com/quangbach27/golang-common/log"
 
 	"backend/internal/ledgers/apps/commands"
 	"backend/internal/ledgers/apps/queries"
@@ -195,8 +194,6 @@ func (h *Handlers) ListFundSourceStatements(ctx context.Context, request ListFun
 
 func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error) {
 	params := request.Params
-
-	log.FromContext(ctx).Info("list params", "params", params)
 
 	// Missing params become zero values, which NewPageRequest turns into the defaults.
 	page, err := shared.NewPageRequest(utils.SafeDeref(params.Page, 0), utils.SafeDeref(params.PageSize, 20))

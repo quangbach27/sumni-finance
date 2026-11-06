@@ -4,6 +4,7 @@ import (
 	"context"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/log"
 	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/domain"
@@ -59,6 +60,8 @@ func (h *Handlers) CreateFundSource(ctx context.Context, cmd CreateFundSource) (
 	if err := h.fsRepo.CreateFundSource(ctx, fundSource); err != nil {
 		return domain.FundSourceUUID{}, err
 	}
+
+	log.FromContext(ctx).With("fundSourceUUID", fundSource.UUID().String(), "type", cmd.Type.String()).Info("fund source created")
 
 	return fundSource.UUID(), nil
 }

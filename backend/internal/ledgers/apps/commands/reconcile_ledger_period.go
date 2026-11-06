@@ -3,6 +3,8 @@ package commands
 import (
 	"context"
 
+	"github.com/quangbach27/golang-common/log"
+
 	"backend/internal/ledgers/domain"
 )
 
@@ -14,5 +16,11 @@ type ReconcileLedgerPeriod struct {
 // is reconciled. The repository checks the statements and sets the closing
 // balance.
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, cmd ReconcileLedgerPeriod) error {
-	return h.periodRepo.ReconcileLedgerPeriod(ctx, cmd.LedgerPeriodUUID)
+	if err := h.periodRepo.ReconcileLedgerPeriod(ctx, cmd.LedgerPeriodUUID); err != nil {
+		return err
+	}
+
+	log.FromContext(ctx).With("periodUUID", cmd.LedgerPeriodUUID.String()).Info("ledger period reconciled")
+
+	return nil
 }

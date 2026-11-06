@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/quangbach27/golang-common/log"
+
 	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/domain"
@@ -40,6 +42,8 @@ func (h *Handlers) OpenLedgerPeriod(ctx context.Context, cmd OpenLedgerPeriod) (
 	if err != nil {
 		return domain.LedgerPeriodUUID{}, err
 	}
+
+	log.FromContext(ctx).With("periodUUID", periodUUID.String()).Info("ledger period opened")
 
 	return periodUUID, nil
 }
