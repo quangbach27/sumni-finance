@@ -1,3 +1,4 @@
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { BookOpen, Plus } from 'lucide-react';
 
 import {
@@ -10,15 +11,14 @@ import {
 } from '@/components/ui/empty';
 
 import OpenLedgerPeriodTrigger from './open-ledger-period-trigger';
+import { getLedgerPeriodsQueryOptions } from '../../api/get-ledger-periods';
 import { getOpenLedgerPeriodDefaultValues } from '../../api/open-ledger-period';
 
-import type { LedgerPeriod } from '../../api/types';
-
-export default function NoOpenPeriod({
-  previous,
-}: {
-  previous?: LedgerPeriod;
-}) {
+export default function NoOpenPeriod() {
+  const { data } = useSuspenseQuery(
+    getLedgerPeriodsQueryOptions({ status: 'reconciled', pageSize: 1 }),
+  );
+  const previous = data.items.at(0);
   const next = getOpenLedgerPeriodDefaultValues(previous?.closeDate).name;
   return (
     <Empty className="mt-6 border border-dashed py-12">
