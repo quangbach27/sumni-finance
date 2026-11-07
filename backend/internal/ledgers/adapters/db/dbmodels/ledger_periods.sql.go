@@ -156,7 +156,15 @@ SELECT
     st.actual_balance,
     st.reconciled_by,
     st.reconciled_at AS statement_reconciled_at,
-    fs.balance AS current_balance
+    fs.name AS fund_source_name,
+    fs.type AS fund_source_type,
+    fs.balance AS fund_source_balance,
+    fs.currency AS fund_source_currency,
+    fs.owner_name AS fund_source_owner_name,
+    fs.bank_code AS fund_source_bank_code,
+    fs.bank_bin AS fund_source_bank_bin,
+    fs.bank_short_name AS fund_source_bank_short_name,
+    fs.account_number AS fund_source_account_number
 FROM p
 LEFT JOIN ledgers.fund_source_statements st ON st.ledger_period_uuid = p.uuid
 LEFT JOIN ledgers.fund_sources fs ON fs.uuid = st.fund_source_uuid
@@ -185,7 +193,15 @@ type GetLedgerPeriodWithStatementsRow struct {
 	ActualBalance           *decimal.Decimal
 	ReconciledBy            *string
 	StatementReconciledAt   *time.Time
-	CurrentBalance          *decimal.Decimal
+	FundSourceName          *string
+	FundSourceType          domain.FundSourceType
+	FundSourceBalance       *decimal.Decimal
+	FundSourceCurrency      *string
+	FundSourceOwnerName     *string
+	FundSourceBankCode      *string
+	FundSourceBankBin       *int32
+	FundSourceBankShortName *string
+	FundSourceAccountNumber *string
 }
 
 func (q *Queries) GetLedgerPeriodWithStatements(ctx context.Context, ledgerPeriodUuid domain.LedgerPeriodUUID) ([]GetLedgerPeriodWithStatementsRow, error) {
@@ -219,7 +235,15 @@ func (q *Queries) GetLedgerPeriodWithStatements(ctx context.Context, ledgerPerio
 			&i.ActualBalance,
 			&i.ReconciledBy,
 			&i.StatementReconciledAt,
-			&i.CurrentBalance,
+			&i.FundSourceName,
+			&i.FundSourceType,
+			&i.FundSourceBalance,
+			&i.FundSourceCurrency,
+			&i.FundSourceOwnerName,
+			&i.FundSourceBankCode,
+			&i.FundSourceBankBin,
+			&i.FundSourceBankShortName,
+			&i.FundSourceAccountNumber,
 		); err != nil {
 			return nil, err
 		}

@@ -29,8 +29,8 @@ func TestGetUnlockedLedgerPeriod(t *testing.T) {
 	t.Run("returns period with current balances and entry totals", func(t *testing.T) {
 		utils.ResetLedgerPeriods(t)
 		clients, token := utils.NewTestClients(t), newUserToken()
-		_, fs1 := createFundSource(t, clients, token, domain.FundSourceTypeCash)
-		_, fs2 := createFundSource(t, clients, token, domain.FundSourceTypeBank)
+		body1, fs1 := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		body2, fs2 := createFundSource(t, clients, token, domain.FundSourceTypeBank)
 		period := openPeriod(t, clients, token, fs1, fs2)
 
 		resp := postLedgerEntries(t, clients, token, period,
@@ -52,10 +52,15 @@ func TestGetUnlockedLedgerPeriod(t *testing.T) {
 		require.Len(t, lp.Statements, 2)
 
 		want := map[string]int64{fs1.String(): 750_000, fs2.String(): 1_010_000}
+		wantBodies := map[string]ledgersClients.CreateFundSourceRequest{fs1.String(): body1, fs2.String(): body2}
 		for _, st := range lp.Statements {
+			fsID := st.FundSource.Uuid.String()
 			assert.True(t, st.OpeningBalance.Equal(decimal.NewFromInt(1_000_000)))
-			assert.True(t, st.CurrentBalance.Equal(decimal.NewFromInt(want[st.FundSourceUuid.String()])),
-				"fund source %s current %s", st.FundSourceUuid, st.CurrentBalance)
+			assert.True(t, st.FundSource.Balance.Equal(decimal.NewFromInt(want[fsID])),
+				"fund source %s balance %s", fsID, st.FundSource.Balance)
+			assert.Equal(t, wantBodies[fsID].Name, st.FundSource.Name)
+			assert.Equal(t, wantBodies[fsID].Type, st.FundSource.Type)
+			assert.Equal(t, wantBodies[fsID].Details, st.FundSource.Details)
 		}
 	})
 

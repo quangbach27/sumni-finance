@@ -270,13 +270,12 @@ func toAPILedgerPeriodDetail(period queries.LedgerPeriodDetail) LedgerPeriodDeta
 	for _, st := range period.Statements {
 		statements = append(statements, LedgerStatementDetail{
 			Uuid:           domain.FundSourceStatementUUID{UUID: common.MustUUIDFromString(st.UUID)},
-			FundSourceUuid: domain.FundSourceUUID{UUID: common.MustUUIDFromString(st.FundSourceUUID)},
 			OpeningBalance: st.OpeningBalance,
 			ClosingBalance: st.ClosingBalance,
 			ActualBalance:  st.ActualBalance,
 			ReconciledBy:   st.ReconciledBy,
 			ReconciledAt:   st.ReconciledAt,
-			CurrentBalance: st.CurrentBalance,
+			FundSource:     toAPIFundSource(st.FundSource),
 		})
 	}
 

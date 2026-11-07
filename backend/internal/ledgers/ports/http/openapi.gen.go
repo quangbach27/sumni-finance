@@ -184,9 +184,8 @@ type LedgerStatementDetail struct {
 	// ClosingBalance Set when the period is closed.
 	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
 
-	// CurrentBalance Live balance of the fund source.
-	CurrentBalance Decimal                 `json:"current_balance"`
-	FundSourceUuid FundSourceUUID          `json:"fund_source_uuid"`
+	// FundSource The fund source this statement belongs to, with its live balance.
+	FundSource     FundSource              `json:"fund_source"`
 	OpeningBalance Decimal                 `json:"opening_balance"`
 	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
 	ReconciledBy   *string                 `json:"reconciled_by,omitempty"`

@@ -51,10 +51,10 @@ type FundSourceStatement struct {
 	ReconciledAt   *time.Time
 }
 
-// LedgerStatementDetail is a fund source statement plus the fund source's live balance.
+// LedgerStatementDetail is a fund source statement plus the fund source it belongs to.
 type LedgerStatementDetail struct {
 	FundSourceStatement
-	CurrentBalance decimal.Decimal
+	FundSource FundSource
 }
 
 // LedgerPeriodDetail is a ledger period with its statements and entry totals.

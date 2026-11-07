@@ -701,15 +701,30 @@ components:
           format: date-time
 
     LedgerStatementDetail:
-      allOf:
-        - $ref: "#/components/schemas/FundSourceStatement"
-        - type: object
-          required: [current_balance]
-          properties:
-            current_balance:
-              description: Live balance of the fund source.
-              allOf:
-                - $ref: "#/components/schemas/Decimal"
+      type: object
+      required: [uuid, opening_balance, fund_source]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/FundSourceStatementUUID"
+        opening_balance:
+          $ref: "#/components/schemas/Decimal"
+        closing_balance:
+          description: Set when the period is closed.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        actual_balance:
+          description: Set when reconciled.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        reconciled_by:
+          type: string
+        reconciled_at:
+          type: string
+          format: date-time
+        fund_source:
+          description: The fund source this statement belongs to, with its live balance.
+          allOf:
+            - $ref: "#/components/schemas/FundSource"
 
     LedgerPeriodDetail:
       allOf:

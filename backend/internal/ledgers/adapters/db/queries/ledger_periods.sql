@@ -116,7 +116,15 @@ SELECT
     st.actual_balance,
     st.reconciled_by,
     st.reconciled_at AS statement_reconciled_at,
-    fs.balance AS current_balance
+    fs.name AS fund_source_name,
+    fs.type AS fund_source_type,
+    fs.balance AS fund_source_balance,
+    fs.currency AS fund_source_currency,
+    fs.owner_name AS fund_source_owner_name,
+    fs.bank_code AS fund_source_bank_code,
+    fs.bank_bin AS fund_source_bank_bin,
+    fs.bank_short_name AS fund_source_bank_short_name,
+    fs.account_number AS fund_source_account_number
 FROM p
 LEFT JOIN ledgers.fund_source_statements st ON st.ledger_period_uuid = p.uuid
 LEFT JOIN ledgers.fund_sources fs ON fs.uuid = st.fund_source_uuid

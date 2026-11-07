@@ -139,14 +139,43 @@ func (r *LedgerPeriodReadModel) GetLedgerPeriod(ctx context.Context, ledgerPerio
 		if row.StatementOpeningBalance != nil {
 			st.OpeningBalance = *row.StatementOpeningBalance
 		}
-		if row.CurrentBalance != nil {
-			st.CurrentBalance = *row.CurrentBalance
-		}
+		st.FundSource = statementFundSource(row)
 
 		result.Statements = append(result.Statements, st)
 	}
 
 	return result, nil
+}
+
+func statementFundSource(row dbmodels.GetLedgerPeriodWithStatementsRow) queries.FundSource {
+	fs := queries.FundSource{
+		UUID:    row.FundSourceUuid,
+		Type:    row.FundSourceType.String(),
+		Details: queries.FundSourceDetails{},
+	}
+	if row.FundSourceName != nil {
+		fs.Name = *row.FundSourceName
+	}
+	if row.FundSourceBalance != nil {
+		fs.Balance = *row.FundSourceBalance
+	}
+	if row.FundSourceCurrency != nil {
+		fs.Currency = *row.FundSourceCurrency
+	}
+	if row.FundSourceOwnerName != nil {
+		fs.Details.OwnerName = *row.FundSourceOwnerName
+	}
+
+	if row.FundSourceBankCode != nil && row.FundSourceBankBin != nil && row.FundSourceBankShortName != nil && row.FundSourceAccountNumber != nil {
+		fs.Details.Bank = &queries.BankDetails{
+			BankCode:      *row.FundSourceBankCode,
+			BankBin:       *row.FundSourceBankBin,
+			BankShortName: *row.FundSourceBankShortName,
+			AccountNumber: *row.FundSourceAccountNumber,
+		}
+	}
+
+	return fs
 }
 
 func uuidPtrToString[T fmt.Stringer](id *T) *string {
