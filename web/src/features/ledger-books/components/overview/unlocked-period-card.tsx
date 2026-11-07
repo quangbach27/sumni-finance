@@ -90,7 +90,7 @@ const PeriodAlert = ({ view }: { view: PeriodView }) => {
   );
 };
 
-const ReconcileButton = ({
+const ReconciliationButton = ({
   periodUuid,
   className,
   size,
@@ -103,7 +103,10 @@ const ReconcileButton = ({
     size={size}
     className={className}
     render={
-      <Link to="/ledger-books/$uuid/reconcile" params={{ uuid: periodUuid }} />
+      <Link
+        to="/ledger-books/$uuid/reconciliation"
+        params={{ uuid: periodUuid }}
+      />
     }
   >
     <Check data-icon="inline-start" />
@@ -131,14 +134,14 @@ const DesktopLayout = ({ period, view }: LayoutProps) => {
           </div>
           <p className="text-muted-foreground mt-1 text-base">{range}</p>
         </div>
-        {/* TODO: wire entries / post-entry / reconcile once those flows exist. */}
+        {/* TODO: wire entries / post-entry / reconciliation once those flows exist. */}
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" disabled>
             <BookOpen data-icon="inline-start" />
             Tất cả bút toán
           </Button>
           {isClosed ? (
-            <ReconcileButton periodUuid={period.uuid} />
+            <ReconciliationButton periodUuid={period.uuid} />
           ) : (
             <>
               <ClosePeriodButton
@@ -235,7 +238,7 @@ const MobileLayout = ({ period, view }: LayoutProps) => {
                 <ChevronRight className="size-4" />
               </button>
             </div>
-            <ReconcileButton
+            <ReconciliationButton
               periodUuid={period.uuid}
               size="lg"
               className="w-full"
@@ -247,7 +250,7 @@ const MobileLayout = ({ period, view }: LayoutProps) => {
   );
 };
 
-/** Open or closed-awaiting-reconcile period; separate layouts for mobile and desktop. */
+/** Open or closed-awaiting-reconciliation period; separate layouts for mobile and desktop. */
 export default function UnlockedPeriodCard({ period }: Props) {
   const isMobile = useIsMobile();
   const view = getPeriodView(period);
