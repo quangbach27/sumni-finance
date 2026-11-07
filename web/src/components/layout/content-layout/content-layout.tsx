@@ -24,7 +24,7 @@ export default function ContentLayout({
       <div className="flex items-center justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-4xl font-bold">{title}</h1>
+            <h1 className="text-2xl font-bold md:text-4xl">{title}</h1>
             {titleAdornment}
           </div>
           {description && (

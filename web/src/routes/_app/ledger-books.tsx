@@ -1,13 +1,25 @@
+import { Suspense } from 'react';
+
 import { createFileRoute } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
 
 import ContentLayout from '@/components/layout/content-layout/content-layout';
+import ErrorComponent from '@/components/layout/error-component/error-component';
 
-import OpenLedgerPeriodTrigger from '@/features/ledger-books/components/open-ledger-period-trigger';
+import LedgerBooksPage, {
+  OpenPeriodHeaderTrigger,
+} from '@/features/ledger-books/components/overview/ledger-books-page';
 
 export const Route = createFileRoute('/_app/ledger-books')({
   staticData: { crumb: 'Sổ cái' },
   component: RouteComponent,
+  errorComponent: ({ error, reset }) => (
+    <ErrorComponent
+      error={error}
+      reset={reset}
+      title="Sổ cái"
+      fallbackMessage="Không thể tải sổ cái."
+    />
+  ),
 });
 
 function RouteComponent() {
@@ -16,13 +28,12 @@ function RouteComponent() {
       title="Sổ cái"
       description="Mỗi kỳ ghi bút toán và cập nhật số dư nguồn quỹ. Chỉ một kỳ được mở tại một thời điểm"
       additionalContent={
-        <OpenLedgerPeriodTrigger>
-          <Plus data-icon="inline-start" />
-          <span>Mở kỳ mới</span>
-        </OpenLedgerPeriodTrigger>
+        <Suspense fallback={null}>
+          <OpenPeriodHeaderTrigger />
+        </Suspense>
       }
     >
-      Sổ cái
+      <LedgerBooksPage />
     </ContentLayout>
   );
 }

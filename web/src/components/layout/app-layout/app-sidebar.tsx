@@ -42,7 +42,7 @@ export default function AppSidebar({ navItems }: Props) {
                     <Link
                       to={item.href}
                       onClick={() => setOpenMobile(false)}
-                      activeOptions={{ exact: true, includeSearch: false }}
+                      activeOptions={{ exact: false, includeSearch: false }}
                       activeProps={{ 'data-active': true }}
                     >
                       {<item.icon />}
