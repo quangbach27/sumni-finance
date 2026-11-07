@@ -27,3 +27,9 @@ export const startOfDay = (date: Date) =>
 
 export const endOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 0);
+
+/** Whole calendar days from today until `date` (negative when past). */
+export const daysUntil = (date: Date, from: Date = new Date()): number =>
+  Math.round(
+    (startOfDay(date).getTime() - startOfDay(from).getTime()) / 86_400_000,
+  );

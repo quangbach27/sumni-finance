@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 
 import { Info } from 'lucide-react';
 
@@ -12,7 +12,8 @@ import {
 import DatePicker from '@/components/shared/date-picker/date-picker';
 import FormField from '@/components/shared/form-field/form-field';
 import TextInput from '@/components/shared/form-field/text-input';
-import StatusAlert from '@/components/shared/status-alert/status-alert';
+import StatusAlertOutlet from '@/components/shared/status-alert/status-alert-outlet';
+import { useStatusAlert } from '@/components/shared/status-alert/status-alert-provider';
 
 import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 
@@ -44,11 +45,6 @@ type OpenLedgerPeriodFormProps = {
   ) => void;
 };
 
-type Status = {
-  message: string;
-  details?: string[];
-};
-
 const ERROR_FALLBACK = 'Không thể mở kỳ mới. Vui lòng thử lại.';
 
 export default function OpenLedgerPeriodForm({
@@ -58,20 +54,15 @@ export default function OpenLedgerPeriodForm({
   previousPeriod,
   onSubmit,
 }: OpenLedgerPeriodFormProps) {
-  const [status, setStatus] = useState<Status | null>(null);
-  const alertRef = useRef<HTMLDivElement>(null);
+  const { showAlert, dismissAlert } = useStatusAlert();
 
   const total = fundSources.reduce((sum, f) => sum + f.balance, 0);
 
-  // Editing any field dismisses a stale success / error alert.
+  // Editing any field dismisses a stale alert.
   useEffect(() => {
-    const subscription = form.watch(() => setStatus(null));
+    const subscription = form.watch(() => dismissAlert());
     return () => subscription.unsubscribe();
-  }, [form]);
-
-  useEffect(() => {
-    if (status) alertRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [status]);
+  }, [form, dismissAlert]);
 
   const handleError = (error: unknown) => {
     const { message, details } = formatApiError(error, ERROR_FALLBACK);
@@ -81,34 +72,22 @@ export default function OpenLedgerPeriodForm({
         if (field) form.setError(field, { message: detail.message });
       }
     }
-    setStatus({ message, details });
+    showAlert({
+      variant: 'destructive',
+      title: 'Không thể mở kỳ mới',
+      message,
+      details,
+    });
   };
 
   const handleSubmit = form.handleSubmit((values) => {
-    setStatus(null);
     onSubmit(values, { onError: handleError });
   });
 
   return (
     <form id={id} onSubmit={handleSubmit} noValidate>
       <FieldGroup>
-        {status && (
-          <StatusAlert
-            ref={alertRef}
-            variant="destructive"
-            title="Không thể mở kỳ mới"
-            onDismiss={() => setStatus(null)}
-          >
-            {status.message}
-            {status.details && status.details.length > 0 && (
-              <ul className="mt-1 list-disc pl-4">
-                {status.details.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )}
-          </StatusAlert>
-        )}
+        <StatusAlertOutlet />
 
         <div className="bg-muted/50 flex gap-3 rounded-lg border p-3 text-sm">
           <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />

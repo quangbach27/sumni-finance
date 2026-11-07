@@ -34,6 +34,6 @@ export const getUnlockedLedgerPeriodQueryOptions = () =>
 /** Live system balance: closing balances once closed, else current balances. */
 export const getSystemBalance = (period: LedgerPeriodDetail) =>
   period.statements.reduce(
-    (sum, s) => sum + (s.closingBalance ?? s.currentBalance),
+    (sum, s) => sum + (s.closingBalance ?? s.fundSource.balance),
     0,
   );

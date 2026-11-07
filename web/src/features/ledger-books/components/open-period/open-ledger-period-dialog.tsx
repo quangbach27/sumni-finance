@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/drawer';
 import { toast } from '@/components/ui/toast';
 
+import { StatusAlertProvider } from '@/components/shared/status-alert/status-alert-provider';
+
 import { getFundSourcesQueryOptions } from '@/features/fund-sources/api/get-fund-sources';
 
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -51,7 +53,17 @@ type OpenLedgerPeriodDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export default function OpenLedgerPeriodDialog({
+export default function OpenLedgerPeriodDialog(
+  props: OpenLedgerPeriodDialogProps,
+) {
+  return (
+    <StatusAlertProvider>
+      <OpenLedgerPeriodDialogContent {...props} />
+    </StatusAlertProvider>
+  );
+}
+
+function OpenLedgerPeriodDialogContent({
   open,
   onOpenChange,
 }: OpenLedgerPeriodDialogProps) {

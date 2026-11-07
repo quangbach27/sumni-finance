@@ -59,4 +59,9 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // shadcn-generated; not edited by hand (see web/CLAUDE.md).
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: { 'no-shadow': 'off' },
+  },
 ]);

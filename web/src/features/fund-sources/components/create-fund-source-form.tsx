@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 
 import { Banknote, Landmark, Lock, Sparkles } from 'lucide-react';
 import { Controller } from 'react-hook-form';
@@ -15,7 +15,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import AmountInput from '@/components/shared/form-field/amount-input';
 import FormField from '@/components/shared/form-field/form-field';
 import TextInput from '@/components/shared/form-field/text-input';
-import StatusAlert from '@/components/shared/status-alert/status-alert';
+import StatusAlertOutlet from '@/components/shared/status-alert/status-alert-outlet';
+import { useStatusAlert } from '@/components/shared/status-alert/status-alert-provider';
 
 import { isApiError } from '@/lib/clients';
 
@@ -64,12 +65,6 @@ type CreateFundSourceFormProps = {
   onSubmit: (values: CreateFundSourceFormValues) => Promise<void>;
 };
 
-type Status = {
-  type: 'success' | 'error';
-  message: string;
-  details?: string[];
-};
-
 const ERROR_FALLBACK = 'Không thể thêm nguồn quỹ. Vui lòng thử lại.';
 
 export default function CreateFundSourceForm({
@@ -85,68 +80,40 @@ export default function CreateFundSourceForm({
 
   const suggestedName = suggestName(ownerName, type);
 
-  const [status, setStatus] = useState<Status | null>(null);
+  const { showAlert, dismissAlert } = useStatusAlert();
 
-  const alertRef = useRef<HTMLDivElement>(null);
-
-  // Editing any field dismisses a stale success / error alert.
+  // Editing any field dismisses a stale alert.
   useEffect(() => {
-    const subscription = form.watch(() => setStatus(null));
+    const subscription = form.watch(() => dismissAlert());
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, dismissAlert]);
 
-  useEffect(() => {
-    if (status) alertRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [status]);
-
+  // On success the parent closes the dialog; on failure the field errors stay
+  // on the form and the alert explains what went wrong.
   const handleSubmit = form.handleSubmit(async (values) => {
-    setStatus(null);
     try {
       await onSubmit(values);
-      // Reset first: it notifies watchers, which would clear the alert.
-      form.reset();
-      setStatus({
-        type: 'success',
-        message: `Đã thêm nguồn quỹ "${values.name}".`,
-      });
     } catch (error) {
       const { message, details } = formatApiError(error, ERROR_FALLBACK);
-      // Set field errors first: they must not be wiped by the watch() reset
-      // of the alert, and setError does not notify watchers.
       if (isApiError(error)) {
         for (const detail of error.details) {
           const field = detail.entity_id && ENTITY_TO_FIELD[detail.entity_id];
           if (field) form.setError(field, { message: detail.message });
         }
       }
-      setStatus({ type: 'error', message, details });
+      showAlert({
+        variant: 'destructive',
+        title: 'Không thể thêm nguồn quỹ',
+        message,
+        details,
+      });
     }
   });
 
   return (
     <form id={id} onSubmit={handleSubmit} noValidate>
       <FieldGroup>
-        {status && (
-          <StatusAlert
-            ref={alertRef}
-            variant={status.type === 'success' ? 'success' : 'destructive'}
-            title={
-              status.type === 'success'
-                ? 'Thêm nguồn quỹ thành công'
-                : 'Không thể thêm nguồn quỹ'
-            }
-            onDismiss={() => setStatus(null)}
-          >
-            {status.message}
-            {status.details && status.details.length > 0 && (
-              <ul className="mt-1 list-disc pl-4">
-                {status.details.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )}
-          </StatusAlert>
-        )}
+        <StatusAlertOutlet />
 
         <Controller
           control={form.control}

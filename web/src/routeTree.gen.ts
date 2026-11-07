@@ -15,6 +15,7 @@ import { Route as AppFundSourcesRouteImport } from './routes/_app/fund-sources'
 import { Route as AppLedgerBooksRouteImport } from './routes/_app/ledger-books'
 import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppLedgerBooksUuidFinalizationRouteImport } from './routes/_app/ledger-books_.$uuid.finalization'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -45,6 +46,12 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppLedgerBooksUuidFinalizationRoute =
+  AppLedgerBooksUuidFinalizationRouteImport.update({
+    id: '/ledger-books_/$uuid/finalization',
+    path: '/ledger-books/$uuid/finalization',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/ledger-books': typeof AppLedgerBooksRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/ledger-books/$uuid/finalization': typeof AppLedgerBooksUuidFinalizationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +67,7 @@ export interface FileRoutesByTo {
   '/ledger-books': typeof AppLedgerBooksRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/ledger-books/$uuid/finalization': typeof AppLedgerBooksUuidFinalizationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +77,25 @@ export interface FileRoutesById {
   '/_app/ledger-books': typeof AppLedgerBooksRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/ledger-books_/$uuid/finalization': typeof AppLedgerBooksUuidFinalizationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/fund-sources' | '/ledger-books' | '/reports' | '/settings'
+  fullPaths:
+    | '/'
+    | '/fund-sources'
+    | '/ledger-books'
+    | '/reports'
+    | '/settings'
+    | '/ledger-books/$uuid/finalization'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/fund-sources' | '/ledger-books' | '/reports' | '/settings'
+  to:
+    | '/'
+    | '/fund-sources'
+    | '/ledger-books'
+    | '/reports'
+    | '/settings'
+    | '/ledger-books/$uuid/finalization'
   id:
     | '__root__'
     | '/'
@@ -82,6 +104,7 @@ export interface FileRouteTypes {
     | '/_app/ledger-books'
     | '/_app/reports'
     | '/_app/settings'
+    | '/_app/ledger-books_/$uuid/finalization'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -133,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/ledger-books_/$uuid/finalization': {
+      id: '/_app/ledger-books_/$uuid/finalization'
+      path: '/ledger-books/$uuid/finalization'
+      fullPath: '/ledger-books/$uuid/finalization'
+      preLoaderRoute: typeof AppLedgerBooksUuidFinalizationRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
   }
 }
 
@@ -141,6 +171,7 @@ interface AppRouteRouteChildren {
   AppLedgerBooksRoute: typeof AppLedgerBooksRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppLedgerBooksUuidFinalizationRoute: typeof AppLedgerBooksUuidFinalizationRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
@@ -148,6 +179,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppLedgerBooksRoute: AppLedgerBooksRoute,
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppLedgerBooksUuidFinalizationRoute: AppLedgerBooksUuidFinalizationRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

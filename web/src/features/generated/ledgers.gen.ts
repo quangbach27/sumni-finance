@@ -355,9 +355,18 @@ export interface components {
             /** Format: date-time */
             reconciled_at?: string;
         };
-        LedgerStatementDetail: components["schemas"]["FundSourceStatement"] & {
-            /** @description Live balance of the fund source. */
-            current_balance: components["schemas"]["Decimal"];
+        LedgerStatementDetail: {
+            uuid: components["schemas"]["FundSourceStatementUUID"];
+            opening_balance: components["schemas"]["Decimal"];
+            /** @description Set when the period is closed. */
+            closing_balance?: components["schemas"]["Decimal"];
+            /** @description Set when reconciled. */
+            actual_balance?: components["schemas"]["Decimal"];
+            reconciled_by?: string;
+            /** Format: date-time */
+            reconciled_at?: string;
+            /** @description The fund source this statement belongs to, with its live balance. */
+            fund_source: components["schemas"]["FundSource"];
         };
         LedgerPeriodDetail: components["schemas"]["LedgerPeriod"] & {
             total_inflow: components["schemas"]["Decimal"];

@@ -30,6 +30,8 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 
+import { StatusAlertProvider } from '@/components/shared/status-alert/status-alert-provider';
+
 import { useIsMobile } from '@/hooks/use-mobile';
 
 import CreateFundSourceForm from './create-fund-source-form';
@@ -52,7 +54,17 @@ type CreateFundSourceDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export default function CreateFundSourceDialog({
+export default function CreateFundSourceDialog(
+  props: CreateFundSourceDialogProps,
+) {
+  return (
+    <StatusAlertProvider>
+      <CreateFundSourceDialogContent {...props} />
+    </StatusAlertProvider>
+  );
+}
+
+function CreateFundSourceDialogContent({
   open,
   onOpenChange,
 }: CreateFundSourceDialogProps) {
@@ -93,6 +105,8 @@ export default function CreateFundSourceDialog({
 
   const handleSubmit = async (input: CreateFundSourceFormValues) => {
     await mutateAsync(input);
+    // Success: close right away (nothing left to discard).
+    onOpenChange(false);
   };
 
   const formContent = (
