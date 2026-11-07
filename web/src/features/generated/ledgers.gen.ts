@@ -22,6 +22,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ledger-periods/unlocked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the unlocked ledger period
+         * @description The single period that is not reconciled yet (opened or closed). The response is the same as getLedgerPeriod.
+         */
+        get: operations["getUnlockedLedgerPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger-periods/{ledger_period_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a ledger period
+         * @description A ledger period of any status, with its fund source statements (including each fund source's current balance) and the total inflow and outflow of its posted entries.
+         */
+        get: operations["getLedgerPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ledger-periods": {
         parameters: {
             query?: never;
@@ -80,6 +120,46 @@ export interface paths {
          * @description Closes an opened period and sets the closing balance of every fund source statement to the current balance of its fund source. Fails with 400 `period-not-open` when the period is not opened.
          */
         post: operations["closeLedgerPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger-periods/{ledger_period_uuid}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a closed ledger period
+         * @description Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+         */
+        post: operations["reopenLedgerPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger-periods/{ledger_period_uuid}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate a report for a ledger period
+         * @description Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+         */
+        post: operations["generateLedgerPeriodReport"];
         delete?: never;
         options?: never;
         head?: never;
@@ -191,6 +271,11 @@ export interface components {
         };
         /** Format: uuid */
         LedgerPeriodUUID: string;
+        /** Format: uuid */
+        ReportUUID: string;
+        GenerateLedgerPeriodReportResponse: {
+            report_uuid: components["schemas"]["ReportUUID"];
+        };
         /** @enum {string} */
         LedgerStatus: "opened" | "closed" | "reconciled";
         PageInfo: {
@@ -214,10 +299,14 @@ export interface components {
             reopened_at?: string;
             /** Format: date-time */
             reconciled_at?: string;
+            report_uuid?: components["schemas"]["ReportUUID"];
         };
         ListLedgerPeriodsResponse: {
             items: components["schemas"]["LedgerPeriod"][];
             page_info: components["schemas"]["PageInfo"];
+        };
+        ReopenLedgerPeriodRequest: {
+            reason: string;
         };
         OpenLedgerPeriodRequest: {
             name: string;
@@ -265,6 +354,23 @@ export interface components {
             reconciled_by?: string;
             /** Format: date-time */
             reconciled_at?: string;
+        };
+        LedgerStatementDetail: components["schemas"]["FundSourceStatement"] & {
+            /** @description Live balance of the fund source. */
+            current_balance: components["schemas"]["Decimal"];
+        };
+        LedgerPeriodDetail: components["schemas"]["LedgerPeriod"] & {
+            total_inflow: components["schemas"]["Decimal"];
+            total_outflow: components["schemas"]["Decimal"];
+            /**
+             * Format: int64
+             * @description Number of posted ledger entries in the period.
+             */
+            entry_count: number;
+            statements: components["schemas"]["LedgerStatementDetail"][];
+        };
+        GetLedgerPeriodResponse: {
+            ledger_period: components["schemas"]["LedgerPeriodDetail"];
         };
         ListFundSourceStatementsResponse: {
             items: components["schemas"]["FundSourceStatement"][];
@@ -400,6 +506,54 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    getUnlockedLedgerPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The unlocked ledger period. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetLedgerPeriodResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getLedgerPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ledger_period_uuid: components["schemas"]["LedgerPeriodUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ledger period. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetLedgerPeriodResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     listLedgerPeriods: {
         parameters: {
             query?: {
@@ -509,6 +663,61 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    reopenLedgerPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ledger_period_uuid: components["schemas"]["LedgerPeriodUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenLedgerPeriodRequest"];
+            };
+        };
+        responses: {
+            /** @description Ledger period reopened */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    generateLedgerPeriodReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ledger_period_uuid: components["schemas"]["LedgerPeriodUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report generated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateLedgerPeriodReportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

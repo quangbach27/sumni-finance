@@ -1,18 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Info } from 'lucide-react';
-import { Controller } from 'react-hook-form';
 
 import {
   Field,
   FieldDescription,
-  FieldError,
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 
 import DatePicker from '@/components/shared/date-picker/date-picker';
+import FormField from '@/components/shared/form-field/form-field';
+import TextInput from '@/components/shared/form-field/text-input';
 import StatusAlert from '@/components/shared/status-alert/status-alert';
 
 import { formatApiError } from '@/features/fund-sources/api/format-api-error';
@@ -20,16 +19,16 @@ import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 import { isApiError } from '@/lib/clients';
 import { formatAmount } from '@/lib/currency';
 
-import type { OpenLedgerPeriodFormValues } from '../api/open-ledger-period';
-import type { LedgerPeriod } from '../api/types';
+import type { OpenLedgerPeriodFormValues } from '../../api/open-ledger-period';
+import type { LedgerPeriod } from '../../api/types';
 import type { FundSource } from '@/features/fund-sources/api/types';
 import type { UseFormReturn } from 'react-hook-form';
 
 // Backend entity ids -> form field names.
 const ENTITY_TO_FIELD: Record<string, keyof OpenLedgerPeriodFormValues> = {
   name: 'name',
-  open_date: 'open_date',
-  close_date: 'close_date',
+  open_date: 'openDate',
+  close_date: 'closeDate',
 };
 
 type OpenLedgerPeriodFormProps = {
@@ -38,12 +37,14 @@ type OpenLedgerPeriodFormProps = {
   form: UseFormReturn<OpenLedgerPeriodFormValues>;
   fundSources: FundSource[];
   previousPeriod?: LedgerPeriod;
-  /** Resolves on success, rejects (ideally with an ApiError) on failure. */
-  onSubmit: (values: OpenLedgerPeriodFormValues) => Promise<void>;
+  /** Success handling is the caller's; the form only handles errors. */
+  onSubmit: (
+    values: OpenLedgerPeriodFormValues,
+    callbacks: { onError: (error: unknown) => void },
+  ) => void;
 };
 
 type Status = {
-  type: 'success' | 'error';
   message: string;
   details?: string[];
 };
@@ -72,26 +73,20 @@ export default function OpenLedgerPeriodForm({
     if (status) alertRef.current?.scrollIntoView({ block: 'nearest' });
   }, [status]);
 
-  const handleSubmit = form.handleSubmit(async (values) => {
-    setStatus(null);
-    try {
-      await onSubmit(values);
-      // Reset first: it notifies watchers, which would clear the alert.
-      form.reset(values);
-      setStatus({
-        type: 'success',
-        message: `Đã mở kỳ "${values.name}".`,
-      });
-    } catch (error) {
-      const { message, details } = formatApiError(error, ERROR_FALLBACK);
-      if (isApiError(error)) {
-        for (const detail of error.details) {
-          const field = detail.entity_id && ENTITY_TO_FIELD[detail.entity_id];
-          if (field) form.setError(field, { message: detail.message });
-        }
+  const handleError = (error: unknown) => {
+    const { message, details } = formatApiError(error, ERROR_FALLBACK);
+    if (isApiError(error)) {
+      for (const detail of error.details) {
+        const field = detail.entity_id && ENTITY_TO_FIELD[detail.entity_id];
+        if (field) form.setError(field, { message: detail.message });
       }
-      setStatus({ type: 'error', message, details });
     }
+    setStatus({ message, details });
+  };
+
+  const handleSubmit = form.handleSubmit((values) => {
+    setStatus(null);
+    onSubmit(values, { onError: handleError });
   });
 
   return (
@@ -100,12 +95,8 @@ export default function OpenLedgerPeriodForm({
         {status && (
           <StatusAlert
             ref={alertRef}
-            variant={status.type === 'success' ? 'success' : 'destructive'}
-            title={
-              status.type === 'success'
-                ? 'Mở kỳ thành công'
-                : 'Không thể mở kỳ mới'
-            }
+            variant="destructive"
+            title="Không thể mở kỳ mới"
             onDismiss={() => setStatus(null)}
           >
             {status.message}
@@ -131,63 +122,27 @@ export default function OpenLedgerPeriodForm({
           </p>
         </div>
 
-        <Controller
+        <FormField
           control={form.control}
           name="name"
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="ledger-period-name">Tên kỳ</FieldLabel>
-              <Input
-                {...field}
-                id="ledger-period-name"
-                autoComplete="off"
-                aria-invalid={fieldState.invalid}
-                className="h-10"
-              />
-              <FieldError errors={[fieldState.error]} />
-            </Field>
-          )}
+          label="Tên kỳ"
+          Component={TextInput}
+          autoComplete="off"
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Controller
+          <FormField
             control={form.control}
-            name="open_date"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="ledger-period-open-date">
-                  Từ ngày
-                </FieldLabel>
-                <DatePicker
-                  id="ledger-period-open-date"
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  invalid={fieldState.invalid}
-                />
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
+            name="openDate"
+            label="Từ ngày"
+            Component={DatePicker}
           />
-          <Controller
+          <FormField
             control={form.control}
-            name="close_date"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="ledger-period-close-date">
-                  Đến ngày
-                </FieldLabel>
-                <DatePicker
-                  id="ledger-period-close-date"
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  invalid={fieldState.invalid}
-                  minDate={form.watch('open_date')}
-                />
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
+            name="closeDate"
+            label="Đến ngày"
+            Component={DatePicker}
+            minDate={form.watch('openDate')}
           />
         </div>
 

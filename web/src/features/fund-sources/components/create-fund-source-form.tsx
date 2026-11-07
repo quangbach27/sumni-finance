@@ -6,18 +6,18 @@ import { Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
+import AmountInput from '@/components/shared/form-field/amount-input';
+import FormField from '@/components/shared/form-field/form-field';
+import TextInput from '@/components/shared/form-field/text-input';
 import StatusAlert from '@/components/shared/status-alert/status-alert';
 
 import { isApiError } from '@/lib/clients';
-import { formatAmount, getCurrencySymbol, parseAmount } from '@/lib/currency';
 
 import BankCombobox from './bank-combobox';
 import { formatApiError } from '../api/format-api-error';
@@ -231,143 +231,68 @@ export default function CreateFundSourceForm({
             </p>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Controller
+              <FormField
                 control={form.control}
                 name="owner_name"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="fund-source-owner">
-                      Chủ tài khoản
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      id="fund-source-owner"
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                      className="h-10"
-                    />
-                    <FieldError errors={[fieldState.error]} />
-                  </Field>
-                )}
+                label="Chủ tài khoản"
+                Component={TextInput}
+                autoComplete="off"
               />
-              <Controller
+              <FormField
                 control={form.control}
                 name="account_number"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="fund-source-account">
-                      Số tài khoản
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      id="fund-source-account"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                      className="h-10"
-                    />
-                    <FieldError errors={[fieldState.error]} />
-                  </Field>
-                )}
+                label="Số tài khoản"
+                Component={TextInput}
+                autoComplete="off"
+                inputMode="numeric"
               />
             </div>
           </>
         )}
 
         {type === 'cash' && (
-          <Controller
+          <FormField
             control={form.control}
             name="owner_name"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="fund-source-owner">
-                  Người giữ tiền
-                </FieldLabel>
-                <Input
-                  {...field}
-                  id="fund-source-owner"
-                  autoComplete="off"
-                  aria-invalid={fieldState.invalid}
-                  className="h-10"
-                />
-                <FieldDescription>
-                  Người chịu trách nhiệm giữ khoản tiền mặt này.
-                </FieldDescription>
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
+            label="Người giữ tiền"
+            description="Người chịu trách nhiệm giữ khoản tiền mặt này."
+            Component={TextInput}
+            autoComplete="off"
           />
         )}
 
-        <Controller
+        <FormField
           control={form.control}
           name="balance"
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="fund-source-balance">
-                Số dư ban đầu
-              </FieldLabel>
-              <div className="relative">
-                <Input
-                  id="fund-source-balance"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  aria-invalid={fieldState.invalid}
-                  className="h-10 pr-9 text-right"
-                  value={formatAmount(field.value, 'VND')}
-                  onBlur={field.onBlur}
-                  onChange={(e) =>
-                    field.onChange(parseAmount(e.target.value, 'VND'))
-                  }
-                />
-                <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm underline">
-                  {getCurrencySymbol('VND')}
-                </span>
-              </div>
-              <FieldDescription>
-                Số dư tại thời điểm bắt đầu dùng sổ.
-              </FieldDescription>
-              <FieldError errors={[fieldState.error]} />
-            </Field>
-          )}
+          label="Số dư ban đầu"
+          description="Số dư tại thời điểm bắt đầu dùng sổ."
+          Component={AmountInput}
         />
 
-        <Controller
+        <FormField
           control={form.control}
           name="name"
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="fund-source-name">
-                  Tên nguồn quỹ
-                </FieldLabel>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="text-primary rounded-full"
-                  disabled={!suggestedName}
-                  onClick={() => {
-                    form.setValue('name', suggestedName, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    });
-                  }}
-                >
-                  <Sparkles data-icon="inline-start" />
-                  Tự gợi ý
-                </Button>
-              </div>
-              <Input
-                {...field}
-                id="fund-source-name"
-                autoComplete="off"
-                aria-invalid={fieldState.invalid}
-                className="h-10"
-              />
-              <FieldError errors={[fieldState.error]} />
-            </Field>
-          )}
+          label="Tên nguồn quỹ"
+          Component={TextInput}
+          autoComplete="off"
+          labelAction={
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="text-primary rounded-full"
+              disabled={!suggestedName}
+              onClick={() => {
+                form.setValue('name', suggestedName, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+              }}
+            >
+              <Sparkles data-icon="inline-start" />
+              Tự gợi ý
+            </Button>
+          }
         />
       </FieldGroup>
     </form>
