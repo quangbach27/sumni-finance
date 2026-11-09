@@ -13,6 +13,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type LedgersCategory struct {
+	Uuid        models.CategoryUUID
+	ParentUuid  *models.CategoryUUID
+	Name        string
+	Description *string
+	CreatedAt   time.Time
+}
+
 type LedgersFundSource struct {
 	Uuid          domain.FundSourceUUID
 	Name          string
@@ -47,7 +55,7 @@ type LedgersLedgerEntry struct {
 	Direction           shared.Direction
 	Description         string
 	OccurredAt          time.Time
-	CategoryUuid        *domain.CategoryUUID
+	CategoryUuid        *models.CategoryUUID
 	FsBalanceBefore     decimal.Decimal
 	FsBalanceAfter      decimal.Decimal
 	Status              domain.EntryStatus

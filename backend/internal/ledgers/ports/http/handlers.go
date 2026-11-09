@@ -356,3 +356,63 @@ func toAPIFundSource(fs queries.FundSource) FundSource {
 		Details:  details,
 	}
 }
+
+func (h *Handlers) ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error) {
+	categories, err := h.queryHandlers.ListCategories(ctx, queries.ListCategories{})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]Category, 0, len(categories))
+	for _, c := range categories {
+		subs := make([]SubCategory, 0, len(c.SubCategories))
+		for _, s := range c.SubCategories {
+			subs = append(subs, SubCategory{
+				Uuid:        models.CategoryUUID{UUID: common.MustUUIDFromString(s.UUID)},
+				Name:        s.Name,
+				Description: s.Description,
+			})
+		}
+
+		items = append(items, Category{
+			Uuid:          models.CategoryUUID{UUID: common.MustUUIDFromString(c.UUID)},
+			Name:          c.Name,
+			Description:   c.Description,
+			SubCategories: subs,
+		})
+	}
+
+	return ListCategories200JSONResponse{Items: items}, nil
+}
+
+func (h *Handlers) UpsertCategories(ctx context.Context, request UpsertCategoriesRequestObject) (UpsertCategoriesResponseObject, error) {
+	if request.Body == nil {
+		return nil, common.NewInvalidInputError("body-required", "request body is required")
+	}
+
+	inputs := make([]commands.CategoryInput, 0, len(request.Body.Categories))
+	for _, c := range request.Body.Categories {
+		var subs []commands.SubCategoryInput
+		if c.SubCategories != nil {
+			for _, s := range *c.SubCategories {
+				subs = append(subs, commands.SubCategoryInput{UUID: s.Uuid, Name: s.Name, Description: s.Description})
+			}
+		}
+
+		inputs = append(inputs, commands.CategoryInput{
+			UUID:          c.Uuid,
+			Name:          c.Name,
+			Description:   c.Description,
+			SubCategories: subs,
+		})
+	}
+
+	uuids, err := h.commandHandlers.UpsertCategory(ctx, commands.UpsertCategory{
+		Categories: inputs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return UpsertCategories200JSONResponse{CategoryUuids: uuids}, nil
+}

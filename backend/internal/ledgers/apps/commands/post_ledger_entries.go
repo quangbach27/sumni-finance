@@ -10,6 +10,7 @@ import (
 	"github.com/quangbach27/golang-common/log"
 	"github.com/shopspring/decimal"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -19,7 +20,7 @@ type LedgerEntryInput struct {
 	Direction    shared.Direction
 	Description  string
 	OccurredAt   time.Time
-	CategoryUUID *domain.CategoryUUID
+	CategoryUUID *models.CategoryUUID
 }
 
 type PostLedgerEntries struct {

@@ -79,7 +79,12 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	commandHandlers, err := commands.NewHandlers(fsRepo, periodRepo, periodRepo, fsFactory)
+	categoryRepo, err := db.NewCategoryRepository(m.pgxDb)
+	if err != nil {
+		return err
+	}
+
+	commandHandlers, err := commands.NewHandlers(fsRepo, periodRepo, periodRepo, categoryRepo, fsFactory)
 	if err != nil {
 		return err
 	}
@@ -99,7 +104,12 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	queryHandlers, err := queries.NewHandlers(fsReadModel, periodReadModel, statementReadModel)
+	categoryReadModel, err := db.NewCategoryReadModel(m.pgxDb)
+	if err != nil {
+		return err
+	}
+
+	queryHandlers, err := queries.NewHandlers(fsReadModel, periodReadModel, statementReadModel, categoryReadModel)
 	if err != nil {
 		return err
 	}

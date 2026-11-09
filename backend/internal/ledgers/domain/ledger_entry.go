@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"backend/internal/ledgers/apps/models"
 	"strings"
 	"time"
 
@@ -54,7 +55,7 @@ type LedgerEntry struct {
 	description string
 	occurredAt  time.Time
 
-	categoryUUID *CategoryUUID
+	categoryUUID *models.CategoryUUID
 
 	// fund source balance around this entry, recorded when the entry is
 	// applied to the fund source
@@ -82,7 +83,7 @@ func NewLedgerEntry(
 	direction shared.Direction,
 	description string,
 	occurredAt time.Time,
-	categoryUUID *CategoryUUID,
+	categoryUUID *models.CategoryUUID,
 ) (*LedgerEntry, error) {
 	description = strings.TrimSpace(description)
 
@@ -138,7 +139,7 @@ func (e *LedgerEntry) Amount() decimal.Decimal             { return e.amount }
 func (e *LedgerEntry) Direction() shared.Direction         { return e.direction }
 func (e *LedgerEntry) Description() string                 { return e.description }
 func (e *LedgerEntry) OccurredAt() time.Time               { return e.occurredAt }
-func (e *LedgerEntry) CategoryUUID() *CategoryUUID         { return e.categoryUUID }
+func (e *LedgerEntry) CategoryUUID() *models.CategoryUUID  { return e.categoryUUID }
 func (e *LedgerEntry) Status() EntryStatus                 { return e.status }
 func (e *LedgerEntry) Kind() EntryKind                     { return e.kind }
 func (e *LedgerEntry) ReversedByEntryID() *LedgerEntryUUID { return e.reversedByEntryID }

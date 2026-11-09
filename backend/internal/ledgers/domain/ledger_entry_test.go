@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -18,7 +19,7 @@ func newEntry(t *testing.T) *domain.LedgerEntry {
 
 	fs := newFundSource(t, 100)
 	period := newPeriodUUID()
-	cat := domain.CategoryUUID{}
+	cat := models.CategoryUUID{}
 	cat.UUID = fs.UUID().UUID // any non-zero uuid
 	e, err := domain.NewLedgerEntry(
 		period, fs.UUID(), decimal.NewFromInt(50), shared.DirectionOutflow,

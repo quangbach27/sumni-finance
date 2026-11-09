@@ -20,8 +20,24 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// Category defines model for Category.
+type Category struct {
+	Description   *string       `json:"description,omitempty"`
+	Name          string        `json:"name"`
+	SubCategories []SubCategory `json:"sub_categories"`
+	Uuid          CategoryUUID  `json:"uuid"`
+}
+
+// CategoryInput defines model for CategoryInput.
+type CategoryInput struct {
+	Description   *string             `json:"description,omitempty"`
+	Name          string              `json:"name"`
+	SubCategories *[]SubCategoryInput `json:"sub_categories,omitempty"`
+	Uuid          *CategoryUUID       `json:"uuid,omitempty"`
+}
+
 // CategoryUUID defines model for CategoryUUID.
-type CategoryUUID = domain.CategoryUUID
+type CategoryUUID = models.CategoryUUID
 
 // CreateFundSourceRequest defines model for CreateFundSourceRequest.
 type CreateFundSourceRequest struct {
@@ -194,6 +210,11 @@ type LedgerStatementDetail struct {
 // LedgerStatus defines model for LedgerStatus.
 type LedgerStatus = domain.LedgerStatus
 
+// ListCategoriesResponse defines model for ListCategoriesResponse.
+type ListCategoriesResponse struct {
+	Items []Category `json:"items"`
+}
+
 // ListFundSourceStatementsResponse defines model for ListFundSourceStatementsResponse.
 type ListFundSourceStatementsResponse struct {
 	Items []FundSourceStatement `json:"items"`
@@ -261,6 +282,31 @@ type ReopenLedgerPeriodRequest struct {
 // ReportUUID defines model for ReportUUID.
 type ReportUUID = models.ReportUUID
 
+// SubCategory defines model for SubCategory.
+type SubCategory struct {
+	Description *string      `json:"description,omitempty"`
+	Name        string       `json:"name"`
+	Uuid        CategoryUUID `json:"uuid"`
+}
+
+// SubCategoryInput defines model for SubCategoryInput.
+type SubCategoryInput struct {
+	Description *string       `json:"description,omitempty"`
+	Name        string        `json:"name"`
+	Uuid        *CategoryUUID `json:"uuid,omitempty"`
+}
+
+// UpsertCategoriesRequest defines model for UpsertCategoriesRequest.
+type UpsertCategoriesRequest struct {
+	Categories []CategoryInput `json:"categories"`
+}
+
+// UpsertCategoriesResponse defines model for UpsertCategoriesResponse.
+type UpsertCategoriesResponse struct {
+	// CategoryUuids In the order of the request categories.
+	CategoryUuids []CategoryUUID `json:"category_uuids"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -283,6 +329,9 @@ type ListLedgerPeriodsParams struct {
 	Status   *LedgerStatus `form:"status,omitempty" json:"status,omitempty"`
 }
 
+// UpsertCategoriesJSONRequestBody defines body for UpsertCategories for application/json ContentType.
+type UpsertCategoriesJSONRequestBody = UpsertCategoriesRequest
+
 // CreateFundSourceJSONRequestBody defines body for CreateFundSource for application/json ContentType.
 type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
 
@@ -300,6 +349,12 @@ type ReconcileFundSourceStatementsJSONRequestBody = ReconcileFundSourceStatement
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListCategories List all categories
+	// (GET /api/v1/categories)
+	ListCategories(ctx *echo.Context) error
+	// UpsertCategories Create or update categories with their sub-categories
+	// (PUT /api/v1/categories)
+	UpsertCategories(ctx *echo.Context) error
 	// ListFundSources List fund sources
 	// (GET /api/v1/fund-sources)
 	ListFundSources(ctx *echo.Context) error
@@ -344,6 +399,24 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// ListCategories converts echo context to params.
+func (w *ServerInterfaceWrapper) ListCategories(ctx *echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListCategories(ctx)
+	return err
+}
+
+// UpsertCategories converts echo context to params.
+func (w *ServerInterfaceWrapper) UpsertCategories(ctx *echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpsertCategories(ctx)
+	return err
 }
 
 // ListFundSources converts echo context to params.
@@ -596,6 +669,8 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/api/v1/ledger-periods", wrapper.ListLedgerPeriods, options.OperationMiddlewares["listLedgerPeriods"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods", wrapper.OpenLedgerPeriod, options.OperationMiddlewares["openLedgerPeriod"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/entries", wrapper.PostLedgerEntries, options.OperationMiddlewares["postLedgerEntries"]...)
+	router.GET(options.BaseURL+"/api/v1/categories", wrapper.ListCategories, options.OperationMiddlewares["listCategories"]...)
+	router.PUT(options.BaseURL+"/api/v1/categories", wrapper.UpsertCategories, options.OperationMiddlewares["upsertCategories"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/close", wrapper.CloseLedgerPeriod, options.OperationMiddlewares["closeLedgerPeriod"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/reopen", wrapper.ReopenLedgerPeriod, options.OperationMiddlewares["reopenLedgerPeriod"]...)
 	router.POST(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid/report", wrapper.GenerateLedgerPeriodReport, options.OperationMiddlewares["generateLedgerPeriodReport"]...)
@@ -614,6 +689,137 @@ type InternalServerErrorJSONResponse ErrorResponse
 type NotFoundJSONResponse ErrorResponse
 
 type UnauthorizedJSONResponse ErrorResponse
+
+type ListCategoriesRequestObject struct {
+}
+
+type ListCategoriesResponseObject interface {
+	VisitListCategoriesResponse(w http.ResponseWriter) error
+}
+
+type ListCategories200JSONResponse ListCategoriesResponse
+
+func (response ListCategories200JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCategories401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListCategories401JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCategories500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ListCategories500JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertCategoriesRequestObject struct {
+	Body *UpsertCategoriesJSONRequestBody
+}
+
+type UpsertCategoriesResponseObject interface {
+	VisitUpsertCategoriesResponse(w http.ResponseWriter) error
+}
+
+type UpsertCategories200JSONResponse UpsertCategoriesResponse
+
+func (response UpsertCategories200JSONResponse) VisitUpsertCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertCategories400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpsertCategories400JSONResponse) VisitUpsertCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertCategories401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpsertCategories401JSONResponse) VisitUpsertCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertCategories409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpsertCategories409JSONResponse) VisitUpsertCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertCategories500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response UpsertCategories500JSONResponse) VisitUpsertCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListFundSourcesRequestObject struct {
 }
@@ -1620,6 +1826,12 @@ func (response ReconcileFundSourceStatements500JSONResponse) VisitReconcileFundS
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListCategories List all categories
+	// (GET /api/v1/categories)
+	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
+	// UpsertCategories Create or update categories with their sub-categories
+	// (PUT /api/v1/categories)
+	UpsertCategories(ctx context.Context, request UpsertCategoriesRequestObject) (UpsertCategoriesResponseObject, error)
 	// ListFundSources List fund sources
 	// (GET /api/v1/fund-sources)
 	ListFundSources(ctx context.Context, request ListFundSourcesRequestObject) (ListFundSourcesResponseObject, error)
@@ -1671,6 +1883,75 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
+}
+
+// ListCategories operation middleware
+func (sh *strictHandler) ListCategories(ctx *echo.Context) error {
+	var request ListCategoriesRequestObject
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCategories(ctx.Request().Context(), request.(ListCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCategories")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListCategoriesResponseObject); ok {
+		return validResponse.VisitListCategoriesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpsertCategories operation middleware
+func (sh *strictHandler) UpsertCategories(ctx *echo.Context) error {
+	var request UpsertCategoriesRequestObject
+
+	var body UpsertCategoriesJSONRequestBody
+	var err error
+	if _, ok := ctx.Echo().Binder.(*echo.DefaultBinder); ok {
+		// A request validator built on kin-openapi's openapi3filter with
+		// KeepValidatedValue leaves the value it validated on the body. Bind
+		// that value, matching member names exactly, so the handler receives
+		// what was validated instead of a second, case-insensitive decode.
+		// Otherwise bind only the request body, so that path and query
+		// parameters are not also bound into the body struct.
+		if vb, ok := ctx.Request().Body.(interface{ ValidatedValue() any }); !ok || runtime.BindJSONValue(vb.ValidatedValue(), &body) != nil {
+			err = echo.BindBody(ctx, &body)
+		}
+	} else {
+		// A custom binder is installed on the Echo instance; defer to it
+		// entirely, since echo.Binder does not expose body-only binding and
+		// the binder may do more than decode (for example call ctx.Validate).
+		err = ctx.Bind(&body)
+	}
+	if err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpsertCategories(ctx.Request().Context(), request.(UpsertCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpsertCategories")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(UpsertCategoriesResponseObject); ok {
+		return validResponse.VisitUpsertCategoriesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
 }
 
 // ListFundSources operation middleware

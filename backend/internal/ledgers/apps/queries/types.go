@@ -65,3 +65,11 @@ type LedgerPeriodDetail struct {
 	EntryCount   int64
 	Statements   []LedgerStatementDetail
 }
+
+// Category is a category of a period; SubCategories is empty for a sub-category.
+type Category struct {
+	UUID          string
+	Name          string
+	Description   *string
+	SubCategories []Category
+}

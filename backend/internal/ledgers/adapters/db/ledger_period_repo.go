@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -103,6 +104,10 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 
 		entries, err := postFn(period, fundSources)
 		if err != nil {
+			return err
+		}
+
+		if err := validateEntryCategories(ctx, q, entries); err != nil {
 			return err
 		}
 
@@ -248,6 +253,54 @@ func listFundSourcesInPeriod(
 	}
 
 	return fundSources, nil
+}
+
+// validateEntryCategories fails unless every category (or sub-category) used by
+// the entries exists. Each failure carries the entry index.
+func validateEntryCategories(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	entries []*domain.LedgerEntry,
+) error {
+	var uuids []common.UUID
+	for _, e := range entries {
+		if e != nil && e.CategoryUUID() != nil {
+			uuids = append(uuids, e.CategoryUUID().UUID)
+		}
+	}
+	if len(uuids) == 0 {
+		return nil
+	}
+
+	found, err := q.ListExistingCategoryUUIDs(ctx, uuids)
+	if err != nil {
+		return err
+	}
+
+	existing := make(map[models.CategoryUUID]struct{}, len(found))
+	for _, id := range found {
+		existing[id] = struct{}{}
+	}
+
+	var details []common.ErrorDetails
+	for i, e := range entries {
+		if e == nil || e.CategoryUUID() == nil {
+			continue
+		}
+		if _, ok := existing[*e.CategoryUUID()]; !ok {
+			details = append(details, common.ErrorDetails{
+				EntityType: "ledger-entry",
+				EntityID:   strconv.Itoa(i),
+				ErrorSlug:  "category-not-found",
+				Message:    "category was not found",
+			})
+		}
+	}
+	if len(details) > 0 {
+		return common.NewInvalidInputError("category-not-found", "one or more categories were not found").WithDetails(details)
+	}
+
+	return nil
 }
 
 // saveJournalEntries inserts the entries. Each entry must have its fund source

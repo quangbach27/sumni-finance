@@ -22,16 +22,22 @@ type FundSourceStatementReadModel interface {
 	ListFundSourceStatements(ctx context.Context, ledgerPeriodUUID domain.LedgerPeriodUUID) ([]FundSourceStatement, error)
 }
 
+type CategoryReadModel interface {
+	ListCategories(ctx context.Context) ([]Category, error)
+}
+
 type Handlers struct {
 	fsReadModel        FundSourceReadModel
 	periodReadModel    LedgerPeriodReadModel
 	statementReadModel FundSourceStatementReadModel
+	categoryReadModel  CategoryReadModel
 }
 
 func NewHandlers(
 	fsReadModel FundSourceReadModel,
 	periodReadModel LedgerPeriodReadModel,
 	statementReadModel FundSourceStatementReadModel,
+	categoryReadModel CategoryReadModel,
 ) (*Handlers, error) {
 	var errs []error
 
@@ -47,6 +53,10 @@ func NewHandlers(
 		errs = append(errs, errors.New("fund source statement read model can't be nil"))
 	}
 
+	if categoryReadModel == nil {
+		errs = append(errs, errors.New("category read model can't be nil"))
+	}
+
 	if len(errs) != 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -55,5 +65,6 @@ func NewHandlers(
 		fsReadModel:        fsReadModel,
 		periodReadModel:    periodReadModel,
 		statementReadModel: statementReadModel,
+		categoryReadModel:  categoryReadModel,
 	}, nil
 }

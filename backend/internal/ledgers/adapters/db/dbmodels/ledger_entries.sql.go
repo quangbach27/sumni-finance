@@ -8,6 +8,7 @@ package dbmodels
 import (
 	"time"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 	"github.com/shopspring/decimal"
@@ -21,7 +22,7 @@ type InsertLedgerEntriesParams struct {
 	Direction        shared.Direction
 	Description      string
 	OccurredAt       time.Time
-	CategoryUuid     *domain.CategoryUUID
+	CategoryUuid     *models.CategoryUUID
 	FsBalanceBefore  decimal.Decimal
 	FsBalanceAfter   decimal.Decimal
 	Status           domain.EntryStatus

@@ -22,8 +22,24 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// Category defines model for Category.
+type Category struct {
+	Description   *string       `json:"description,omitempty"`
+	Name          string        `json:"name"`
+	SubCategories []SubCategory `json:"sub_categories"`
+	Uuid          CategoryUUID  `json:"uuid"`
+}
+
+// CategoryInput defines model for CategoryInput.
+type CategoryInput struct {
+	Description   *string             `json:"description,omitempty"`
+	Name          string              `json:"name"`
+	SubCategories *[]SubCategoryInput `json:"sub_categories,omitempty"`
+	Uuid          *CategoryUUID       `json:"uuid,omitempty"`
+}
+
 // CategoryUUID defines model for CategoryUUID.
-type CategoryUUID = domain.CategoryUUID
+type CategoryUUID = models.CategoryUUID
 
 // CreateFundSourceRequest defines model for CreateFundSourceRequest.
 type CreateFundSourceRequest struct {
@@ -196,6 +212,11 @@ type LedgerStatementDetail struct {
 // LedgerStatus defines model for LedgerStatus.
 type LedgerStatus = domain.LedgerStatus
 
+// ListCategoriesResponse defines model for ListCategoriesResponse.
+type ListCategoriesResponse struct {
+	Items []Category `json:"items"`
+}
+
 // ListFundSourceStatementsResponse defines model for ListFundSourceStatementsResponse.
 type ListFundSourceStatementsResponse struct {
 	Items []FundSourceStatement `json:"items"`
@@ -263,6 +284,31 @@ type ReopenLedgerPeriodRequest struct {
 // ReportUUID defines model for ReportUUID.
 type ReportUUID = models.ReportUUID
 
+// SubCategory defines model for SubCategory.
+type SubCategory struct {
+	Description *string      `json:"description,omitempty"`
+	Name        string       `json:"name"`
+	Uuid        CategoryUUID `json:"uuid"`
+}
+
+// SubCategoryInput defines model for SubCategoryInput.
+type SubCategoryInput struct {
+	Description *string       `json:"description,omitempty"`
+	Name        string        `json:"name"`
+	Uuid        *CategoryUUID `json:"uuid,omitempty"`
+}
+
+// UpsertCategoriesRequest defines model for UpsertCategoriesRequest.
+type UpsertCategoriesRequest struct {
+	Categories []CategoryInput `json:"categories"`
+}
+
+// UpsertCategoriesResponse defines model for UpsertCategoriesResponse.
+type UpsertCategoriesResponse struct {
+	// CategoryUuids In the order of the request categories.
+	CategoryUuids []CategoryUUID `json:"category_uuids"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -284,6 +330,9 @@ type ListLedgerPeriodsParams struct {
 	PageSize *int          `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *LedgerStatus `form:"status,omitempty" json:"status,omitempty"`
 }
+
+// UpsertCategoriesJSONRequestBody defines body for UpsertCategories for application/json ContentType.
+type UpsertCategoriesJSONRequestBody = UpsertCategoriesRequest
 
 // CreateFundSourceJSONRequestBody defines body for CreateFundSource for application/json ContentType.
 type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
@@ -373,6 +422,31 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+
+	// ListCategories List all categories
+	//
+	// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+	//
+	// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpsertCategoriesWithBody Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategoriesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpsertCategories Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategories(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFundSources List fund sources
 	//
@@ -511,6 +585,61 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
 	ReconcileFundSourceStatements(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListCategories List all categories
+//
+// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+//
+// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCategoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpsertCategoriesWithBody Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *Client) UpsertCategoriesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertCategoriesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpsertCategories Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *Client) UpsertCategories(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertCategoriesRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // ListFundSources List fund sources
@@ -829,6 +958,73 @@ func (c *Client) ReconcileFundSourceStatements(ctx context.Context, ledgerPeriod
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListCategoriesRequest constructs an http.Request for the ListCategories method
+func NewListCategoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpsertCategoriesRequest calls the generic UpsertCategories builder with application/json body
+func NewUpsertCategoriesRequest(server string, body UpsertCategoriesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpsertCategoriesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpsertCategoriesRequestWithBody constructs an http.Request for the UpsertCategories method, with any body, and a specified content type
+func NewUpsertCategoriesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewListFundSourcesRequest constructs an http.Request for the ListFundSources method
@@ -1398,6 +1594,33 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListCategoriesWithResponse List all categories
+	//
+	// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesClientResponse, error)
+
+	// UpsertCategoriesWithBodyWithResponse Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategoriesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error)
+
+	// UpsertCategoriesWithResponse Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategoriesWithResponse(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error)
+
 	// ListFundSourcesWithResponse List fund sources
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1551,6 +1774,130 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
 	ReconcileFundSourceStatementsWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReconcileFundSourceStatementsClientResponse, error)
+}
+
+type ListCategoriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListCategoriesResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCategoriesClientResponse) GetJSON200() *ListCategoriesResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListCategoriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListCategoriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCategoriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCategoriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCategoriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCategoriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpsertCategoriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UpsertCategoriesResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON200() *UpsertCategoriesResponse {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r UpsertCategoriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpsertCategoriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpsertCategoriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpsertCategoriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type ListFundSourcesClientResponse struct {
@@ -2415,6 +2762,51 @@ func (r ReconcileFundSourceStatementsClientResponse) ContentType() string {
 	return ""
 }
 
+// ListCategoriesWithResponse List all categories
+//
+// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesClientResponse, error) {
+	rsp, err := c.ListCategories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCategoriesClientResponse(rsp)
+}
+
+// UpsertCategoriesWithBodyWithResponse Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *ClientWithResponses) UpsertCategoriesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error) {
+	rsp, err := c.UpsertCategoriesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertCategoriesClientResponse(rsp)
+}
+
+// UpsertCategoriesWithResponse Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *ClientWithResponses) UpsertCategoriesWithResponse(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error) {
+	rsp, err := c.UpsertCategories(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertCategoriesClientResponse(rsp)
+}
+
 // ListFundSourcesWithResponse List fund sources
 //
 // Returns a wrapper object for the known response body format(s).
@@ -2675,6 +3067,100 @@ func (c *ClientWithResponses) ReconcileFundSourceStatementsWithResponse(ctx cont
 		return nil, err
 	}
 	return ParseReconcileFundSourceStatementsClientResponse(rsp)
+}
+
+// ParseListCategoriesClientResponse parses an HTTP response from a ListCategoriesWithResponse call
+func ParseListCategoriesClientResponse(rsp *http.Response) (*ListCategoriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCategoriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListCategoriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpsertCategoriesClientResponse parses an HTTP response from a UpsertCategoriesWithResponse call
+func ParseUpsertCategoriesClientResponse(rsp *http.Response) (*UpsertCategoriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpsertCategoriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpsertCategoriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListFundSourcesClientResponse parses an HTTP response from a ListFundSourcesWithResponse call

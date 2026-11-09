@@ -6,6 +6,7 @@ info:
 tags:
   - name: fund-sources
   - name: ledger-periods
+  - name: categories
 
 paths:
   /api/v1/fund-sources:
@@ -207,6 +208,59 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/categories:
+    get:
+      tags: [categories]
+      operationId: listCategories
+      summary: List all categories
+      description: >
+        Categories are shared by all ledger periods. Each category comes with
+        its sub-categories.
+      responses:
+        "200":
+          description: Categories with their sub-categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCategoriesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags: [categories]
+      operationId: upsertCategories
+      summary: Create or update categories with their sub-categories
+      description: >
+        Saves all categories (and their nested sub-categories) or none. An item
+        with a `uuid` updates that category or sub-category (name and
+        description only); an item without one is created. To add a
+        sub-category to an existing category, send the category with its
+        `uuid` and `name` plus the new sub-category. Sub-categories that are
+        not sent are left as they are. Fails with 409 when a name is already
+        used in the same level.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertCategoriesRequest"
+      responses:
+        "200":
+          description: Categories saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpsertCategoriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "409":
           $ref: "#/components/responses/Conflict"
         "500":
@@ -622,9 +676,91 @@ components:
     CategoryUUID:
       type: string
       format: uuid
-      x-go-type: domain.CategoryUUID
+      x-go-type: models.CategoryUUID
       x-go-type-import:
-        path: backend/internal/ledgers/domain
+        path: backend/internal/ledgers/apps/models
+
+    SubCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        uuid:
+          description: Updates this sub-category when set; otherwise a new one is created.
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        uuid:
+          description: Updates this category when set; otherwise a new one is created.
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+        sub_categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubCategoryInput"
+
+    UpsertCategoriesRequest:
+      type: object
+      required: [categories]
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryInput"
+
+    UpsertCategoriesResponse:
+      type: object
+      required: [category_uuids]
+      properties:
+        category_uuids:
+          description: In the order of the request categories.
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryUUID"
+
+    SubCategory:
+      type: object
+      required: [uuid, name]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+
+    Category:
+      type: object
+      required: [uuid, name, sub_categories]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+        sub_categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubCategory"
+
+    ListCategoriesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
 
     Direction:
       type: string

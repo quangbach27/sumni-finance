@@ -90,7 +90,18 @@ sql:
 
           - column: "ledgers.ledger_entries.category_uuid"
             go_type:
-              import: "backend/internal/ledgers/domain"
+              import: "backend/internal/ledgers/apps/models"
+              type: "CategoryUUID"
+              pointer: true
+
+          - column: "ledgers.categories.uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "CategoryUUID"
+
+          - column: "ledgers.categories.parent_uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
               type: "CategoryUUID"
               pointer: true
 
