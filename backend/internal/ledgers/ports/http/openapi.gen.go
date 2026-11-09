@@ -122,12 +122,11 @@ type GetLedgerPeriodResponse struct {
 
 // LedgerEntryInput defines model for LedgerEntryInput.
 type LedgerEntryInput struct {
-	Amount         Decimal        `json:"amount"`
-	CategoryUuid   *CategoryUUID  `json:"category_uuid,omitempty"`
-	Description    string         `json:"description"`
-	Direction      Direction      `json:"direction"`
-	FundSourceUuid FundSourceUUID `json:"fund_source_uuid"`
-	OccurredAt     time.Time      `json:"occurred_at"`
+	Amount       Decimal       `json:"amount"`
+	CategoryUuid *CategoryUUID `json:"category_uuid,omitempty"`
+	Description  string        `json:"description"`
+	Direction    Direction     `json:"direction"`
+	OccurredAt   time.Time     `json:"occurred_at"`
 }
 
 // LedgerEntryUUID defines model for LedgerEntryUUID.
@@ -233,7 +232,8 @@ type PageInfo struct {
 
 // PostLedgerEntriesRequest defines model for PostLedgerEntriesRequest.
 type PostLedgerEntriesRequest struct {
-	Entries []LedgerEntryInput `json:"entries"`
+	Entries        []LedgerEntryInput `json:"entries"`
+	FundSourceUuid FundSourceUUID     `json:"fund_source_uuid"`
 }
 
 // PostLedgerEntriesResponse defines model for PostLedgerEntriesResponse.

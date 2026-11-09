@@ -20,13 +20,12 @@ import (
 
 // Not parallel for the same reason as the period tests: one unlocked period at a time.
 
-func entryInput(fs domain.FundSourceUUID, direction shared.Direction, amount int64) ledgersClients.LedgerEntryInput {
+func entryInput(direction shared.Direction, amount int64) ledgersClients.LedgerEntryInput {
 	return ledgersClients.LedgerEntryInput{
-		FundSourceUuid: fs,
-		Amount:         decimal.NewFromInt(amount),
-		Direction:      direction,
-		Description:    "entry",
-		OccurredAt:     time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC),
+		Amount:      decimal.NewFromInt(amount),
+		Direction:   direction,
+		Description: "entry",
+		OccurredAt:  time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -35,12 +34,13 @@ func postLedgerEntries(
 	clients *utils.TestClients,
 	token string,
 	period domain.LedgerPeriodUUID,
+	fs domain.FundSourceUUID,
 	entries ...ledgersClients.LedgerEntryInput,
 ) *ledgersClients.PostLedgerEntriesClientResponse {
 	t.Helper()
 
 	resp, err := clients.Ledgers.PostLedgerEntriesWithResponse(
-		context.Background(), period, ledgersClients.PostLedgerEntriesJSONRequestBody{Entries: entries}, utils.AuthEditorFn(token))
+		context.Background(), period, ledgersClients.PostLedgerEntriesJSONRequestBody{FundSourceUuid: fs, Entries: entries}, utils.AuthEditorFn(token))
 	require.NoError(t, err)
 
 	return resp
@@ -76,17 +76,17 @@ func TestPostLedgerEntries(t *testing.T) {
 		_, fs2 := createFundSource(t, clients, token, domain.FundSourceTypeBank)
 		period := openPeriod(t, clients, token, fs1, fs2)
 
-		resp := postLedgerEntries(t, clients, token, period,
-			entryInput(fs1, shared.DirectionOutflow, 300_000),
-			entryInput(fs1, shared.DirectionInflow, 50_000),
-			entryInput(fs2, shared.DirectionInflow, 10_000),
+		resp := postLedgerEntries(t, clients, token, period, fs1,
+			entryInput(shared.DirectionOutflow, 300_000),
+			entryInput(shared.DirectionInflow, 50_000),
 		)
 		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
 		require.NotNil(t, resp.JSON201)
-		assert.Len(t, resp.JSON201.LedgerEntryUuids, 3)
+		assert.Len(t, resp.JSON201.LedgerEntryUuids, 2)
 
 		assert.True(t, fundSourceBalance(t, clients, token, fs1).Equal(decimal.NewFromInt(750_000)))
-		assert.True(t, fundSourceBalance(t, clients, token, fs2).Equal(decimal.NewFromInt(1_010_000)))
+		// The other fund source of the period is untouched.
+		assert.True(t, fundSourceBalance(t, clients, token, fs2).Equal(decimal.NewFromInt(1_000_000)))
 	})
 
 	t.Run("insufficient balance rejects the whole batch", func(t *testing.T) {
@@ -95,9 +95,9 @@ func TestPostLedgerEntries(t *testing.T) {
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
 		period := openPeriod(t, clients, token, fs)
 
-		resp := postLedgerEntries(t, clients, token, period,
-			entryInput(fs, shared.DirectionInflow, 1_000),
-			entryInput(fs, shared.DirectionOutflow, 5_000_000),
+		resp := postLedgerEntries(t, clients, token, period, fs,
+			entryInput(shared.DirectionInflow, 1_000),
+			entryInput(shared.DirectionOutflow, 5_000_000),
 		)
 		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
 		require.NotNil(t, resp.JSON400)
@@ -112,9 +112,9 @@ func TestPostLedgerEntries(t *testing.T) {
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
 		period := openPeriod(t, clients, token, fs)
 
-		bad := entryInput(fs, shared.DirectionInflow, 0)
+		bad := entryInput(shared.DirectionInflow, 0)
 		bad.Description = " "
-		resp := postLedgerEntries(t, clients, token, period, entryInput(fs, shared.DirectionInflow, 1), bad)
+		resp := postLedgerEntries(t, clients, token, period, fs, entryInput(shared.DirectionInflow, 1), bad)
 		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
 		require.NotNil(t, resp.JSON400)
 		assert.ElementsMatch(t, []string{"amount-must-be-positive", "description-required"}, errorSlugs(resp.JSON400))
@@ -130,9 +130,35 @@ func TestPostLedgerEntries(t *testing.T) {
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
 		period := openPeriod(t, clients, token, fs)
 
-		resp := postLedgerEntries(t, clients, token, period)
+		resp := postLedgerEntries(t, clients, token, period, fs)
 		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
 		assert.Equal(t, "entries-required", resp.JSON400.Slug)
+	})
+
+	t.Run("fund source outside the period statements is rejected", func(t *testing.T) {
+		utils.ResetLedgerPeriods(t)
+		clients, token := utils.NewTestClients(t), newUserToken()
+		_, inPeriod := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		_, outside := createFundSource(t, clients, token, domain.FundSourceTypeBank)
+		period := openPeriod(t, clients, token, inPeriod)
+
+		resp := postLedgerEntries(t, clients, token, period, outside, entryInput(shared.DirectionInflow, 1_000))
+		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
+		require.NotNil(t, resp.JSON400)
+		assert.Equal(t, "fund-source-not-in-period", resp.JSON400.Slug)
+
+		assert.True(t, fundSourceBalance(t, clients, token, outside).Equal(decimal.NewFromInt(1_000_000)))
+	})
+
+	t.Run("rejects a missing fund source", func(t *testing.T) {
+		utils.ResetLedgerPeriods(t)
+		clients, token := utils.NewTestClients(t), newUserToken()
+		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		period := openPeriod(t, clients, token, fs)
+
+		resp := postLedgerEntries(t, clients, token, period, domain.FundSourceUUID{}, entryInput(shared.DirectionInflow, 1))
+		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
+		assert.Equal(t, "fund-source-required", resp.JSON400.Slug)
 	})
 
 	t.Run("unknown period is not found", func(t *testing.T) {
@@ -140,7 +166,7 @@ func TestPostLedgerEntries(t *testing.T) {
 		clients, token := utils.NewTestClients(t), newUserToken()
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
 
-		resp := postLedgerEntries(t, clients, token, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()}, entryInput(fs, shared.DirectionInflow, 1))
+		resp := postLedgerEntries(t, clients, token, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()}, fs, entryInput(shared.DirectionInflow, 1))
 		require.Equal(t, 404, resp.StatusCode(), "body: %s", string(resp.Body))
 		assert.Equal(t, "ledger-period-not-found", resp.JSON404.Slug)
 	})
@@ -154,7 +180,7 @@ func TestPostLedgerEntries(t *testing.T) {
 		closeResp := closeLedgerPeriod(t, clients, token, period)
 		require.Equal(t, 204, closeResp.StatusCode(), "body: %s", string(closeResp.Body))
 
-		resp := postLedgerEntries(t, clients, token, period, entryInput(fs, shared.DirectionInflow, 1))
+		resp := postLedgerEntries(t, clients, token, period, fs, entryInput(shared.DirectionInflow, 1))
 		require.Equal(t, 409, resp.StatusCode(), "body: %s", string(resp.Body))
 		assert.Equal(t, "period-not-open", resp.JSON409.Slug)
 	})

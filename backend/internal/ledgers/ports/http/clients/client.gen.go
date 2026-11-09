@@ -124,12 +124,11 @@ type GetLedgerPeriodResponse struct {
 
 // LedgerEntryInput defines model for LedgerEntryInput.
 type LedgerEntryInput struct {
-	Amount         Decimal        `json:"amount"`
-	CategoryUuid   *CategoryUUID  `json:"category_uuid,omitempty"`
-	Description    string         `json:"description"`
-	Direction      Direction      `json:"direction"`
-	FundSourceUuid FundSourceUUID `json:"fund_source_uuid"`
-	OccurredAt     time.Time      `json:"occurred_at"`
+	Amount       Decimal       `json:"amount"`
+	CategoryUuid *CategoryUUID `json:"category_uuid,omitempty"`
+	Description  string        `json:"description"`
+	Direction    Direction     `json:"direction"`
+	OccurredAt   time.Time     `json:"occurred_at"`
 }
 
 // LedgerEntryUUID defines model for LedgerEntryUUID.
@@ -235,7 +234,8 @@ type PageInfo struct {
 
 // PostLedgerEntriesRequest defines model for PostLedgerEntriesRequest.
 type PostLedgerEntriesRequest struct {
-	Entries []LedgerEntryInput `json:"entries"`
+	Entries        []LedgerEntryInput `json:"entries"`
+	FundSourceUuid FundSourceUUID     `json:"fund_source_uuid"`
 }
 
 // PostLedgerEntriesResponse defines model for PostLedgerEntriesResponse.
@@ -441,7 +441,7 @@ type ClientInterface interface {
 
 	// PostLedgerEntriesWithBody Post ledger entries
 	//
-	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -450,7 +450,7 @@ type ClientInterface interface {
 
 	// PostLedgerEntries Post ledger entries
 	//
-	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -670,7 +670,7 @@ func (c *Client) CloseLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerP
 
 // PostLedgerEntriesWithBody Post ledger entries
 //
-// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 //
 // Takes any type of body and a specified content type.
 //
@@ -689,7 +689,7 @@ func (c *Client) PostLedgerEntriesWithBody(ctx context.Context, ledgerPeriodUuid
 
 // PostLedgerEntries Post ledger entries
 //
-// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1475,7 +1475,7 @@ type ClientWithResponsesInterface interface {
 
 	// PostLedgerEntriesWithBodyWithResponse Post ledger entries
 	//
-	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1484,7 +1484,7 @@ type ClientWithResponsesInterface interface {
 
 	// PostLedgerEntriesWithResponse Post ledger entries
 	//
-	// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2546,7 +2546,7 @@ func (c *ClientWithResponses) CloseLedgerPeriodWithResponse(ctx context.Context,
 
 // PostLedgerEntriesWithBodyWithResponse Post ledger entries
 //
-// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2561,7 +2561,7 @@ func (c *ClientWithResponses) PostLedgerEntriesWithBodyWithResponse(ctx context.
 
 // PostLedgerEntriesWithResponse Post ledger entries
 //
-// Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

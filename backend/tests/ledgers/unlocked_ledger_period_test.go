@@ -33,11 +33,12 @@ func TestGetUnlockedLedgerPeriod(t *testing.T) {
 		body2, fs2 := createFundSource(t, clients, token, domain.FundSourceTypeBank)
 		period := openPeriod(t, clients, token, fs1, fs2)
 
-		resp := postLedgerEntries(t, clients, token, period,
-			entryInput(fs1, shared.DirectionOutflow, 300_000),
-			entryInput(fs1, shared.DirectionInflow, 50_000),
-			entryInput(fs2, shared.DirectionInflow, 10_000),
+		resp := postLedgerEntries(t, clients, token, period, fs1,
+			entryInput(shared.DirectionOutflow, 300_000),
+			entryInput(shared.DirectionInflow, 50_000),
 		)
+		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
+		resp = postLedgerEntries(t, clients, token, period, fs2, entryInput(shared.DirectionInflow, 10_000))
 		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
 
 		got := getUnlockedLedgerPeriod(t, clients, token)
@@ -94,8 +95,8 @@ func TestGetUnlockedLedgerPeriod(t *testing.T) {
 		clients, token := utils.NewTestClients(t), newUserToken()
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
 		period := openPeriod(t, clients, token, fs)
-		require.Equal(t, 201, postLedgerEntries(t, clients, token, period,
-			entryInput(fs, shared.DirectionOutflow, 1_000)).StatusCode())
+		require.Equal(t, 201, postLedgerEntries(t, clients, token, period, fs,
+			entryInput(shared.DirectionOutflow, 1_000)).StatusCode())
 
 		unlocked := getUnlockedLedgerPeriod(t, clients, token)
 		require.Equal(t, 200, unlocked.StatusCode(), "body: %s", string(unlocked.Body))

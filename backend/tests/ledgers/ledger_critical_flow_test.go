@@ -17,9 +17,9 @@ import (
 )
 
 // applyEntries adds the signed amount of every entry to the running balances.
-func applyEntries(balances map[string]decimal.Decimal, entries []ledgersClients.LedgerEntryInput) {
+func applyEntries(balances map[string]decimal.Decimal, fs domain.FundSourceUUID, entries []ledgersClients.LedgerEntryInput) {
+	key := fs.String()
 	for _, e := range entries {
-		key := e.FundSourceUuid.String()
 		if e.Direction == shared.DirectionInflow {
 			balances[key] = balances[key].Add(e.Amount)
 		} else {
@@ -97,36 +97,51 @@ func TestLedgerPeriodCriticalFlow(t *testing.T) {
 	assert.True(t, periods.Items[0].OpeningBalance.Equal(decimal.NewFromInt(2_000_000)))
 
 	// 3. Post 12 entries in two batches; balances are checked after each batch.
-	batch1 := []ledgersClients.LedgerEntryInput{
-		entryInput(cash, shared.DirectionOutflow, 300_000),
-		entryInput(cash, shared.DirectionInflow, 50_000),
-		entryInput(cash, shared.DirectionOutflow, 125_500),
-		entryInput(bank, shared.DirectionInflow, 10_000),
-		entryInput(bank, shared.DirectionOutflow, 250_000),
-		entryInput(bank, shared.DirectionInflow, 400_000),
-	}
-	batch2 := []ledgersClients.LedgerEntryInput{
-		entryInput(cash, shared.DirectionInflow, 20_000),
-		entryInput(cash, shared.DirectionOutflow, 10_000),
-		entryInput(cash, shared.DirectionInflow, 75_250),
-		entryInput(bank, shared.DirectionOutflow, 1_500),
-		entryInput(bank, shared.DirectionInflow, 33_333),
-		entryInput(bank, shared.DirectionOutflow, 99_999),
+	type fsBatch struct {
+		fs      domain.FundSourceUUID
+		entries []ledgersClients.LedgerEntryInput
 	}
 
-	for _, batch := range [][]ledgersClients.LedgerEntryInput{batch1, batch2} {
-		resp := postLedgerEntries(t, clients, token, period, batch...)
-		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
-		require.NotNil(t, resp.JSON201)
-		assert.Len(t, resp.JSON201.LedgerEntryUuids, len(batch))
+	batch1 := []fsBatch{
+		{cash, []ledgersClients.LedgerEntryInput{
+			entryInput(shared.DirectionOutflow, 300_000),
+			entryInput(shared.DirectionInflow, 50_000),
+			entryInput(shared.DirectionOutflow, 125_500),
+		}},
+		{bank, []ledgersClients.LedgerEntryInput{
+			entryInput(shared.DirectionInflow, 10_000),
+			entryInput(shared.DirectionOutflow, 250_000),
+			entryInput(shared.DirectionInflow, 400_000),
+		}},
+	}
+	batch2 := []fsBatch{
+		{cash, []ledgersClients.LedgerEntryInput{
+			entryInput(shared.DirectionInflow, 20_000),
+			entryInput(shared.DirectionOutflow, 10_000),
+			entryInput(shared.DirectionInflow, 75_250),
+		}},
+		{bank, []ledgersClients.LedgerEntryInput{
+			entryInput(shared.DirectionOutflow, 1_500),
+			entryInput(shared.DirectionInflow, 33_333),
+			entryInput(shared.DirectionOutflow, 99_999),
+		}},
+	}
 
-		applyEntries(expected, batch)
-		requireBalances(t, clients, token, expected, cash, bank)
+	for _, batch := range [][]fsBatch{batch1, batch2} {
+		for _, b := range batch {
+			resp := postLedgerEntries(t, clients, token, period, b.fs, b.entries...)
+			require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
+			require.NotNil(t, resp.JSON201)
+			assert.Len(t, resp.JSON201.LedgerEntryUuids, len(b.entries))
 
-		// A batch overdrawing a fund source is rejected whole and changes nothing.
-		overdraw := postLedgerEntries(t, clients, token, period,
-			entryInput(bank, shared.DirectionInflow, 1_000),
-			entryInput(cash, shared.DirectionOutflow, 50_000_000),
+			applyEntries(expected, b.fs, b.entries)
+			requireBalances(t, clients, token, expected, cash, bank)
+		}
+
+		// A batch overdrawing its fund source is rejected whole and changes nothing.
+		overdraw := postLedgerEntries(t, clients, token, period, cash,
+			entryInput(shared.DirectionInflow, 1_000),
+			entryInput(shared.DirectionOutflow, 50_000_000),
 		)
 		require.Equal(t, 400, overdraw.StatusCode(), "body: %s", string(overdraw.Body))
 		assert.Equal(t, "insufficient-balance", overdraw.JSON400.Slug)
@@ -154,7 +169,7 @@ func TestLedgerPeriodCriticalFlow(t *testing.T) {
 	checkClosed(t)
 
 	// 5. A closed period rejects posting, closing again and reconciling the period.
-	post := postLedgerEntries(t, clients, token, period, entryInput(cash, shared.DirectionInflow, 1))
+	post := postLedgerEntries(t, clients, token, period, cash, entryInput(shared.DirectionInflow, 1))
 	require.Equal(t, 409, post.StatusCode(), "body: %s", string(post.Body))
 	assert.Equal(t, "period-not-open", post.JSON409.Slug)
 

@@ -177,8 +177,9 @@ paths:
       operationId: postLedgerEntries
       summary: Post ledger entries
       description: >
-        Posts many entries of one period at once, all or nothing. Each entry is
-        applied to its fund source (inflow tops up, outflow withdraws) and
+        Posts many entries of one period to one fund source at once, all or
+        nothing. The fund source must belong to the period. Each entry is
+        applied to it (inflow tops up, outflow withdraws) and
         stores the fund source balance before and after. Fails with 409 when the
         period is not opened.
       parameters:
@@ -634,10 +635,8 @@ components:
 
     LedgerEntryInput:
       type: object
-      required: [fund_source_uuid, amount, direction, description, occurred_at]
+      required: [amount, direction, description, occurred_at]
       properties:
-        fund_source_uuid:
-          $ref: "#/components/schemas/FundSourceUUID"
         amount:
           $ref: "#/components/schemas/Decimal"
         direction:
@@ -652,8 +651,11 @@ components:
 
     PostLedgerEntriesRequest:
       type: object
-      required: [entries]
+      required: [fund_source_uuid, entries]
       properties:
+        fund_source_uuid:
+          description: The one fund source all entries are posted to. Must belong to the period (have a statement in it).
+          $ref: "#/components/schemas/FundSourceUUID"
         entries:
           type: array
           items:

@@ -52,7 +52,7 @@ func TestReopenLedgerPeriod(t *testing.T) {
 		require.Len(t, periods.Items, 1)
 		assert.Equal(t, "opened", periods.Items[0].Status.String())
 
-		post := postLedgerEntries(t, clients, token, period, entryInput(fs, shared.DirectionOutflow, 1_000))
+		post := postLedgerEntries(t, clients, token, period, fs, entryInput(shared.DirectionOutflow, 1_000))
 		require.Equal(t, 201, post.StatusCode(), "body: %s", string(post.Body))
 		require.Equal(t, 204, closeLedgerPeriod(t, clients, token, period).StatusCode())
 	})

@@ -34,11 +34,12 @@ func TestGetLedgerPeriod(t *testing.T) {
 		body2, fs2 := createFundSource(t, clients, token, domain.FundSourceTypeBank)
 		period := openPeriod(t, clients, token, fs1, fs2)
 
-		resp := postLedgerEntries(t, clients, token, period,
-			entryInput(fs1, shared.DirectionOutflow, 300_000),
-			entryInput(fs1, shared.DirectionInflow, 50_000),
-			entryInput(fs2, shared.DirectionInflow, 10_000),
+		resp := postLedgerEntries(t, clients, token, period, fs1,
+			entryInput(shared.DirectionOutflow, 300_000),
+			entryInput(shared.DirectionInflow, 50_000),
 		)
+		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
+		resp = postLedgerEntries(t, clients, token, period, fs2, entryInput(shared.DirectionInflow, 10_000))
 		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
 
 		got := getLedgerPeriod(t, clients, token, period)

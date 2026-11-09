@@ -104,17 +104,17 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntr
 	entries := make([]commands.LedgerEntryInput, 0, len(body.Entries))
 	for _, e := range body.Entries {
 		entries = append(entries, commands.LedgerEntryInput{
-			FundSourceUUID: e.FundSourceUuid,
-			Amount:         e.Amount,
-			Direction:      e.Direction,
-			Description:    e.Description,
-			OccurredAt:     e.OccurredAt,
-			CategoryUUID:   e.CategoryUuid,
+			Amount:       e.Amount,
+			Direction:    e.Direction,
+			Description:  e.Description,
+			OccurredAt:   e.OccurredAt,
+			CategoryUUID: e.CategoryUuid,
 		})
 	}
 
 	entryUUIDs, err := h.commandHandlers.PostLedgerEntries(ctx, commands.PostLedgerEntries{
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
+		FundSourceUUID:   body.FundSourceUuid,
 		Entries:          entries,
 	})
 	if err != nil {
