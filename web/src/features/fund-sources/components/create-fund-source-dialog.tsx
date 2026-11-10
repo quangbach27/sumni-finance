@@ -34,12 +34,12 @@ import { StatusAlertProvider } from '@/components/shared/status-alert/status-ale
 
 import { useIsMobile } from '@/hooks/use-mobile';
 
-import CreateFundSourceForm from './create-fund-source-form';
 import {
   createFundSourceSchema,
   getCreateFundSourceDefaultValues,
   useCreateFundSource,
 } from '../api/create-fund-source';
+import CreateFundSourceForm from './create-fund-source-form';
 
 import type { CreateFundSourceFormValues } from '../api/create-fund-source';
 import type { Resolver } from 'react-hook-form';

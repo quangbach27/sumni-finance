@@ -5,11 +5,11 @@ import { Plus } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 
-import PastPeriods from './past-periods';
-import UnlockedPeriodCard from './unlocked-period-card';
 import { getUnlockedLedgerPeriodQueryOptions } from '../../api/get-unlocked-ledger-period';
 import NoOpenPeriod from '../open-period/no-open-period';
 import OpenLedgerPeriodTrigger from '../open-period/open-ledger-period-trigger';
+import PastPeriods from './past-periods';
+import UnlockedPeriodCard from './unlocked-period-card';
 
 /** Header button: disabled while a period is unlocked (open or closed). */
 export function OpenPeriodHeaderTrigger() {
@@ -17,10 +17,7 @@ export function OpenPeriodHeaderTrigger() {
     getUnlockedLedgerPeriodQueryOptions(),
   );
   return (
-    <OpenLedgerPeriodTrigger
-      variant={unlocked ? 'outline' : 'default'}
-      disabled={!!unlocked}
-    >
+    <OpenLedgerPeriodTrigger disabled={!!unlocked}>
       <Plus data-icon="inline-start" />
       <span>Mở kỳ mới</span>
     </OpenLedgerPeriodTrigger>

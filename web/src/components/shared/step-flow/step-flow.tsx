@@ -2,7 +2,11 @@ import StatusAlertOutlet from '@/components/shared/status-alert/status-alert-out
 import { StatusAlertProvider } from '@/components/shared/status-alert/status-alert-provider';
 import Stepper from '@/components/shared/stepper/stepper';
 
-import { StepFlowProvider, useStepFlow } from './step-flow-context';
+import {
+  StepFlowProvider,
+  useStepFlowActions,
+  useStepFlowState,
+} from './step-flow-context';
 
 import type { ReactNode } from 'react';
 
@@ -10,21 +14,21 @@ export type FlowStep = {
   id: string;
   title: string;
   hint?: string;
-  /** UI of this step, including its own action bar; use `useStepFlow` to confirm. */
+  /** UI of this step, including its own action bar; use `useStepFlowActions().openConfirm` to act. */
   content: ReactNode;
 };
 
 type Props = {
   steps: FlowStep[];
-  /** Id of the step in progress, derived by the caller; null = all steps done. */
-  currentStepId: string | null;
+  /** Step the flow starts on; null = all steps done. The flow owns the current step afterwards. */
+  initialStepId: string | null;
 };
 
-/** Multi-step flow: stepper plus the viewed step's content. Steps finish via `useStepFlow().openConfirm`. */
-export default function StepFlow({ steps, currentStepId }: Props) {
+/** Multi-step flow: stepper plus the viewed step's content. Actions move the flow via `useStepFlowActions()`. */
+export default function StepFlow({ steps, initialStepId }: Props) {
   return (
     <StatusAlertProvider>
-      <StepFlowProvider steps={steps} currentStepId={currentStepId}>
+      <StepFlowProvider steps={steps} initialStepId={initialStepId}>
         <StepFlowView steps={steps} />
       </StepFlowProvider>
     </StatusAlertProvider>
@@ -32,7 +36,8 @@ export default function StepFlow({ steps, currentStepId }: Props) {
 }
 
 function StepFlowView({ steps }: { steps: FlowStep[] }) {
-  const { viewedId, stepStatus, selectStep } = useStepFlow();
+  const { viewedId, stepStatus } = useStepFlowState();
+  const { selectStep } = useStepFlowActions();
   const viewed = steps.find((s) => s.id === viewedId) ?? steps[0];
 
   return (

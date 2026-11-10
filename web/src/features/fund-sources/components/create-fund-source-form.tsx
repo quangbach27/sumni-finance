@@ -16,12 +16,12 @@ import AmountInput from '@/components/shared/form-field/amount-input';
 import FormField from '@/components/shared/form-field/form-field';
 import TextInput from '@/components/shared/form-field/text-input';
 import StatusAlertOutlet from '@/components/shared/status-alert/status-alert-outlet';
-import { useStatusAlert } from '@/components/shared/status-alert/status-alert-provider';
+import { useStatusAlertActions } from '@/components/shared/status-alert/status-alert-provider';
 
 import { isApiError } from '@/lib/clients';
 
-import BankCombobox from './bank-combobox';
 import { formatApiError } from '../api/format-api-error';
+import BankCombobox from './bank-combobox';
 
 import type { CreateFundSourceFormValues } from '../api/create-fund-source';
 import type { FundSourceType } from '../api/types';
@@ -80,7 +80,7 @@ export default function CreateFundSourceForm({
 
   const suggestedName = suggestName(ownerName, type);
 
-  const { showAlert, dismissAlert } = useStatusAlert();
+  const { showAlert, dismissAlert } = useStatusAlertActions();
 
   // Editing any field dismisses a stale alert.
   useEffect(() => {

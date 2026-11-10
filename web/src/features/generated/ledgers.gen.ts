@@ -97,9 +97,33 @@ export interface paths {
         put?: never;
         /**
          * Post ledger entries
-         * @description Posts many entries of one period at once, all or nothing. Each entry is applied to its fund source (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+         * @description Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
          */
         post: operations["postLedgerEntries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all categories
+         * @description Categories are shared by all ledger periods. Each category comes with its sub-categories.
+         */
+        get: operations["listCategories"];
+        /**
+         * Create or update categories with their sub-categories
+         * @description Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+         */
+        put: operations["upsertCategories"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -323,10 +347,43 @@ export interface components {
         LedgerEntryUUID: string;
         /** Format: uuid */
         CategoryUUID: string;
+        SubCategoryInput: {
+            /** @description Updates this sub-category when set; otherwise a new one is created. */
+            uuid?: components["schemas"]["CategoryUUID"];
+            name: string;
+            description?: string;
+        };
+        CategoryInput: {
+            /** @description Updates this category when set; otherwise a new one is created. */
+            uuid?: components["schemas"]["CategoryUUID"];
+            name: string;
+            description?: string;
+            sub_categories?: components["schemas"]["SubCategoryInput"][];
+        };
+        UpsertCategoriesRequest: {
+            categories: components["schemas"]["CategoryInput"][];
+        };
+        UpsertCategoriesResponse: {
+            /** @description In the order of the request categories. */
+            category_uuids: components["schemas"]["CategoryUUID"][];
+        };
+        SubCategory: {
+            uuid: components["schemas"]["CategoryUUID"];
+            name: string;
+            description?: string;
+        };
+        Category: {
+            uuid: components["schemas"]["CategoryUUID"];
+            name: string;
+            description?: string;
+            sub_categories: components["schemas"]["SubCategory"][];
+        };
+        ListCategoriesResponse: {
+            items: components["schemas"]["Category"][];
+        };
         /** @enum {string} */
         Direction: "inflow" | "outflow";
         LedgerEntryInput: {
-            fund_source_uuid: components["schemas"]["FundSourceUUID"];
             amount: components["schemas"]["Decimal"];
             direction: components["schemas"]["Direction"];
             description: string;
@@ -335,6 +392,8 @@ export interface components {
             category_uuid?: components["schemas"]["CategoryUUID"];
         };
         PostLedgerEntriesRequest: {
+            /** @description The one fund source all entries are posted to. Must belong to the period (have a statement in it). */
+            fund_source_uuid: components["schemas"]["FundSourceUUID"];
             entries: components["schemas"]["LedgerEntryInput"][];
         };
         PostLedgerEntriesResponse: {
@@ -377,6 +436,16 @@ export interface components {
              */
             entry_count: number;
             statements: components["schemas"]["LedgerStatementDetail"][];
+            /** @description Posted entries of the period per top-level category. Sub-category entries count toward their parent. */
+            category_summaries: components["schemas"]["CategorySummary"][];
+        };
+        CategorySummary: {
+            /** @description Top-level category. Absent for entries without a known category. */
+            category_uuid?: components["schemas"]["CategoryUUID"];
+            /** Format: int64 */
+            entry_count: number;
+            total_inflow: components["schemas"]["Decimal"];
+            total_outflow: components["schemas"]["Decimal"];
         };
         GetLedgerPeriodResponse: {
             ledger_period: components["schemas"]["LedgerPeriodDetail"];
@@ -646,6 +715,56 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Categories with their sub-categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCategoriesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    upsertCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertCategoriesRequest"];
+            };
+        };
+        responses: {
+            /** @description Categories saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpsertCategoriesResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalServerError"];
         };

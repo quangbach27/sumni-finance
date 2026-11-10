@@ -35,6 +35,7 @@ import StatCardSkeleton from '@/components/shared/stat-card/stat-card-skeleton';
 
 import { formatCurrency } from '@/lib/currency';
 
+import { getFundSourcesQueryOptions } from '../api/get-fund-sources';
 import CreateFundSourceTrigger from './create-fund-source-trigger';
 import FundSourceActionsMenu from './fund-source-actions-menu';
 import FundSourceAvatar from './fund-source-avatar';
@@ -43,7 +44,6 @@ import {
   maskAccountNumber,
   summarizeFundSources,
 } from './fund-source-summary';
-import { getFundSourcesQueryOptions } from '../api/get-fund-sources';
 
 import type { FundSourceFilter } from './fund-source-summary';
 

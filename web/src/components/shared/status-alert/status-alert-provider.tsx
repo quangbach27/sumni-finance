@@ -10,38 +10,58 @@ export type StatusAlertData = {
   details?: string[];
 };
 
-type StatusAlertContextValue = {
-  status: StatusAlertData | null;
+type StatusAlertActions = {
   showAlert: (status: StatusAlertData) => void;
   dismissAlert: () => void;
 };
 
-const StatusAlertContext = createContext<StatusAlertContextValue | null>(null);
+// State and actions live in separate contexts so consumers that only trigger
+// alerts don't re-render every time the alert shows or hides.
+const StatusAlertStateContext = createContext<
+  StatusAlertData | null | undefined
+>(undefined);
+const StatusAlertActionsContext = createContext<StatusAlertActions | null>(
+  null,
+);
 
 /** Holds the status data; render it where needed with `<StatusAlertOutlet />`. Mount one per feature. */
 export function StatusAlertProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<StatusAlertData | null>(null);
 
-  const value = useMemo(
+  const actions = useMemo<StatusAlertActions>(
     () => ({
-      status,
       showAlert: setStatus,
       dismissAlert: () => setStatus(null),
     }),
-    [status],
+    [],
   );
 
   return (
-    <StatusAlertContext.Provider value={value}>
-      {children}
-    </StatusAlertContext.Provider>
+    <StatusAlertActionsContext.Provider value={actions}>
+      <StatusAlertStateContext.Provider value={status}>
+        {children}
+      </StatusAlertStateContext.Provider>
+    </StatusAlertActionsContext.Provider>
   );
 }
 
-export function useStatusAlert() {
-  const ctx = useContext(StatusAlertContext);
+/** Stable `showAlert`/`dismissAlert`; does not re-render when the alert changes. */
+export function useStatusAlertActions() {
+  const ctx = useContext(StatusAlertActionsContext);
   if (!ctx) {
-    throw new Error('useStatusAlert must be used inside <StatusAlertProvider>');
+    throw new Error(
+      'useStatusAlertActions must be used inside <StatusAlertProvider>',
+    );
   }
   return ctx;
+}
+
+/** Current status plus actions; re-renders when the alert changes. */
+export function useStatusAlert() {
+  const actions = useStatusAlertActions();
+  const status = useContext(StatusAlertStateContext);
+  if (status === undefined) {
+    throw new Error('useStatusAlert must be used inside <StatusAlertProvider>');
+  }
+  return { status, ...actions };
 }

@@ -18,9 +18,9 @@ import {
 
 import { useIsMobile } from '@/hooks/use-mobile';
 
+import { useBanks } from '../api/get-banks';
 import BankList from './bank-list';
 import BankSummary from './bank-summary';
-import { useBanks } from '../api/get-banks';
 
 import type { Bank } from '../api/types';
 

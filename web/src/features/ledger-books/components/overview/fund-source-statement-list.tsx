@@ -1,7 +1,7 @@
 import { formatAmount } from '@/lib/currency';
 
 import { isStatementReconciled } from '../../api/is-statement-reconciled';
-import { ReconciledBadge } from '../reconciliation/statement-cells';
+import { ReconciledBadge } from '../ledger-period-details/reconciliation-step/statement-cells';
 import FundSourceInitials from '../shared/fund-source-initials';
 import {
   getFundSourceSubtitle,

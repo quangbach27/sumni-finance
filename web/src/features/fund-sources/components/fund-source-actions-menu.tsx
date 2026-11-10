@@ -15,8 +15,8 @@ import {
 
 import { FUND_SOURCE_ACTION_GROUPS } from './actions/fund-source-actions';
 
-import type { FundSourceAction } from './actions/types';
 import type { FundSource } from '../api/types';
+import type { FundSourceAction } from './actions/types';
 
 type FundSourceActionsMenuProps = { item: FundSource };
 

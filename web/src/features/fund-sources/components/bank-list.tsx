@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/command';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import BankSummary from './bank-summary';
 import { useBanks } from '../api/get-banks';
+import BankSummary from './bank-summary';
 
 import type { Bank } from '../api/types';
 

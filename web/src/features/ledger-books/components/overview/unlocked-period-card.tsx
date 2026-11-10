@@ -1,11 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import {
-  AlertTriangle,
-  BookOpen,
-  Check,
-  ChevronRight,
-  Lock,
-} from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, Lock } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -15,11 +9,10 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { formatAmount } from '@/lib/currency';
 import { daysUntil, formatDate } from '@/lib/date';
 
-import ClosePeriodButton from './close-period-dialog';
+import { getSystemBalance } from '../../api/get-unlocked-ledger-period';
+import ClosePeriodButton from '../ledger-period-details/close-period-dialog';
 import FundSourceStatementList from './fund-source-statement-list';
 import PeriodStatTiles from './period-stat-tiles';
-import { getSystemBalance } from '../../api/get-unlocked-ledger-period';
-import { getMockPeriodExtras } from '../../api/mock-period-extras';
 
 import type { LedgerPeriodDetail } from '../../api/types';
 
@@ -47,7 +40,7 @@ const getPeriodView = (period: LedgerPeriodDetail): PeriodView => {
   const closeDate = new Date(period.closeDate);
   return {
     isClosed,
-    entryCount: getMockPeriodExtras(period).entryCount,
+    entryCount: period.entryCount,
     closeDate,
     daysLeft: daysUntil(closeDate),
     balance: getSystemBalance(period),
@@ -102,15 +95,27 @@ const ReconciliationButton = ({
   <Button
     size={size}
     className={className}
-    render={
-      <Link
-        to="/ledger-books/$uuid/finalization"
-        params={{ uuid: periodUuid }}
-      />
-    }
+    nativeButton={false}
+    render={<Link to="/ledger-books/$uuid" params={{ uuid: periodUuid }} />}
   >
     <Check data-icon="inline-start" />
     Đối soát
+  </Button>
+);
+
+const LedgerDetailsButton = ({
+  periodUuid,
+  className,
+}: {
+  periodUuid: string;
+  className?: string;
+}) => (
+  <Button
+    className={className}
+    nativeButton={false}
+    render={<Link to="/ledger-books/$uuid" params={{ uuid: periodUuid }} />}
+  >
+    Vào sổ
   </Button>
 );
 
@@ -136,10 +141,6 @@ const DesktopLayout = ({ period, view }: LayoutProps) => {
         </div>
         {/* TODO: wire entries / post-entry / reconciliation once those flows exist. */}
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" disabled>
-            <BookOpen data-icon="inline-start" />
-            Tất cả bút toán
-          </Button>
           {isClosed ? (
             <ReconciliationButton periodUuid={period.uuid} />
           ) : (
@@ -147,8 +148,9 @@ const DesktopLayout = ({ period, view }: LayoutProps) => {
               <ClosePeriodButton
                 periodUuid={period.uuid}
                 periodName={period.name}
+                variant="outline"
               />
-              <Button disabled>Vào sổ</Button>
+              <LedgerDetailsButton periodUuid={period.uuid} />
             </>
           )}
         </div>
@@ -192,9 +194,7 @@ const MobileLayout = ({ period, view }: LayoutProps) => {
       {/* TODO: wire post-entry once that flow exists. */}
       {!isClosed && (
         <div className="flex flex-wrap gap-3">
-          <Button disabled className="flex-1">
-            Vào sổ
-          </Button>
+          <LedgerDetailsButton periodUuid={period.uuid} className="flex-1" />
           <ClosePeriodButton
             periodUuid={period.uuid}
             periodName={period.name}

@@ -10,9 +10,9 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 
-import OpenLedgerPeriodTrigger from './open-ledger-period-trigger';
 import { getLedgerPeriodsQueryOptions } from '../../api/get-ledger-periods';
 import { getOpenLedgerPeriodDefaultValues } from '../../api/open-ledger-period';
+import OpenLedgerPeriodTrigger from './open-ledger-period-trigger';
 
 export default function NoOpenPeriod() {
   const { data } = useSuspenseQuery(

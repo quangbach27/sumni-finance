@@ -13,7 +13,7 @@ import DatePicker from '@/components/shared/date-picker/date-picker';
 import FormField from '@/components/shared/form-field/form-field';
 import TextInput from '@/components/shared/form-field/text-input';
 import StatusAlertOutlet from '@/components/shared/status-alert/status-alert-outlet';
-import { useStatusAlert } from '@/components/shared/status-alert/status-alert-provider';
+import { useStatusAlertActions } from '@/components/shared/status-alert/status-alert-provider';
 
 import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 
@@ -54,7 +54,7 @@ export default function OpenLedgerPeriodForm({
   previousPeriod,
   onSubmit,
 }: OpenLedgerPeriodFormProps) {
-  const { showAlert, dismissAlert } = useStatusAlert();
+  const { showAlert, dismissAlert } = useStatusAlertActions();
 
   const total = fundSources.reduce((sum, f) => sum + f.balance, 0);
 

@@ -1,14 +1,13 @@
-import { useState } from 'react';
-
 import { Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
 import StepActionBar from './step-action-bar';
 import StepFlow from './step-flow';
-import { useStepFlow } from './step-flow-context';
+import { useStepFlowActions, useStepFlowState } from './step-flow-context';
 
 import type { FlowStep } from './step-flow';
+import type { StepDirection } from './step-flow-context';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -17,7 +16,7 @@ const box = (text: string) => (
   <div className="bg-card rounded-2xl border p-4 shadow-sm">{text}</div>
 );
 
-/** Demo step body with an action bar that opens the shared confirm dialog. */
+/** Demo step body whose action bar opens the flow's confirm dialog; the flow moves on after `action`. */
 function DemoStep({
   text,
   label,
@@ -25,7 +24,10 @@ function DemoStep({
   dialogDescription,
   helper,
   disabled,
-  onConfirm,
+  direction,
+  action,
+  backLabel,
+  onBack,
 }: {
   text: string;
   label: string;
@@ -33,14 +35,27 @@ function DemoStep({
   dialogDescription: string;
   helper?: string;
   disabled?: boolean;
-  onConfirm: () => Promise<unknown>;
+  direction?: StepDirection;
+  action: () => Promise<unknown>;
+  /** When set, adds a secondary action that sends the flow back a step. */
+  backLabel?: string;
+  onBack?: () => Promise<unknown>;
 }) {
-  const { isCurrent, openConfirm } = useStepFlow();
+  const { isCurrent } = useStepFlowState();
+  const { openConfirm, runAction } = useStepFlowActions();
   return (
     <>
       {box(text)}
       {isCurrent && (
         <StepActionBar helper={helper}>
+          {backLabel && onBack && (
+            <Button
+              variant="outline"
+              onClick={() => runAction(onBack, 'backward')}
+            >
+              {backLabel}
+            </Button>
+          )}
           <Button
             disabled={disabled}
             onClick={() =>
@@ -48,7 +63,8 @@ function DemoStep({
                 title: dialogTitle,
                 description: dialogDescription,
                 confirmLabel: label,
-                onConfirm,
+                action,
+                direction,
               })
             }
           >
@@ -61,21 +77,16 @@ function DemoStep({
   );
 }
 
-/** Demo step body whose action just moves on, with no confirm dialog. */
-function ContinueStep({
-  text,
-  onContinue,
-}: {
-  text: string;
-  onContinue: () => void;
-}) {
-  const { isCurrent } = useStepFlow();
+/** Demo step body whose action runs straight through `runAction`, with no confirm dialog. */
+function ContinueStep({ text }: { text: string }) {
+  const { isCurrent } = useStepFlowState();
+  const { runAction } = useStepFlowActions();
   return (
     <>
       {box(text)}
       {isCurrent && (
         <StepActionBar>
-          <Button onClick={onContinue}>Tiếp tục</Button>
+          <Button onClick={() => runAction(() => wait(500))}>Tiếp tục</Button>
         </StepActionBar>
       )}
     </>
@@ -85,14 +96,17 @@ function ContinueStep({
 type Overrides = {
   disabled?: boolean;
   /** When set, step 1 shows a plain "Tiếp tục" action (no confirm dialog). */
-  onRecord?: () => void;
+  continueWithoutDialog?: boolean;
+  /** When set, the reconcile step also offers "Mở lại kỳ", which goes back a step. */
+  withReopen?: boolean;
   onReconcile?: () => Promise<unknown>;
   onReport?: () => Promise<unknown>;
 };
 
 const buildSteps = ({
   disabled,
-  onRecord,
+  continueWithoutDialog,
+  withReopen,
   onReconcile = () => wait(800),
   onReport = () => wait(800),
 }: Overrides = {}): FlowStep[] => [
@@ -100,8 +114,8 @@ const buildSteps = ({
     id: 'record',
     title: 'Ghi bút toán',
     hint: 'Đã đóng',
-    content: onRecord ? (
-      <ContinueStep text="Bút toán đã ghi" onContinue={onRecord} />
+    content: continueWithoutDialog ? (
+      <ContinueStep text="Bút toán đã ghi" />
     ) : (
       box('Bút toán đã ghi')
     ),
@@ -122,7 +136,9 @@ const buildSteps = ({
             : 'Tất cả nguồn quỹ đã được xác nhận'
         }
         disabled={disabled}
-        onConfirm={onReconcile}
+        action={onReconcile}
+        backLabel={withReopen ? 'Mở lại kỳ' : undefined}
+        onBack={withReopen ? () => wait(500) : undefined}
       />
     ),
   },
@@ -136,7 +152,7 @@ const buildSteps = ({
         label="Tạo báo cáo"
         dialogTitle="Tạo báo cáo?"
         dialogDescription="Báo cáo ghi lại số dư từng nguồn quỹ."
-        onConfirm={onReport}
+        action={onReport}
       />
     ),
   },
@@ -153,7 +169,7 @@ const meta = {
   title: 'Shared/StepFlow',
   component: StepFlow,
   tags: ['autodocs'],
-  args: { steps: buildSteps(), currentStepId: 'reconcile' },
+  args: { steps: buildSteps(), initialStepId: 'reconcile' },
 } satisfies Meta<typeof StepFlow>;
 
 export default meta;
@@ -163,49 +179,32 @@ export const Default: Story = {};
 
 export const Mobile: Story = { globals: mobile };
 
-export const LastStep: Story = { args: { currentStepId: 'report' } };
+export const LastStep: Story = { args: { initialStepId: 'report' } };
 
-export const AllDone: Story = { args: { currentStepId: null } };
+export const AllDone: Story = { args: { initialStepId: null } };
 
 export const ConfirmDisabled: Story = {
   args: { steps: buildSteps({ disabled: true }) },
 };
 
-/** Click "Đánh dấu đã đối soát" and confirm: the dialog closes, an alert shows above the step and the stepper marks it invalid. */
+/** Click "Đánh dấu đã đối soát" and confirm: the dialog closes, the flow stays on the step, an alert shows and the stepper marks it invalid. */
 export const ConfirmFails: Story = {
   args: { steps: buildSteps({ onReconcile: failing }) },
 };
 
 export const ConfirmFailsMobile: Story = { ...ConfirmFails, globals: mobile };
 
-function InteractiveFlow() {
-  const [currentStepId, setCurrentStepId] = useState<string | null>('record');
-  const advance = (next: string | null) => async () => {
-    await wait(500);
-    setCurrentStepId(next);
-  };
-  return (
-    <div className="flex flex-col gap-5">
-      <StepFlow
-        steps={buildSteps({
-          onRecord: () => setCurrentStepId('reconcile'),
-          onReconcile: advance('report'),
-          onReport: advance(null),
-        })}
-        currentStepId={currentStepId}
-      />
-      {currentStepId === null && (
-        <Button variant="outline" onClick={() => setCurrentStepId('record')}>
-          Đặt lại
-        </Button>
-      )}
-    </div>
-  );
-}
+/** "Mở lại kỳ" runs its action, then sends the flow back to step 1. */
+export const ReopenGoesBack: Story = {
+  args: { steps: buildSteps({ withReopen: true }) },
+};
 
 /** Step 1 continues without a dialog; steps 2 and 3 confirm and move on; the last one completes the flow. */
 export const Interactive: Story = {
-  render: () => <InteractiveFlow />,
+  args: {
+    steps: buildSteps({ continueWithoutDialog: true, withReopen: true }),
+    initialStepId: 'record',
+  },
 };
 
 export const InteractiveMobile: Story = { ...Interactive, globals: mobile };
