@@ -40,11 +40,20 @@ export type LedgerStatement = {
   reconciledAt?: string;
 };
 
+/** Posted entries of one top-level category; `categoryUuid` is absent for uncategorized entries. */
+export type CategorySummary = {
+  categoryUuid?: string;
+  entryCount: number;
+  totalInflow: number;
+  totalOutflow: number;
+};
+
 export type LedgerPeriodDetail = LedgerPeriod & {
   totalInflow: number;
   totalOutflow: number;
   entryCount: number;
   statements: LedgerStatement[];
+  categorySummaries: CategorySummary[];
 };
 
 export type LedgerPeriodsPage = { items: LedgerPeriod[]; pageInfo: PageInfo };

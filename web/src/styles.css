@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+@import 'react-datasheet-grid/dist/style.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -221,4 +222,33 @@
   [role='button']:not(:disabled) {
     cursor: pointer;
   }
+}
+
+/* react-datasheet-grid, themed to the app (ledger entries grid). */
+.dsg-container {
+  --dsg-border-color: var(--border);
+  --dsg-selection-border-color: var(--primary);
+  --dsg-selection-border-width: 2px;
+  --dsg-selection-border-radius: 0;
+  --dsg-selection-background-color: transparent;
+  --dsg-header-text-color: var(--foreground);
+  --dsg-header-active-text-color: var(--foreground);
+  --dsg-cell-background-color: var(--card);
+  --dsg-cell-disabled-background-color: var(--muted);
+  font-size: 1rem;
+  border-radius: var(--radius-lg);
+}
+
+.dsg-container .dsg-cell-header {
+  font-weight: 600;
+  background: color-mix(in oklab, var(--muted) 60%, var(--card));
+}
+
+.dsg-container .dsg-input {
+  height: 100%;
+  padding-inline: 1.25rem;
+}
+
+.dsg-container .dsg-row-error .dsg-cell:not(.dsg-cell-gutter) {
+  background: color-mix(in oklab, var(--destructive) 7%, var(--card));
 }

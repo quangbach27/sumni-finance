@@ -89,7 +89,7 @@ export default function PostEntryStep({ periodUuid }: { periodUuid: string }) {
                 <Button
                   render={
                     <Link
-                      to="/ledger-books/$uuid/entries"
+                      to="/ledger-books/$uuid/entries/post"
                       params={{ uuid: period.uuid }}
                     />
                   }
