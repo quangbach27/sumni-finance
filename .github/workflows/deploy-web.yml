@@ -1,0 +1,63 @@
+name: Deploy Web
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        type: choice
+        options:
+          - dev
+        default: dev
+
+# Never run two deployments to the same environment at the same time.
+concurrency:
+  group: deploy-web-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  commit-stage:
+    name: Commit stage
+    uses: ./.github/workflows/web-commit-stage.yml
+    with:
+      environment: ${{ inputs.environment }}
+
+  deploy:
+    name: Deploy to Firebase Hosting (${{ inputs.environment }})
+    needs: [commit-stage]
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.commit-stage.outputs.artifact-name }}
+          path: web/dist
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Firebase Hosting
+        # firebase.json and .firebaserc live in web/ and point "public" to "dist".
+        working-directory: web
+        run: |
+          npx --yes firebase-tools@latest deploy \
+            --only hosting \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --non-interactive
