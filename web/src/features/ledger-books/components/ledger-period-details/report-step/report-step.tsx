@@ -3,15 +3,19 @@ import { Check, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import StepActionBar from '@/components/shared/step-flow/step-action-bar';
-import { useStepFlow } from '@/components/shared/step-flow/step-flow-context';
+import {
+  useStepFlowActions,
+  useStepFlowState,
+} from '@/components/shared/step-flow/step-flow-context';
 
-import { useGenerateLedgerPeriodReport } from '../../api/generate-ledger-period-report';
-
-import type { LedgerPeriodDetail } from '../../api/types';
+import { useGenerateLedgerPeriodReport } from '../../../api/generate-ledger-period-report';
+import { useLedgerPeriod } from '../../../api/get-ledger-period';
 
 /** Step 3: "ready to generate" banner with the generate action, or the report card once it exists. */
-export default function ReportStep({ period }: { period: LedgerPeriodDetail }) {
-  const { isCurrent, openConfirm } = useStepFlow();
+export default function ReportStep({ periodUuid }: { periodUuid: string }) {
+  const period = useLedgerPeriod(periodUuid);
+  const { isCurrent } = useStepFlowState();
+  const { openConfirm } = useStepFlowActions();
   const generateReport = useGenerateLedgerPeriodReport();
 
   if (period.reportUuid) {
@@ -61,7 +65,7 @@ export default function ReportStep({ period }: { period: LedgerPeriodDetail }) {
                 description:
                   'Báo cáo ghi lại số dư từng nguồn quỹ, tổng nợ và có theo danh mục và thẻ.',
                 confirmLabel: 'Tạo báo cáo',
-                onConfirm: () => generateReport.mutateAsync(period.uuid),
+                action: () => generateReport.mutateAsync(periodUuid),
               })
             }
           >

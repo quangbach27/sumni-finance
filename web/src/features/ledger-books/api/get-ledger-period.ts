@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useSuspenseQuery } from '@tanstack/react-query';
 
 import { http } from '@/lib/clients';
 
@@ -24,3 +24,7 @@ export const getLedgerPeriodQueryOptions = (uuid: string) =>
     queryKey: [LEDGER_PERIODS_URL, uuid],
     queryFn: ({ signal }) => getLedgerPeriod(uuid, { signal }),
   });
+
+/** Suspense read of a period; components take the uuid and read the period themselves. */
+export const useLedgerPeriod = (uuid: string) =>
+  useSuspenseQuery(getLedgerPeriodQueryOptions(uuid)).data;

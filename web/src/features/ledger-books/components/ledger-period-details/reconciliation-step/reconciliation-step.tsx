@@ -3,29 +3,30 @@ import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import StepActionBar from '@/components/shared/step-flow/step-action-bar';
-import { useStepFlow } from '@/components/shared/step-flow/step-flow-context';
+import {
+  useStepFlowActions,
+  useStepFlowState,
+} from '@/components/shared/step-flow/step-flow-context';
 
+import { useLedgerPeriod } from '../../../api/get-ledger-period';
+import { useReconcileLedgerPeriod } from '../../../api/reconcile-ledger-period';
+import { useStatementReconciliation } from '../../../hooks/use-statement-reconciliation';
 import ReconciledStatementTable from './reconciled-statement-table';
 import ReconciliationIntro from './reconciliation-intro';
 import ReopenPeriodButton from './reopen-period-dialog';
 import StatementCards from './statement-cards';
 import UnreconciledStatementTable from './unreconciled-statement-table';
-import { useReconcileLedgerPeriod } from '../../api/reconcile-ledger-period';
-import { useStatementReconciliation } from '../../hooks/use-statement-reconciliation';
-
-import type { LedgerPeriodDetail } from '../../api/types';
 
 /** Reconcile step: compare system and real balances, then mark the period reconciled. */
-export default function ReconcileStep({
-  period,
+export default function ReconciliationStep({
+  periodUuid,
 }: {
-  period: LedgerPeriodDetail;
+  periodUuid: string;
 }) {
-  const { isCurrent, openConfirm } = useStepFlow();
-  const reconciliation = useStatementReconciliation(
-    period.uuid,
-    period.statements,
-  );
+  const period = useLedgerPeriod(periodUuid);
+  const { isCurrent } = useStepFlowState();
+  const { openConfirm } = useStepFlowActions();
+  const reconciliation = useStatementReconciliation(periodUuid);
   const reconcilePeriod = useReconcileLedgerPeriod();
 
   const isReconciled = period.status === 'reconciled';
@@ -62,7 +63,7 @@ export default function ReconcileStep({
           }
         >
           <ReopenPeriodButton
-            periodUuid={period.uuid}
+            periodUuid={periodUuid}
             periodName={period.name}
             label="Mở lại kỳ để sửa"
             // Reopening is blocked once any statement is confirmed.
@@ -77,7 +78,7 @@ export default function ReconcileStep({
                 title: 'Hoàn tất đối soát?',
                 description: `Tất cả ${counts.totalCount} nguồn quỹ của ${period.name} đã khớp. Sau khi xác nhận, bạn có thể tạo báo cáo.`,
                 confirmLabel: 'Hoàn tất đối soát',
-                onConfirm: () => reconcilePeriod.mutateAsync(period.uuid),
+                action: () => reconcilePeriod.mutateAsync(periodUuid),
               })
             }
           >

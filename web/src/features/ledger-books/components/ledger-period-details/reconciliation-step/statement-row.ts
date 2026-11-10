@@ -1,11 +1,11 @@
 import { formatAmount } from '@/lib/currency';
 
-import { getFundSourceLabel } from '../shared/fund-source-label';
+import { getFundSourceLabel } from '../../shared/fund-source-label';
 
 import type {
   LedgerStatement,
   LedgerStatementFundSource,
-} from '../../api/types';
+} from '../../../api/types';
 
 export const CURRENCY = 'VND';
 

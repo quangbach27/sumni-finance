@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatAmount } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
+import FundSourceInitials from '../../shared/fund-source-initials';
 import {
   ActualBalanceInput,
   ConfirmButton,
@@ -14,7 +15,6 @@ import {
   ReconciledBadge,
 } from './statement-cells';
 import { CURRENCY } from './statement-row';
-import FundSourceInitials from '../shared/fund-source-initials';
 
 import type { StatementListProps, StatementRow } from './statement-row';
 

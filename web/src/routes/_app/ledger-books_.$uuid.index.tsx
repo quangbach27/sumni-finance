@@ -1,35 +1,35 @@
 import { Suspense } from 'react';
 
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
-import { Check, FileText } from 'lucide-react';
+import { Link, createFileRoute } from '@tanstack/react-router';
+import { Check, FileText, FolderTree } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import ContentLayout from '@/components/layout/content-layout/content-layout';
 import ErrorComponent from '@/components/layout/error-component/error-component';
 
 import { getLedgerPeriodQueryOptions } from '@/features/ledger-books/api/get-ledger-period';
-import FinalizationPage from '@/features/ledger-books/components/finalization/finalization-page';
-import ReopenPeriodButton from '@/features/ledger-books/components/reconciliation/reopen-period-dialog';
+import LedgerPeriodDetailsPage from '@/features/ledger-books/components/ledger-period-details/ledger-period-details-page';
 
 import { formatDate } from '@/lib/date';
 
-export const Route = createFileRoute('/_app/ledger-books_/$uuid/finalization')({
-  staticData: { crumb: 'Chốt kỳ' },
+export const Route = createFileRoute('/_app/ledger-books_/$uuid/')({
+  staticData: { crumb: 'Chi tiết kỳ' },
   component: RouteComponent,
   errorComponent: ({ error, reset }) => (
     <ErrorComponent
       error={error}
       reset={reset}
-      title="Chốt kỳ"
-      fallbackMessage="Không thể tải dữ liệu chốt kỳ."
+      title="Chi tiết kỳ"
+      fallbackMessage="Không thể tải dữ liệu kỳ."
     />
   ),
 });
 
-function FinalizationLayout({ periodUuid }: { periodUuid: string }) {
+function PeriodDetailsLayout({ periodUuid }: { periodUuid: string }) {
   const { data: period } = useSuspenseQuery(
     getLedgerPeriodQueryOptions(periodUuid),
   );
@@ -37,17 +37,20 @@ function FinalizationLayout({ periodUuid }: { periodUuid: string }) {
   const reconciledAt = period.reconciledAt
     ? formatDate(new Date(period.reconciledAt))
     : undefined;
+  const range = `${formatDate(new Date(period.openDate))} – ${formatDate(new Date(period.closeDate))}`;
 
   return (
     <ContentLayout
-      title={isReconciled ? period.name : `Chốt kỳ ${period.name}`}
+      title={period.name}
       description={
         isReconciled
           ? `${reconciledAt ? `Đã đối soát ${reconciledAt} · ` : ''}Kỳ đã khóa`
-          : 'Đã đóng kỳ. Không ghi thêm bút toán thường, chỉ ghi bút toán điều chỉnh.'
+          : `${range} · ${period.entryCount} bút toán`
       }
       titleAdornment={
-        isReconciled ? (
+        period.status === 'opened' ? (
+          <Badge>Đang mở</Badge>
+        ) : isReconciled ? (
           <Badge variant="secondary">
             {period.reportUuid ? (
               <FileText data-icon="inline-start" />
@@ -63,18 +66,19 @@ function FinalizationLayout({ periodUuid }: { periodUuid: string }) {
         )
       }
       additionalContent={
-        period.status === 'closed' && (
-          <div className="hidden md:block">
-            <ReopenPeriodButton
-              periodUuid={periodUuid}
-              periodName={period.name}
-              label="Mở lại kỳ"
-            />
-          </div>
-        )
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={
+            <Link to="/ledger-books/categories">
+              <FolderTree />
+              Danh mục
+            </Link>
+          }
+        />
       }
     >
-      <FinalizationPage period={period} />
+      <LedgerPeriodDetailsPage periodUuid={periodUuid} />
     </ContentLayout>
   );
 }
@@ -84,12 +88,12 @@ function RouteComponent() {
   return (
     <Suspense
       fallback={
-        <ContentLayout title="Chốt kỳ">
+        <ContentLayout title="Chi tiết kỳ">
           <Skeleton className="mt-4 h-96 w-full rounded-2xl" />
         </ContentLayout>
       }
     >
-      <FinalizationLayout periodUuid={uuid} />
+      <PeriodDetailsLayout periodUuid={uuid} />
     </Suspense>
   );
 }

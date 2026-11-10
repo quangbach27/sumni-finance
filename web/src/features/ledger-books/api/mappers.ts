@@ -59,6 +59,12 @@ export const toLedgerPeriodDetail = (
   totalOutflow: toNumber(p.total_outflow),
   entryCount: p.entry_count,
   statements: p.statements.map(toLedgerStatement),
+  categorySummaries: p.category_summaries.map((c) => ({
+    categoryUuid: c.category_uuid,
+    entryCount: c.entry_count,
+    totalInflow: toNumber(c.total_inflow),
+    totalOutflow: toNumber(c.total_outflow),
+  })),
 });
 
 export const toLedgerPeriodsPage = (

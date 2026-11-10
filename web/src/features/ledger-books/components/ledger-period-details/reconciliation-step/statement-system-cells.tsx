@@ -3,8 +3,8 @@ import { TableCell } from '@/components/ui/table';
 import { formatAmount } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
+import FundSourceInitials from '../../shared/fund-source-initials';
 import { CURRENCY, signed } from './statement-row';
-import FundSourceInitials from '../shared/fund-source-initials';
 
 import type { StatementRow } from './statement-row';
 

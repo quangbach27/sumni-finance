@@ -6,26 +6,24 @@ import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 
 import { parseAmount } from '@/lib/currency';
 
+import { useLedgerPeriod } from '../api/get-ledger-period';
 import { isStatementReconciled } from '../api/is-statement-reconciled';
 import { useReconcileStatements } from '../api/reconcile-statements';
 import {
   CURRENCY,
   rowLabels,
-} from '../components/reconciliation/statement-row';
+} from '../components/ledger-period-details/reconciliation-step/statement-row';
 
-import type { LedgerStatement } from '../api/types';
 import type {
   RowStatus,
   StatementRow,
-} from '../components/reconciliation/statement-row';
+} from '../components/ledger-period-details/reconciliation-step/statement-row';
 
 const SETTLE_DELAY_MS = 500;
 
 /** Typed balances, derived statement rows and per-row confirm of a reconciliation. */
-export function useStatementReconciliation(
-  periodUuid: string,
-  statements: LedgerStatement[],
-) {
+export function useStatementReconciliation(periodUuid: string) {
+  const { statements } = useLedgerPeriod(periodUuid);
   const reconcileStatements = useReconcileStatements();
 
   // Digits typed per statement UUID.

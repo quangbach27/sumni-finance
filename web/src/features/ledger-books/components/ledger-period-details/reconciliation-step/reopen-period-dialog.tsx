@@ -13,9 +13,11 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
+import { useOptionalStepFlowActions } from '@/components/shared/step-flow/step-flow-context';
+
 import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 
-import { useReopenLedgerPeriod } from '../../api/reopen-ledger-period';
+import { useReopenLedgerPeriod } from '../../../api/reopen-ledger-period';
 
 type Props = {
   periodUuid: string;
@@ -40,12 +42,23 @@ export default function ReopenPeriodButton({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string>();
   const navigate = useNavigate();
+  const flow = useOptionalStepFlowActions();
   const { mutateAsync, isPending } = useReopenLedgerPeriod();
 
   const submit = async () => {
     setError(undefined);
+    const reopen = () =>
+      mutateAsync({ uuid: periodUuid, reason: reason.trim() });
+
+    // Inside a flow: go back a step once reopened; a failure shows as the flow's alert.
+    if (flow) {
+      await flow.runAction(reopen, 'backward');
+      setOpen(false);
+      return;
+    }
+
     try {
-      await mutateAsync({ uuid: periodUuid, reason: reason.trim() });
+      await reopen();
       setOpen(false);
       await navigate({ to: '/ledger-books' });
     } catch (e) {
