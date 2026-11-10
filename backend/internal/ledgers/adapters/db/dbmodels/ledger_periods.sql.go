@@ -109,6 +109,54 @@ func (q *Queries) GetLedgerPeriodByUUID(ctx context.Context, uuid domain.LedgerP
 	return i, err
 }
 
+const getLedgerPeriodCategorySummary = `-- name: GetLedgerPeriodCategorySummary :many
+SELECT
+    COALESCE(c.parent_uuid, c.uuid) AS category_uuid,
+    COUNT(*)::bigint AS entry_count,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)::numeric(20, 2) AS total_inflow,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'outflow'), 0)::numeric(20, 2) AS total_outflow
+FROM ledgers.ledger_entries e
+LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+WHERE e.ledger_period_uuid = $1
+  AND e.status = 'posted'
+GROUP BY COALESCE(c.parent_uuid, c.uuid)
+ORDER BY category_uuid NULLS LAST
+`
+
+type GetLedgerPeriodCategorySummaryRow struct {
+	CategoryUuid *models.CategoryUUID
+	EntryCount   int64
+	TotalInflow  decimal.Decimal
+	TotalOutflow decimal.Decimal
+}
+
+// Posted entries of a period grouped by top-level category. An entry on a sub-category
+// counts toward its parent; entries without a known category share one NULL group.
+func (q *Queries) GetLedgerPeriodCategorySummary(ctx context.Context, ledgerPeriodUuid domain.LedgerPeriodUUID) ([]GetLedgerPeriodCategorySummaryRow, error) {
+	rows, err := q.db.Query(ctx, getLedgerPeriodCategorySummary, ledgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetLedgerPeriodCategorySummaryRow{}
+	for rows.Next() {
+		var i GetLedgerPeriodCategorySummaryRow
+		if err := rows.Scan(
+			&i.CategoryUuid,
+			&i.EntryCount,
+			&i.TotalInflow,
+			&i.TotalOutflow,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLedgerPeriodReportUUID = `-- name: GetLedgerPeriodReportUUID :one
 SELECT report_uuid
 FROM ledgers.ledger_periods

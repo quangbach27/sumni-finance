@@ -129,3 +129,18 @@ FROM p
 LEFT JOIN ledgers.fund_source_statements st ON st.ledger_period_uuid = p.uuid
 LEFT JOIN ledgers.fund_sources fs ON fs.uuid = st.fund_source_uuid
 ORDER BY st.created_at, st.uuid;
+
+-- name: GetLedgerPeriodCategorySummary :many
+-- Posted entries of a period grouped by top-level category. An entry on a sub-category
+-- counts toward its parent; entries without a known category share one NULL group.
+SELECT
+    COALESCE(c.parent_uuid, c.uuid) AS category_uuid,
+    COUNT(*)::bigint AS entry_count,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)::numeric(20, 2) AS total_inflow,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'outflow'), 0)::numeric(20, 2) AS total_outflow
+FROM ledgers.ledger_entries e
+LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+WHERE e.ledger_period_uuid = @ledger_period_uuid
+  AND e.status = 'posted'
+GROUP BY COALESCE(c.parent_uuid, c.uuid)
+ORDER BY category_uuid NULLS LAST;

@@ -144,6 +144,26 @@ func (r *LedgerPeriodReadModel) GetLedgerPeriod(ctx context.Context, ledgerPerio
 		result.Statements = append(result.Statements, st)
 	}
 
+	summaryRows, err := dbmodels.New(r.db).GetLedgerPeriodCategorySummary(ctx, ledgerPeriodUUID)
+	if err != nil {
+		return queries.LedgerPeriodDetail{}, fmt.Errorf("get ledger period category summary: %w", err)
+	}
+
+	result.CategorySummaries = make([]queries.CategorySummary, 0, len(summaryRows))
+	for _, row := range summaryRows {
+		summary := queries.CategorySummary{
+			EntryCount:   row.EntryCount,
+			TotalInflow:  row.TotalInflow,
+			TotalOutflow: row.TotalOutflow,
+		}
+		if row.CategoryUuid != nil {
+			id := row.CategoryUuid.String()
+			summary.CategoryUUID = &id
+		}
+
+		result.CategorySummaries = append(result.CategorySummaries, summary)
+	}
+
 	return result, nil
 }
 

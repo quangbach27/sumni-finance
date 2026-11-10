@@ -64,6 +64,17 @@ type LedgerPeriodDetail struct {
 	TotalOutflow decimal.Decimal
 	EntryCount   int64
 	Statements   []LedgerStatementDetail
+	// CategorySummaries groups posted entries by top-level category.
+	CategorySummaries []CategorySummary
+}
+
+// CategorySummary totals the posted entries of one top-level category in a period.
+// CategoryUUID is nil for entries without a known category.
+type CategorySummary struct {
+	CategoryUUID *string
+	EntryCount   int64
+	TotalInflow  decimal.Decimal
+	TotalOutflow decimal.Decimal
 }
 
 // Category is a category of a period; SubCategories is empty for a sub-category.

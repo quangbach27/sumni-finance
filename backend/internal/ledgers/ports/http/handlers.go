@@ -279,24 +279,39 @@ func toAPILedgerPeriodDetail(period queries.LedgerPeriodDetail) LedgerPeriodDeta
 		})
 	}
 
+	summaries := make([]CategorySummary, 0, len(period.CategorySummaries))
+	for _, cs := range period.CategorySummaries {
+		summary := CategorySummary{
+			EntryCount:   cs.EntryCount,
+			TotalInflow:  cs.TotalInflow,
+			TotalOutflow: cs.TotalOutflow,
+		}
+		if cs.CategoryUUID != nil {
+			summary.CategoryUuid = &models.CategoryUUID{UUID: common.MustUUIDFromString(*cs.CategoryUUID)}
+		}
+
+		summaries = append(summaries, summary)
+	}
+
 	base := toAPILedgerPeriod(period.LedgerPeriod)
 
 	return LedgerPeriodDetail{
-		Uuid:           base.Uuid,
-		Name:           base.Name,
-		OpeningBalance: base.OpeningBalance,
-		ClosingBalance: base.ClosingBalance,
-		OpenDate:       base.OpenDate,
-		CloseDate:      base.CloseDate,
-		Status:         base.Status,
-		ReopenReason:   base.ReopenReason,
-		ReopenedAt:     base.ReopenedAt,
-		ReconciledAt:   base.ReconciledAt,
-		ReportUuid:     base.ReportUuid,
-		TotalInflow:    period.TotalInflow,
-		TotalOutflow:   period.TotalOutflow,
-		EntryCount:     period.EntryCount,
-		Statements:     statements,
+		Uuid:              base.Uuid,
+		Name:              base.Name,
+		OpeningBalance:    base.OpeningBalance,
+		ClosingBalance:    base.ClosingBalance,
+		OpenDate:          base.OpenDate,
+		CloseDate:         base.CloseDate,
+		Status:            base.Status,
+		ReopenReason:      base.ReopenReason,
+		ReopenedAt:        base.ReopenedAt,
+		ReconciledAt:      base.ReconciledAt,
+		ReportUuid:        base.ReportUuid,
+		TotalInflow:       period.TotalInflow,
+		TotalOutflow:      period.TotalOutflow,
+		EntryCount:        period.EntryCount,
+		Statements:        statements,
+		CategorySummaries: summaries,
 	}
 }
 

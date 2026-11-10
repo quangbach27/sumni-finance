@@ -36,6 +36,15 @@ type CategoryInput struct {
 	Uuid          *CategoryUUID       `json:"uuid,omitempty"`
 }
 
+// CategorySummary defines model for CategorySummary.
+type CategorySummary struct {
+	// CategoryUuid Top-level category. Absent for entries without a known category.
+	CategoryUuid *CategoryUUID `json:"category_uuid,omitempty"`
+	EntryCount   int64         `json:"entry_count"`
+	TotalInflow  Decimal       `json:"total_inflow"`
+	TotalOutflow Decimal       `json:"total_outflow"`
+}
+
 // CategoryUUID defines model for CategoryUUID.
 type CategoryUUID = models.CategoryUUID
 
@@ -167,7 +176,9 @@ type LedgerPeriod struct {
 
 // LedgerPeriodDetail defines model for LedgerPeriodDetail.
 type LedgerPeriodDetail struct {
-	CloseDate time.Time `json:"close_date"`
+	// CategorySummaries Posted entries of the period per top-level category. Sub-category entries count toward their parent.
+	CategorySummaries []CategorySummary `json:"category_summaries"`
+	CloseDate         time.Time         `json:"close_date"`
 
 	// ClosingBalance Set once the period is reconciled.
 	ClosingBalance *Decimal `json:"closing_balance,omitempty"`

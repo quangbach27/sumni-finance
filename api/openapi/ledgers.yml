@@ -868,7 +868,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/LedgerPeriod"
         - type: object
-          required: [total_inflow, total_outflow, entry_count, statements]
+          required: [total_inflow, total_outflow, entry_count, statements, category_summaries]
           properties:
             total_inflow:
               $ref: "#/components/schemas/Decimal"
@@ -882,6 +882,27 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/LedgerStatementDetail"
+            category_summaries:
+              type: array
+              description: Posted entries of the period per top-level category. Sub-category entries count toward their parent.
+              items:
+                $ref: "#/components/schemas/CategorySummary"
+
+    CategorySummary:
+      type: object
+      required: [entry_count, total_inflow, total_outflow]
+      properties:
+        category_uuid:
+          description: Top-level category. Absent for entries without a known category.
+          allOf:
+            - $ref: "#/components/schemas/CategoryUUID"
+        entry_count:
+          type: integer
+          format: int64
+        total_inflow:
+          $ref: "#/components/schemas/Decimal"
+        total_outflow:
+          $ref: "#/components/schemas/Decimal"
 
     GetLedgerPeriodResponse:
       type: object

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -181,5 +182,79 @@ func TestPostLedgerEntriesWithCategory(t *testing.T) {
 		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
 		assert.Equal(t, []string{"category-not-found"}, errorSlugs(resp.JSON400))
 		assert.Equal(t, "1", *(*resp.JSON400.Details)[0].EntityId)
+	})
+}
+
+func TestGetLedgerPeriodCategorySummaries(t *testing.T) {
+	t.Run("rolls sub-category entries up to the parent and groups uncategorized ones", func(t *testing.T) {
+		utils.ResetLedgerPeriods(t)
+		clients, token := utils.NewTestClients(t), newUserToken()
+		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		period := openPeriod(t, clients, token, fs)
+
+		require.Equal(t, 200, upsertCategories(t, clients, token,
+			ledgersClients.CategoryInput{Name: "Food", SubCategories: &[]ledgersClients.SubCategoryInput{{Name: "Rice"}}},
+			ledgersClients.CategoryInput{Name: "Salary"},
+		).StatusCode())
+
+		var food, salary ledgersClients.Category
+		for _, c := range listCategories(t, clients, token) {
+			switch c.Name {
+			case "Food":
+				food = c
+			case "Salary":
+				salary = c
+			}
+		}
+		require.NotEmpty(t, food.SubCategories)
+
+		onFood, onRice := entryInput(shared.DirectionOutflow, 1_000), entryInput(shared.DirectionOutflow, 2_000)
+		onFood.CategoryUuid = &food.Uuid
+		onRice.CategoryUuid = &food.SubCategories[0].Uuid
+		onSalary := entryInput(shared.DirectionInflow, 5_000)
+		onSalary.CategoryUuid = &salary.Uuid
+		uncategorized := entryInput(shared.DirectionInflow, 700)
+
+		resp := postLedgerEntries(t, clients, token, period, fs, onFood, onRice, onSalary, uncategorized)
+		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
+
+		got := getLedgerPeriod(t, clients, token, period)
+		require.Equal(t, 200, got.StatusCode(), "body: %s", string(got.Body))
+
+		type totals struct {
+			count   int64
+			in, out decimal.Decimal
+		}
+		byCategory := map[string]totals{}
+		var uncategorizedTotals *totals
+		for _, s := range got.JSON200.LedgerPeriod.CategorySummaries {
+			tt := totals{count: s.EntryCount, in: s.TotalInflow, out: s.TotalOutflow}
+			if s.CategoryUuid == nil {
+				uncategorizedTotals = &tt
+				continue
+			}
+			byCategory[s.CategoryUuid.String()] = tt
+		}
+
+		require.Len(t, byCategory, 2)
+		assert.EqualValues(t, 2, byCategory[food.Uuid.String()].count)
+		assert.True(t, byCategory[food.Uuid.String()].out.Equal(decimal.NewFromInt(3_000)))
+		assert.True(t, byCategory[food.Uuid.String()].in.IsZero())
+		assert.EqualValues(t, 1, byCategory[salary.Uuid.String()].count)
+		assert.True(t, byCategory[salary.Uuid.String()].in.Equal(decimal.NewFromInt(5_000)))
+		require.NotNil(t, uncategorizedTotals)
+		assert.EqualValues(t, 1, uncategorizedTotals.count)
+		assert.True(t, uncategorizedTotals.in.Equal(decimal.NewFromInt(700)))
+	})
+
+	t.Run("period without entries has no summaries", func(t *testing.T) {
+		utils.ResetLedgerPeriods(t)
+		clients, token := utils.NewTestClients(t), newUserToken()
+		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		period := openPeriod(t, clients, token, fs)
+
+		got := getLedgerPeriod(t, clients, token, period)
+		require.Equal(t, 200, got.StatusCode(), "body: %s", string(got.Body))
+		assert.Empty(t, got.JSON200.LedgerPeriod.CategorySummaries)
 	})
 }
