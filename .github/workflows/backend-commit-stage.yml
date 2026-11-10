@@ -1,0 +1,148 @@
+name: Backend Commit Stage
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Environment whose variables (GCP_*) are used to publish the image"
+        type: string
+        required: false
+        default: dev
+    outputs:
+      image:
+        description: "Artifact Registry reference of the published backend image"
+        value: ${{ jobs.package.outputs.image }}
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment whose variables (GCP_*) are used to publish the image"
+        type: choice
+        options:
+          - dev
+        default: dev
+
+env:
+  VERSION: ${{ github.sha }}
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    services:
+      postgres:
+        image: postgres:17.6-alpine3.22
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: wild-workout
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "backend/go.mod"
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Check go.mod / go.sum are tidy
+        working-directory: backend
+        run: |
+          make tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Lint
+        working-directory: backend
+        run: make lint
+
+      - name: Test
+        working-directory: backend
+        run: make test-unit
+
+      - name: Build
+        working-directory: backend
+        run: go build -v ./...
+
+      - name: Scan backend code (Anchore)
+        uses: anchore/scan-action@v7
+        id: scan
+        with:
+          path: "backend"
+          fail-build: false
+          severity-cutoff: high
+
+      - name: Upload backend code scan SARIF report
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: backend-code
+
+  package:
+    name: Package and Publish
+    needs: [build]
+    runs-on: ubuntu-24.04
+    # GCP_* variables come from the selected GitHub environment.
+    environment: ${{ inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
+      security-events: write
+    env:
+      # Artifact Registry path from `terraform output image_path`.
+      IMAGE: ${{ vars.GCP_ARTIFACT_REPO }}/backend:${{ github.sha }}
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Cloud Run runs on amd64.
+      - name: Build container image
+        run: docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f backend/docker/app-prod/Dockerfile backend
+
+      - name: Scan backend image (Anchore)
+        uses: anchore/scan-action@v7
+        id: scan
+        with:
+          image: ${{ env.IMAGE }}
+          fail-build: false
+          severity-cutoff: high
+
+      - name: Upload backend image scan SARIF report
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: backend-image
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Publish image
+        run: docker push "$IMAGE"
+
+      - name: Set image output
+        id: meta
+        run: echo "image=$IMAGE" >> "$GITHUB_OUTPUT"

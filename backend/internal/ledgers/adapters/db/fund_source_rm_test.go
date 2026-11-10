@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,7 @@ func TestFundSourceReadModel_ListFundSources(t *testing.T) {
 	factory, err := domain.NewFundSourceFactory(bankverifier.NewBankAccountVerifierStub())
 	require.NoError(t, err)
 
-	vnd := common.MustEnum[shared.Currency]("VND")
+	vnd := shared.CurrencyVND
 
 	bankDetails, err := factory.CreateBankDetails(ctx, "VCB", 970436, "Vietcombank", "An", "123456")
 	require.NoError(t, err)

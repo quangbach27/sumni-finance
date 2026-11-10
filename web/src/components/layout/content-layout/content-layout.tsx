@@ -4,6 +4,7 @@ import type React from 'react';
 
 type ContentLayoutProps = {
   title: string;
+  titleAdornment?: React.ReactNode;
   description?: string;
   className?: string;
   children: React.ReactNode;
@@ -12,6 +13,7 @@ type ContentLayoutProps = {
 
 export default function ContentLayout({
   title,
+  titleAdornment,
   description,
   className,
   children,
@@ -21,7 +23,10 @@ export default function ContentLayout({
     <section className={cn('mx-auto w-full max-w-7xl p-4 md:p-6', className)}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold">{title}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold md:text-4xl">{title}</h1>
+            {titleAdornment}
+          </div>
           {description && (
             <span className="text-muted-foreground hidden md:block">
               {description}

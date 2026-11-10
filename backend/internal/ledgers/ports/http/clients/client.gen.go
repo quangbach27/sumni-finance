@@ -12,12 +12,43 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 
+	"github.com/oapi-codegen/runtime"
 	"github.com/shopspring/decimal"
 )
+
+// Category defines model for Category.
+type Category struct {
+	Description   *string       `json:"description,omitempty"`
+	Name          string        `json:"name"`
+	SubCategories []SubCategory `json:"sub_categories"`
+	Uuid          CategoryUUID  `json:"uuid"`
+}
+
+// CategoryInput defines model for CategoryInput.
+type CategoryInput struct {
+	Description   *string             `json:"description,omitempty"`
+	Name          string              `json:"name"`
+	SubCategories *[]SubCategoryInput `json:"sub_categories,omitempty"`
+	Uuid          *CategoryUUID       `json:"uuid,omitempty"`
+}
+
+// CategorySummary defines model for CategorySummary.
+type CategorySummary struct {
+	// CategoryUuid Top-level category. Absent for entries without a known category.
+	CategoryUuid *CategoryUUID `json:"category_uuid,omitempty"`
+	EntryCount   int64         `json:"entry_count"`
+	TotalInflow  Decimal       `json:"total_inflow"`
+	TotalOutflow Decimal       `json:"total_outflow"`
+}
+
+// CategoryUUID defines model for CategoryUUID.
+type CategoryUUID = models.CategoryUUID
 
 // CreateFundSourceRequest defines model for CreateFundSourceRequest.
 type CreateFundSourceRequest struct {
@@ -38,6 +69,9 @@ type Currency = shared.Currency
 
 // Decimal defines model for Decimal.
 type Decimal = decimal.Decimal
+
+// Direction defines model for Direction.
+type Direction = shared.Direction
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
@@ -80,28 +114,251 @@ type FundSourceDetails struct {
 	OwnerName     string  `json:"owner_name"`
 }
 
+// FundSourceStatement defines model for FundSourceStatement.
+type FundSourceStatement struct {
+	// ActualBalance Set when reconciled.
+	ActualBalance *Decimal `json:"actual_balance,omitempty"`
+
+	// ClosingBalance Set when the period is closed.
+	ClosingBalance *Decimal                `json:"closing_balance,omitempty"`
+	FundSourceUuid FundSourceUUID          `json:"fund_source_uuid"`
+	OpeningBalance Decimal                 `json:"opening_balance"`
+	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
+	ReconciledBy   *string                 `json:"reconciled_by,omitempty"`
+	Uuid           FundSourceStatementUUID `json:"uuid"`
+}
+
+// FundSourceStatementUUID defines model for FundSourceStatementUUID.
+type FundSourceStatementUUID = domain.FundSourceStatementUUID
+
 // FundSourceType defines model for FundSourceType.
 type FundSourceType = domain.FundSourceType
 
 // FundSourceUUID defines model for FundSourceUUID.
 type FundSourceUUID = domain.FundSourceUUID
 
+// GenerateLedgerPeriodReportResponse defines model for GenerateLedgerPeriodReportResponse.
+type GenerateLedgerPeriodReportResponse struct {
+	ReportUuid ReportUUID `json:"report_uuid"`
+}
+
+// GetLedgerPeriodResponse defines model for GetLedgerPeriodResponse.
+type GetLedgerPeriodResponse struct {
+	LedgerPeriod LedgerPeriodDetail `json:"ledger_period"`
+}
+
+// LedgerEntryInput defines model for LedgerEntryInput.
+type LedgerEntryInput struct {
+	Amount       Decimal       `json:"amount"`
+	CategoryUuid *CategoryUUID `json:"category_uuid,omitempty"`
+	Description  string        `json:"description"`
+	Direction    Direction     `json:"direction"`
+	OccurredAt   time.Time     `json:"occurred_at"`
+}
+
+// LedgerEntryUUID defines model for LedgerEntryUUID.
+type LedgerEntryUUID = domain.LedgerEntryUUID
+
+// LedgerPeriod defines model for LedgerPeriod.
+type LedgerPeriod struct {
+	CloseDate time.Time `json:"close_date"`
+
+	// ClosingBalance Set once the period is reconciled.
+	ClosingBalance *Decimal         `json:"closing_balance,omitempty"`
+	Name           string           `json:"name"`
+	OpenDate       time.Time        `json:"open_date"`
+	OpeningBalance Decimal          `json:"opening_balance"`
+	ReconciledAt   *time.Time       `json:"reconciled_at,omitempty"`
+	ReopenReason   *string          `json:"reopen_reason,omitempty"`
+	ReopenedAt     *time.Time       `json:"reopened_at,omitempty"`
+	ReportUuid     *ReportUUID      `json:"report_uuid,omitempty"`
+	Status         LedgerStatus     `json:"status"`
+	Uuid           LedgerPeriodUUID `json:"uuid"`
+}
+
+// LedgerPeriodDetail defines model for LedgerPeriodDetail.
+type LedgerPeriodDetail struct {
+	// CategorySummaries Posted entries of the period per top-level category. Sub-category entries count toward their parent.
+	CategorySummaries []CategorySummary `json:"category_summaries"`
+	CloseDate         time.Time         `json:"close_date"`
+
+	// ClosingBalance Set once the period is reconciled.
+	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
+
+	// EntryCount Number of posted ledger entries in the period.
+	EntryCount     int64                   `json:"entry_count"`
+	Name           string                  `json:"name"`
+	OpenDate       time.Time               `json:"open_date"`
+	OpeningBalance Decimal                 `json:"opening_balance"`
+	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
+	ReopenReason   *string                 `json:"reopen_reason,omitempty"`
+	ReopenedAt     *time.Time              `json:"reopened_at,omitempty"`
+	ReportUuid     *ReportUUID             `json:"report_uuid,omitempty"`
+	Statements     []LedgerStatementDetail `json:"statements"`
+	Status         LedgerStatus            `json:"status"`
+	TotalInflow    Decimal                 `json:"total_inflow"`
+	TotalOutflow   Decimal                 `json:"total_outflow"`
+	Uuid           LedgerPeriodUUID        `json:"uuid"`
+}
+
+// LedgerPeriodUUID defines model for LedgerPeriodUUID.
+type LedgerPeriodUUID = domain.LedgerPeriodUUID
+
+// LedgerStatementDetail defines model for LedgerStatementDetail.
+type LedgerStatementDetail struct {
+	// ActualBalance Set when reconciled.
+	ActualBalance *Decimal `json:"actual_balance,omitempty"`
+
+	// ClosingBalance Set when the period is closed.
+	ClosingBalance *Decimal `json:"closing_balance,omitempty"`
+
+	// FundSource The fund source this statement belongs to, with its live balance.
+	FundSource     FundSource              `json:"fund_source"`
+	OpeningBalance Decimal                 `json:"opening_balance"`
+	ReconciledAt   *time.Time              `json:"reconciled_at,omitempty"`
+	ReconciledBy   *string                 `json:"reconciled_by,omitempty"`
+	Uuid           FundSourceStatementUUID `json:"uuid"`
+}
+
+// LedgerStatus defines model for LedgerStatus.
+type LedgerStatus = domain.LedgerStatus
+
+// ListCategoriesResponse defines model for ListCategoriesResponse.
+type ListCategoriesResponse struct {
+	Items []Category `json:"items"`
+}
+
+// ListFundSourceStatementsResponse defines model for ListFundSourceStatementsResponse.
+type ListFundSourceStatementsResponse struct {
+	Items []FundSourceStatement `json:"items"`
+}
+
 // ListFundSourcesResponse defines model for ListFundSourcesResponse.
 type ListFundSourcesResponse struct {
 	FundSources []FundSource `json:"fund_sources"`
 }
 
+// ListLedgerPeriodsResponse defines model for ListLedgerPeriodsResponse.
+type ListLedgerPeriodsResponse struct {
+	Items    []LedgerPeriod `json:"items"`
+	PageInfo PageInfo       `json:"page_info"`
+}
+
+// OpenLedgerPeriodRequest defines model for OpenLedgerPeriodRequest.
+type OpenLedgerPeriodRequest struct {
+	CloseDate       time.Time        `json:"close_date"`
+	FundSourceUuids []FundSourceUUID `json:"fund_source_uuids"`
+	Name            string           `json:"name"`
+	OpenDate        time.Time        `json:"open_date"`
+}
+
+// OpenLedgerPeriodResponse defines model for OpenLedgerPeriodResponse.
+type OpenLedgerPeriodResponse struct {
+	LedgerPeriodUuid LedgerPeriodUUID `json:"ledger_period_uuid"`
+}
+
+// PageInfo defines model for PageInfo.
+type PageInfo struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	TotalCount int `json:"total_count"`
+}
+
+// PostLedgerEntriesRequest defines model for PostLedgerEntriesRequest.
+type PostLedgerEntriesRequest struct {
+	Entries        []LedgerEntryInput `json:"entries"`
+	FundSourceUuid FundSourceUUID     `json:"fund_source_uuid"`
+}
+
+// PostLedgerEntriesResponse defines model for PostLedgerEntriesResponse.
+type PostLedgerEntriesResponse struct {
+	// LedgerEntryUuids In the order of the request entries.
+	LedgerEntryUuids []LedgerEntryUUID `json:"ledger_entry_uuids"`
+}
+
+// ReconcileFundSourceStatementsRequest defines model for ReconcileFundSourceStatementsRequest.
+type ReconcileFundSourceStatementsRequest struct {
+	Statements []ReconcileStatementInput `json:"statements"`
+}
+
+// ReconcileStatementInput defines model for ReconcileStatementInput.
+type ReconcileStatementInput struct {
+	ActualBalance Decimal                 `json:"actual_balance"`
+	StatementUuid FundSourceStatementUUID `json:"statement_uuid"`
+}
+
+// ReopenLedgerPeriodRequest defines model for ReopenLedgerPeriodRequest.
+type ReopenLedgerPeriodRequest struct {
+	Reason string `json:"reason"`
+}
+
+// ReportUUID defines model for ReportUUID.
+type ReportUUID = models.ReportUUID
+
+// SubCategory defines model for SubCategory.
+type SubCategory struct {
+	Description *string      `json:"description,omitempty"`
+	Name        string       `json:"name"`
+	Uuid        CategoryUUID `json:"uuid"`
+}
+
+// SubCategoryInput defines model for SubCategoryInput.
+type SubCategoryInput struct {
+	Description *string       `json:"description,omitempty"`
+	Name        string        `json:"name"`
+	Uuid        *CategoryUUID `json:"uuid,omitempty"`
+}
+
+// UpsertCategoriesRequest defines model for UpsertCategoriesRequest.
+type UpsertCategoriesRequest struct {
+	Categories []CategoryInput `json:"categories"`
+}
+
+// UpsertCategoriesResponse defines model for UpsertCategoriesResponse.
+type UpsertCategoriesResponse struct {
+	// CategoryUuids In the order of the request categories.
+	CategoryUuids []CategoryUUID `json:"category_uuids"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
+
+// Conflict defines model for Conflict.
+type Conflict = ErrorResponse
 
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = ErrorResponse
 
+// NotFound defines model for NotFound.
+type NotFound = ErrorResponse
+
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorResponse
 
+// ListLedgerPeriodsParams defines parameters for ListLedgerPeriods.
+type ListLedgerPeriodsParams struct {
+	Page     *int          `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int          `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *LedgerStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// UpsertCategoriesJSONRequestBody defines body for UpsertCategories for application/json ContentType.
+type UpsertCategoriesJSONRequestBody = UpsertCategoriesRequest
+
 // CreateFundSourceJSONRequestBody defines body for CreateFundSource for application/json ContentType.
 type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
+
+// OpenLedgerPeriodJSONRequestBody defines body for OpenLedgerPeriod for application/json ContentType.
+type OpenLedgerPeriodJSONRequestBody = OpenLedgerPeriodRequest
+
+// PostLedgerEntriesJSONRequestBody defines body for PostLedgerEntries for application/json ContentType.
+type PostLedgerEntriesJSONRequestBody = PostLedgerEntriesRequest
+
+// ReopenLedgerPeriodJSONRequestBody defines body for ReopenLedgerPeriod for application/json ContentType.
+type ReopenLedgerPeriodJSONRequestBody = ReopenLedgerPeriodRequest
+
+// ReconcileFundSourceStatementsJSONRequestBody defines body for ReconcileFundSourceStatements for application/json ContentType.
+type ReconcileFundSourceStatementsJSONRequestBody = ReconcileFundSourceStatementsRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -177,6 +434,31 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// ListCategories List all categories
+	//
+	// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+	//
+	// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpsertCategoriesWithBody Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategoriesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpsertCategories Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategories(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListFundSources List fund sources
 	//
 	// Corresponds with GET /api/v1/fund-sources (the `ListFundSources` operationId).
@@ -195,6 +477,180 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/fund-sources (the `CreateFundSource` operationId).
 	CreateFundSource(ctx context.Context, body CreateFundSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListLedgerPeriods List ledger periods
+	//
+	// Newest period (by open date) first.
+	//
+	// Corresponds with GET /api/v1/ledger-periods (the `ListLedgerPeriods` operationId).
+	ListLedgerPeriods(ctx context.Context, params *ListLedgerPeriodsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenLedgerPeriodWithBody Open a ledger period
+	//
+	// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+	OpenLedgerPeriodWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenLedgerPeriod Open a ledger period
+	//
+	// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+	OpenLedgerPeriod(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUnlockedLedgerPeriod Get the unlocked ledger period
+	//
+	// The single period that is not reconciled yet (opened or closed). The response is the same as getLedgerPeriod.
+	//
+	// Corresponds with GET /api/v1/ledger-periods/unlocked (the `GetUnlockedLedgerPeriod` operationId).
+	GetUnlockedLedgerPeriod(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerPeriod Get a ledger period
+	//
+	// A ledger period of any status, with its fund source statements (including each fund source's current balance) and the total inflow and outflow of its posted entries.
+	//
+	// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid} (the `GetLedgerPeriod` operationId).
+	GetLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CloseLedgerPeriod Close a ledger period
+	//
+	// Closes an opened period and sets the closing balance of every fund source statement to the current balance of its fund source. Fails with 400 `period-not-open` when the period is not opened.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/close (the `CloseLedgerPeriod` operationId).
+	CloseLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerEntriesWithBody Post ledger entries
+	//
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntriesWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerEntries Post ledger entries
+	//
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntries(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReconcileLedgerPeriod Reconcile a ledger period
+	//
+	// Locks a closed period once every fund source statement is reconciled. The period closing balance becomes the total of the statements' closing balances. Fails with 409 `period-not-closed` when the period is not closed, or `statements-not-reconciled` (details list the statements) when any statement is not reconciled.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reconcile (the `ReconcileLedgerPeriod` operationId).
+	ReconcileLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReopenLedgerPeriodWithBody Reopen a closed ledger period
+	//
+	// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+	ReopenLedgerPeriodWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReopenLedgerPeriod Reopen a closed ledger period
+	//
+	// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+	ReopenLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReopenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GenerateLedgerPeriodReport Generate a report for a ledger period
+	//
+	// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/report (the `GenerateLedgerPeriodReport` operationId).
+	GenerateLedgerPeriodReport(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListFundSourceStatements List the fund source statements of a ledger period
+	//
+	// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid}/statements (the `ListFundSourceStatements` operationId).
+	ListFundSourceStatements(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReconcileFundSourceStatementsWithBody Reconcile fund source statements
+	//
+	// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+	ReconcileFundSourceStatementsWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReconcileFundSourceStatements Reconcile fund source statements
+	//
+	// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+	ReconcileFundSourceStatements(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListCategories List all categories
+//
+// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+//
+// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCategoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpsertCategoriesWithBody Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *Client) UpsertCategoriesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertCategoriesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpsertCategories Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *Client) UpsertCategories(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertCategoriesRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // ListFundSources List fund sources
@@ -244,6 +700,342 @@ func (c *Client) CreateFundSource(ctx context.Context, body CreateFundSourceJSON
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// ListLedgerPeriods List ledger periods
+//
+// Newest period (by open date) first.
+//
+// Corresponds with GET /api/v1/ledger-periods (the `ListLedgerPeriods` operationId).
+func (c *Client) ListLedgerPeriods(ctx context.Context, params *ListLedgerPeriodsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListLedgerPeriodsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// OpenLedgerPeriodWithBody Open a ledger period
+//
+// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+func (c *Client) OpenLedgerPeriodWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOpenLedgerPeriodRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// OpenLedgerPeriod Open a ledger period
+//
+// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+func (c *Client) OpenLedgerPeriod(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOpenLedgerPeriodRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetUnlockedLedgerPeriod Get the unlocked ledger period
+//
+// The single period that is not reconciled yet (opened or closed). The response is the same as getLedgerPeriod.
+//
+// Corresponds with GET /api/v1/ledger-periods/unlocked (the `GetUnlockedLedgerPeriod` operationId).
+func (c *Client) GetUnlockedLedgerPeriod(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUnlockedLedgerPeriodRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerPeriod Get a ledger period
+//
+// A ledger period of any status, with its fund source statements (including each fund source's current balance) and the total inflow and outflow of its posted entries.
+//
+// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid} (the `GetLedgerPeriod` operationId).
+func (c *Client) GetLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerPeriodRequest(c.Server, ledgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CloseLedgerPeriod Close a ledger period
+//
+// Closes an opened period and sets the closing balance of every fund source statement to the current balance of its fund source. Fails with 400 `period-not-open` when the period is not opened.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/close (the `CloseLedgerPeriod` operationId).
+func (c *Client) CloseLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCloseLedgerPeriodRequest(c.Server, ledgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerEntriesWithBody Post ledger entries
+//
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *Client) PostLedgerEntriesWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerEntriesRequestWithBody(c.Server, ledgerPeriodUuid, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerEntries Post ledger entries
+//
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *Client) PostLedgerEntries(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerEntriesRequest(c.Server, ledgerPeriodUuid, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReconcileLedgerPeriod Reconcile a ledger period
+//
+// Locks a closed period once every fund source statement is reconciled. The period closing balance becomes the total of the statements' closing balances. Fails with 409 `period-not-closed` when the period is not closed, or `statements-not-reconciled` (details list the statements) when any statement is not reconciled.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reconcile (the `ReconcileLedgerPeriod` operationId).
+func (c *Client) ReconcileLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReconcileLedgerPeriodRequest(c.Server, ledgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReopenLedgerPeriodWithBody Reopen a closed ledger period
+//
+// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+func (c *Client) ReopenLedgerPeriodWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReopenLedgerPeriodRequestWithBody(c.Server, ledgerPeriodUuid, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReopenLedgerPeriod Reopen a closed ledger period
+//
+// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+func (c *Client) ReopenLedgerPeriod(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReopenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReopenLedgerPeriodRequest(c.Server, ledgerPeriodUuid, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GenerateLedgerPeriodReport Generate a report for a ledger period
+//
+// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/report (the `GenerateLedgerPeriodReport` operationId).
+func (c *Client) GenerateLedgerPeriodReport(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGenerateLedgerPeriodReportRequest(c.Server, ledgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListFundSourceStatements List the fund source statements of a ledger period
+//
+// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid}/statements (the `ListFundSourceStatements` operationId).
+func (c *Client) ListFundSourceStatements(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListFundSourceStatementsRequest(c.Server, ledgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReconcileFundSourceStatementsWithBody Reconcile fund source statements
+//
+// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+func (c *Client) ReconcileFundSourceStatementsWithBody(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReconcileFundSourceStatementsRequestWithBody(c.Server, ledgerPeriodUuid, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReconcileFundSourceStatements Reconcile fund source statements
+//
+// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+func (c *Client) ReconcileFundSourceStatements(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReconcileFundSourceStatementsRequest(c.Server, ledgerPeriodUuid, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewListCategoriesRequest constructs an http.Request for the ListCategories method
+func NewListCategoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpsertCategoriesRequest calls the generic UpsertCategories builder with application/json body
+func NewUpsertCategoriesRequest(server string, body UpsertCategoriesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpsertCategoriesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpsertCategoriesRequestWithBody constructs an http.Request for the UpsertCategories method, with any body, and a specified content type
+func NewUpsertCategoriesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewListFundSourcesRequest constructs an http.Request for the ListFundSources method
@@ -313,6 +1105,462 @@ func NewCreateFundSourceRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewListLedgerPeriodsRequest constructs an http.Request for the ListLedgerPeriods method
+func NewListLedgerPeriodsRequest(server string, params *ListLedgerPeriodsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_size", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewOpenLedgerPeriodRequest calls the generic OpenLedgerPeriod builder with application/json body
+func NewOpenLedgerPeriodRequest(server string, body OpenLedgerPeriodJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewOpenLedgerPeriodRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewOpenLedgerPeriodRequestWithBody constructs an http.Request for the OpenLedgerPeriod method, with any body, and a specified content type
+func NewOpenLedgerPeriodRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetUnlockedLedgerPeriodRequest constructs an http.Request for the GetUnlockedLedgerPeriod method
+func NewGetUnlockedLedgerPeriodRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/unlocked")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLedgerPeriodRequest constructs an http.Request for the GetLedgerPeriod method
+func NewGetLedgerPeriodRequest(server string, ledgerPeriodUuid LedgerPeriodUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCloseLedgerPeriodRequest constructs an http.Request for the CloseLedgerPeriod method
+func NewCloseLedgerPeriodRequest(server string, ledgerPeriodUuid LedgerPeriodUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/close", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostLedgerEntriesRequest calls the generic PostLedgerEntries builder with application/json body
+func NewPostLedgerEntriesRequest(server string, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostLedgerEntriesRequestWithBody(server, ledgerPeriodUuid, "application/json", bodyReader)
+}
+
+// NewPostLedgerEntriesRequestWithBody constructs an http.Request for the PostLedgerEntries method, with any body, and a specified content type
+func NewPostLedgerEntriesRequestWithBody(server string, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/entries", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewReconcileLedgerPeriodRequest constructs an http.Request for the ReconcileLedgerPeriod method
+func NewReconcileLedgerPeriodRequest(server string, ledgerPeriodUuid LedgerPeriodUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/reconcile", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReopenLedgerPeriodRequest calls the generic ReopenLedgerPeriod builder with application/json body
+func NewReopenLedgerPeriodRequest(server string, ledgerPeriodUuid LedgerPeriodUUID, body ReopenLedgerPeriodJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReopenLedgerPeriodRequestWithBody(server, ledgerPeriodUuid, "application/json", bodyReader)
+}
+
+// NewReopenLedgerPeriodRequestWithBody constructs an http.Request for the ReopenLedgerPeriod method, with any body, and a specified content type
+func NewReopenLedgerPeriodRequestWithBody(server string, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/reopen", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGenerateLedgerPeriodReportRequest constructs an http.Request for the GenerateLedgerPeriodReport method
+func NewGenerateLedgerPeriodReportRequest(server string, ledgerPeriodUuid LedgerPeriodUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/report", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListFundSourceStatementsRequest constructs an http.Request for the ListFundSourceStatements method
+func NewListFundSourceStatementsRequest(server string, ledgerPeriodUuid LedgerPeriodUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/statements", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReconcileFundSourceStatementsRequest calls the generic ReconcileFundSourceStatements builder with application/json body
+func NewReconcileFundSourceStatementsRequest(server string, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReconcileFundSourceStatementsRequestWithBody(server, ledgerPeriodUuid, "application/json", bodyReader)
+}
+
+// NewReconcileFundSourceStatementsRequestWithBody constructs an http.Request for the ReconcileFundSourceStatements method, with any body, and a specified content type
+func NewReconcileFundSourceStatementsRequestWithBody(server string, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_period_uuid", ledgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-periods/%s/statements/reconcile", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -357,6 +1605,33 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListCategoriesWithResponse List all categories
+	//
+	// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesClientResponse, error)
+
+	// UpsertCategoriesWithBodyWithResponse Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategoriesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error)
+
+	// UpsertCategoriesWithResponse Create or update categories with their sub-categories
+	//
+	// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+	UpsertCategoriesWithResponse(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error)
+
 	// ListFundSourcesWithResponse List fund sources
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -377,6 +1652,263 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/fund-sources (the `CreateFundSource` operationId).
 	CreateFundSourceWithResponse(ctx context.Context, body CreateFundSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateFundSourceClientResponse, error)
+
+	// ListLedgerPeriodsWithResponse List ledger periods
+	//
+	// Newest period (by open date) first.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-periods (the `ListLedgerPeriods` operationId).
+	ListLedgerPeriodsWithResponse(ctx context.Context, params *ListLedgerPeriodsParams, reqEditors ...RequestEditorFn) (*ListLedgerPeriodsClientResponse, error)
+
+	// OpenLedgerPeriodWithBodyWithResponse Open a ledger period
+	//
+	// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+	OpenLedgerPeriodWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OpenLedgerPeriodClientResponse, error)
+
+	// OpenLedgerPeriodWithResponse Open a ledger period
+	//
+	// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+	OpenLedgerPeriodWithResponse(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*OpenLedgerPeriodClientResponse, error)
+
+	// GetUnlockedLedgerPeriodWithResponse Get the unlocked ledger period
+	//
+	// The single period that is not reconciled yet (opened or closed). The response is the same as getLedgerPeriod.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-periods/unlocked (the `GetUnlockedLedgerPeriod` operationId).
+	GetUnlockedLedgerPeriodWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUnlockedLedgerPeriodClientResponse, error)
+
+	// GetLedgerPeriodWithResponse Get a ledger period
+	//
+	// A ledger period of any status, with its fund source statements (including each fund source's current balance) and the total inflow and outflow of its posted entries.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid} (the `GetLedgerPeriod` operationId).
+	GetLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*GetLedgerPeriodClientResponse, error)
+
+	// CloseLedgerPeriodWithResponse Close a ledger period
+	//
+	// Closes an opened period and sets the closing balance of every fund source statement to the current balance of its fund source. Fails with 400 `period-not-open` when the period is not opened.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/close (the `CloseLedgerPeriod` operationId).
+	CloseLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*CloseLedgerPeriodClientResponse, error)
+
+	// PostLedgerEntriesWithBodyWithResponse Post ledger entries
+	//
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntriesWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error)
+
+	// PostLedgerEntriesWithResponse Post ledger entries
+	//
+	// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+	PostLedgerEntriesWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error)
+
+	// ReconcileLedgerPeriodWithResponse Reconcile a ledger period
+	//
+	// Locks a closed period once every fund source statement is reconciled. The period closing balance becomes the total of the statements' closing balances. Fails with 409 `period-not-closed` when the period is not closed, or `statements-not-reconciled` (details list the statements) when any statement is not reconciled.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reconcile (the `ReconcileLedgerPeriod` operationId).
+	ReconcileLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*ReconcileLedgerPeriodClientResponse, error)
+
+	// ReopenLedgerPeriodWithBodyWithResponse Reopen a closed ledger period
+	//
+	// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+	ReopenLedgerPeriodWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReopenLedgerPeriodClientResponse, error)
+
+	// ReopenLedgerPeriodWithResponse Reopen a closed ledger period
+	//
+	// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+	ReopenLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReopenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*ReopenLedgerPeriodClientResponse, error)
+
+	// GenerateLedgerPeriodReportWithResponse Generate a report for a ledger period
+	//
+	// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/report (the `GenerateLedgerPeriodReport` operationId).
+	GenerateLedgerPeriodReportWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*GenerateLedgerPeriodReportClientResponse, error)
+
+	// ListFundSourceStatementsWithResponse List the fund source statements of a ledger period
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid}/statements (the `ListFundSourceStatements` operationId).
+	ListFundSourceStatementsWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*ListFundSourceStatementsClientResponse, error)
+
+	// ReconcileFundSourceStatementsWithBodyWithResponse Reconcile fund source statements
+	//
+	// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+	ReconcileFundSourceStatementsWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReconcileFundSourceStatementsClientResponse, error)
+
+	// ReconcileFundSourceStatementsWithResponse Reconcile fund source statements
+	//
+	// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+	ReconcileFundSourceStatementsWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReconcileFundSourceStatementsClientResponse, error)
+}
+
+type ListCategoriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListCategoriesResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCategoriesClientResponse) GetJSON200() *ListCategoriesResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListCategoriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListCategoriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCategoriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCategoriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCategoriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCategoriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpsertCategoriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UpsertCategoriesResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON200() *UpsertCategoriesResponse {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r UpsertCategoriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r UpsertCategoriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpsertCategoriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpsertCategoriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpsertCategoriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type ListFundSourcesClientResponse struct {
@@ -496,6 +2028,796 @@ func (r CreateFundSourceClientResponse) ContentType() string {
 	return ""
 }
 
+type ListLedgerPeriodsClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListLedgerPeriodsResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListLedgerPeriodsClientResponse) GetJSON200() *ListLedgerPeriodsResponse {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ListLedgerPeriodsClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListLedgerPeriodsClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListLedgerPeriodsClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListLedgerPeriodsClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListLedgerPeriodsClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListLedgerPeriodsClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListLedgerPeriodsClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type OpenLedgerPeriodClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *OpenLedgerPeriodResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r OpenLedgerPeriodClientResponse) GetJSON201() *OpenLedgerPeriodResponse {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r OpenLedgerPeriodClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r OpenLedgerPeriodClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r OpenLedgerPeriodClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r OpenLedgerPeriodClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r OpenLedgerPeriodClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r OpenLedgerPeriodClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r OpenLedgerPeriodClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r OpenLedgerPeriodClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r OpenLedgerPeriodClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetUnlockedLedgerPeriodClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GetLedgerPeriodResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetUnlockedLedgerPeriodClientResponse) GetJSON200() *GetLedgerPeriodResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetUnlockedLedgerPeriodClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetUnlockedLedgerPeriodClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetUnlockedLedgerPeriodClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetUnlockedLedgerPeriodClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUnlockedLedgerPeriodClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUnlockedLedgerPeriodClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUnlockedLedgerPeriodClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerPeriodClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GetLedgerPeriodResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerPeriodClientResponse) GetJSON200() *GetLedgerPeriodResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerPeriodClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetLedgerPeriodClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetLedgerPeriodClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerPeriodClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerPeriodClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerPeriodClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerPeriodClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CloseLedgerPeriodClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CloseLedgerPeriodClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CloseLedgerPeriodClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CloseLedgerPeriodClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r CloseLedgerPeriodClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r CloseLedgerPeriodClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r CloseLedgerPeriodClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CloseLedgerPeriodClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CloseLedgerPeriodClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CloseLedgerPeriodClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostLedgerEntriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *PostLedgerEntriesResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON201() *PostLedgerEntriesResponse {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostLedgerEntriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostLedgerEntriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostLedgerEntriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostLedgerEntriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostLedgerEntriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ReconcileLedgerPeriodClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ReconcileLedgerPeriodClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReconcileLedgerPeriodClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ReconcileLedgerPeriodClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r ReconcileLedgerPeriodClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ReconcileLedgerPeriodClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ReconcileLedgerPeriodClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReconcileLedgerPeriodClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReconcileLedgerPeriodClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReconcileLedgerPeriodClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ReopenLedgerPeriodClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ReopenLedgerPeriodClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReopenLedgerPeriodClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ReopenLedgerPeriodClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r ReopenLedgerPeriodClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ReopenLedgerPeriodClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ReopenLedgerPeriodClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReopenLedgerPeriodClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReopenLedgerPeriodClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReopenLedgerPeriodClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GenerateLedgerPeriodReportClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GenerateLedgerPeriodReportResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GenerateLedgerPeriodReportClientResponse) GetJSON200() *GenerateLedgerPeriodReportResponse {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GenerateLedgerPeriodReportClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GenerateLedgerPeriodReportClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GenerateLedgerPeriodReportClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GenerateLedgerPeriodReportClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GenerateLedgerPeriodReportClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GenerateLedgerPeriodReportClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GenerateLedgerPeriodReportClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GenerateLedgerPeriodReportClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListFundSourceStatementsClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListFundSourceStatementsResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListFundSourceStatementsClientResponse) GetJSON200() *ListFundSourceStatementsResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListFundSourceStatementsClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ListFundSourceStatementsClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListFundSourceStatementsClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListFundSourceStatementsClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListFundSourceStatementsClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListFundSourceStatementsClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListFundSourceStatementsClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ReconcileFundSourceStatementsClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ReconcileFundSourceStatementsClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReconcileFundSourceStatementsClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ReconcileFundSourceStatementsClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r ReconcileFundSourceStatementsClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ReconcileFundSourceStatementsClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ReconcileFundSourceStatementsClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReconcileFundSourceStatementsClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReconcileFundSourceStatementsClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReconcileFundSourceStatementsClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListCategoriesWithResponse List all categories
+//
+// Categories are shared by all ledger periods. Each category comes with its sub-categories.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/categories (the `ListCategories` operationId).
+func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesClientResponse, error) {
+	rsp, err := c.ListCategories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCategoriesClientResponse(rsp)
+}
+
+// UpsertCategoriesWithBodyWithResponse Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *ClientWithResponses) UpsertCategoriesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error) {
+	rsp, err := c.UpsertCategoriesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertCategoriesClientResponse(rsp)
+}
+
+// UpsertCategoriesWithResponse Create or update categories with their sub-categories
+//
+// Saves all categories (and their nested sub-categories) or none. An item with a `uuid` updates that category or sub-category (name and description only); an item without one is created. To add a sub-category to an existing category, send the category with its `uuid` and `name` plus the new sub-category. Sub-categories that are not sent are left as they are. Fails with 409 when a name is already used in the same level.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/categories (the `UpsertCategories` operationId).
+func (c *ClientWithResponses) UpsertCategoriesWithResponse(ctx context.Context, body UpsertCategoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertCategoriesClientResponse, error) {
+	rsp, err := c.UpsertCategories(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertCategoriesClientResponse(rsp)
+}
+
 // ListFundSourcesWithResponse List fund sources
 //
 // Returns a wrapper object for the known response body format(s).
@@ -533,6 +2855,323 @@ func (c *ClientWithResponses) CreateFundSourceWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseCreateFundSourceClientResponse(rsp)
+}
+
+// ListLedgerPeriodsWithResponse List ledger periods
+//
+// Newest period (by open date) first.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-periods (the `ListLedgerPeriods` operationId).
+func (c *ClientWithResponses) ListLedgerPeriodsWithResponse(ctx context.Context, params *ListLedgerPeriodsParams, reqEditors ...RequestEditorFn) (*ListLedgerPeriodsClientResponse, error) {
+	rsp, err := c.ListLedgerPeriods(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListLedgerPeriodsClientResponse(rsp)
+}
+
+// OpenLedgerPeriodWithBodyWithResponse Open a ledger period
+//
+// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+func (c *ClientWithResponses) OpenLedgerPeriodWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OpenLedgerPeriodClientResponse, error) {
+	rsp, err := c.OpenLedgerPeriodWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOpenLedgerPeriodClientResponse(rsp)
+}
+
+// OpenLedgerPeriodWithResponse Open a ledger period
+//
+// Opens a new period. Fails with 409 while an unlocked (not reconciled) period exists. The opening balance is taken from the fund sources.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods (the `OpenLedgerPeriod` operationId).
+func (c *ClientWithResponses) OpenLedgerPeriodWithResponse(ctx context.Context, body OpenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*OpenLedgerPeriodClientResponse, error) {
+	rsp, err := c.OpenLedgerPeriod(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOpenLedgerPeriodClientResponse(rsp)
+}
+
+// GetUnlockedLedgerPeriodWithResponse Get the unlocked ledger period
+//
+// The single period that is not reconciled yet (opened or closed). The response is the same as getLedgerPeriod.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-periods/unlocked (the `GetUnlockedLedgerPeriod` operationId).
+func (c *ClientWithResponses) GetUnlockedLedgerPeriodWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUnlockedLedgerPeriodClientResponse, error) {
+	rsp, err := c.GetUnlockedLedgerPeriod(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUnlockedLedgerPeriodClientResponse(rsp)
+}
+
+// GetLedgerPeriodWithResponse Get a ledger period
+//
+// A ledger period of any status, with its fund source statements (including each fund source's current balance) and the total inflow and outflow of its posted entries.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid} (the `GetLedgerPeriod` operationId).
+func (c *ClientWithResponses) GetLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*GetLedgerPeriodClientResponse, error) {
+	rsp, err := c.GetLedgerPeriod(ctx, ledgerPeriodUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerPeriodClientResponse(rsp)
+}
+
+// CloseLedgerPeriodWithResponse Close a ledger period
+//
+// Closes an opened period and sets the closing balance of every fund source statement to the current balance of its fund source. Fails with 400 `period-not-open` when the period is not opened.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/close (the `CloseLedgerPeriod` operationId).
+func (c *ClientWithResponses) CloseLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*CloseLedgerPeriodClientResponse, error) {
+	rsp, err := c.CloseLedgerPeriod(ctx, ledgerPeriodUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCloseLedgerPeriodClientResponse(rsp)
+}
+
+// PostLedgerEntriesWithBodyWithResponse Post ledger entries
+//
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *ClientWithResponses) PostLedgerEntriesWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error) {
+	rsp, err := c.PostLedgerEntriesWithBody(ctx, ledgerPeriodUuid, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerEntriesClientResponse(rsp)
+}
+
+// PostLedgerEntriesWithResponse Post ledger entries
+//
+// Posts many entries of one period to one fund source at once, all or nothing. The fund source must belong to the period. Each entry is applied to it (inflow tops up, outflow withdraws) and stores the fund source balance before and after. Fails with 409 when the period is not opened.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/entries (the `PostLedgerEntries` operationId).
+func (c *ClientWithResponses) PostLedgerEntriesWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body PostLedgerEntriesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerEntriesClientResponse, error) {
+	rsp, err := c.PostLedgerEntries(ctx, ledgerPeriodUuid, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerEntriesClientResponse(rsp)
+}
+
+// ReconcileLedgerPeriodWithResponse Reconcile a ledger period
+//
+// Locks a closed period once every fund source statement is reconciled. The period closing balance becomes the total of the statements' closing balances. Fails with 409 `period-not-closed` when the period is not closed, or `statements-not-reconciled` (details list the statements) when any statement is not reconciled.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reconcile (the `ReconcileLedgerPeriod` operationId).
+func (c *ClientWithResponses) ReconcileLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*ReconcileLedgerPeriodClientResponse, error) {
+	rsp, err := c.ReconcileLedgerPeriod(ctx, ledgerPeriodUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReconcileLedgerPeriodClientResponse(rsp)
+}
+
+// ReopenLedgerPeriodWithBodyWithResponse Reopen a closed ledger period
+//
+// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+func (c *ClientWithResponses) ReopenLedgerPeriodWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReopenLedgerPeriodClientResponse, error) {
+	rsp, err := c.ReopenLedgerPeriodWithBody(ctx, ledgerPeriodUuid, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReopenLedgerPeriodClientResponse(rsp)
+}
+
+// ReopenLedgerPeriodWithResponse Reopen a closed ledger period
+//
+// Reopens a closed period and clears the closing balance of its fund source statements. Fails with 400 `period-not-closed` when the period is not closed, 400 `period-locked` when it is reconciled, 400 `reopen-reason-required` when the reason is blank, and 409 `fund-source-statement-reconciled` when any statement is already reconciled.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/reopen (the `ReopenLedgerPeriod` operationId).
+func (c *ClientWithResponses) ReopenLedgerPeriodWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReopenLedgerPeriodJSONRequestBody, reqEditors ...RequestEditorFn) (*ReopenLedgerPeriodClientResponse, error) {
+	rsp, err := c.ReopenLedgerPeriod(ctx, ledgerPeriodUuid, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReopenLedgerPeriodClientResponse(rsp)
+}
+
+// GenerateLedgerPeriodReportWithResponse Generate a report for a ledger period
+//
+// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/report (the `GenerateLedgerPeriodReport` operationId).
+func (c *ClientWithResponses) GenerateLedgerPeriodReportWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*GenerateLedgerPeriodReportClientResponse, error) {
+	rsp, err := c.GenerateLedgerPeriodReport(ctx, ledgerPeriodUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGenerateLedgerPeriodReportClientResponse(rsp)
+}
+
+// ListFundSourceStatementsWithResponse List the fund source statements of a ledger period
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-periods/{ledger_period_uuid}/statements (the `ListFundSourceStatements` operationId).
+func (c *ClientWithResponses) ListFundSourceStatementsWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*ListFundSourceStatementsClientResponse, error) {
+	rsp, err := c.ListFundSourceStatements(ctx, ledgerPeriodUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListFundSourceStatementsClientResponse(rsp)
+}
+
+// ReconcileFundSourceStatementsWithBodyWithResponse Reconcile fund source statements
+//
+// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+func (c *ClientWithResponses) ReconcileFundSourceStatementsWithBodyWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReconcileFundSourceStatementsClientResponse, error) {
+	rsp, err := c.ReconcileFundSourceStatementsWithBody(ctx, ledgerPeriodUuid, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReconcileFundSourceStatementsClientResponse(rsp)
+}
+
+// ReconcileFundSourceStatementsWithResponse Reconcile fund source statements
+//
+// Compares the actual balance of each statement with its closing balance, all or nothing. A mismatch fails with 400 and per-statement details (entity_id is the statement uuid). Fails with 409 when the period is not closed.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile (the `ReconcileFundSourceStatements` operationId).
+func (c *ClientWithResponses) ReconcileFundSourceStatementsWithResponse(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, body ReconcileFundSourceStatementsJSONRequestBody, reqEditors ...RequestEditorFn) (*ReconcileFundSourceStatementsClientResponse, error) {
+	rsp, err := c.ReconcileFundSourceStatements(ctx, ledgerPeriodUuid, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReconcileFundSourceStatementsClientResponse(rsp)
+}
+
+// ParseListCategoriesClientResponse parses an HTTP response from a ListCategoriesWithResponse call
+func ParseListCategoriesClientResponse(rsp *http.Response) (*ListCategoriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCategoriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListCategoriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpsertCategoriesClientResponse parses an HTTP response from a UpsertCategoriesWithResponse call
+func ParseUpsertCategoriesClientResponse(rsp *http.Response) (*UpsertCategoriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpsertCategoriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpsertCategoriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListFundSourcesClientResponse parses an HTTP response from a ListFundSourcesWithResponse call
@@ -609,6 +3248,598 @@ func ParseCreateFundSourceClientResponse(rsp *http.Response) (*CreateFundSourceC
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListLedgerPeriodsClientResponse parses an HTTP response from a ListLedgerPeriodsWithResponse call
+func ParseListLedgerPeriodsClientResponse(rsp *http.Response) (*ListLedgerPeriodsClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListLedgerPeriodsClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListLedgerPeriodsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseOpenLedgerPeriodClientResponse parses an HTTP response from a OpenLedgerPeriodWithResponse call
+func ParseOpenLedgerPeriodClientResponse(rsp *http.Response) (*OpenLedgerPeriodClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OpenLedgerPeriodClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest OpenLedgerPeriodResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetUnlockedLedgerPeriodClientResponse parses an HTTP response from a GetUnlockedLedgerPeriodWithResponse call
+func ParseGetUnlockedLedgerPeriodClientResponse(rsp *http.Response) (*GetUnlockedLedgerPeriodClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUnlockedLedgerPeriodClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetLedgerPeriodResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerPeriodClientResponse parses an HTTP response from a GetLedgerPeriodWithResponse call
+func ParseGetLedgerPeriodClientResponse(rsp *http.Response) (*GetLedgerPeriodClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerPeriodClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetLedgerPeriodResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCloseLedgerPeriodClientResponse parses an HTTP response from a CloseLedgerPeriodWithResponse call
+func ParseCloseLedgerPeriodClientResponse(rsp *http.Response) (*CloseLedgerPeriodClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CloseLedgerPeriodClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostLedgerEntriesClientResponse parses an HTTP response from a PostLedgerEntriesWithResponse call
+func ParsePostLedgerEntriesClientResponse(rsp *http.Response) (*PostLedgerEntriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostLedgerEntriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest PostLedgerEntriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReconcileLedgerPeriodClientResponse parses an HTTP response from a ReconcileLedgerPeriodWithResponse call
+func ParseReconcileLedgerPeriodClientResponse(rsp *http.Response) (*ReconcileLedgerPeriodClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReconcileLedgerPeriodClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReopenLedgerPeriodClientResponse parses an HTTP response from a ReopenLedgerPeriodWithResponse call
+func ParseReopenLedgerPeriodClientResponse(rsp *http.Response) (*ReopenLedgerPeriodClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReopenLedgerPeriodClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGenerateLedgerPeriodReportClientResponse parses an HTTP response from a GenerateLedgerPeriodReportWithResponse call
+func ParseGenerateLedgerPeriodReportClientResponse(rsp *http.Response) (*GenerateLedgerPeriodReportClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GenerateLedgerPeriodReportClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GenerateLedgerPeriodReportResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListFundSourceStatementsClientResponse parses an HTTP response from a ListFundSourceStatementsWithResponse call
+func ParseListFundSourceStatementsClientResponse(rsp *http.Response) (*ListFundSourceStatementsClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListFundSourceStatementsClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListFundSourceStatementsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReconcileFundSourceStatementsClientResponse parses an HTTP response from a ReconcileFundSourceStatementsWithResponse call
+func ParseReconcileFundSourceStatementsClientResponse(rsp *http.Response) (*ReconcileFundSourceStatementsClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReconcileFundSourceStatementsClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError

@@ -1,13 +1,10 @@
 import { Suspense, lazy } from 'react';
 
-import { useQueryErrorResetBoundary } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
-import { Button } from '@/components/ui/button';
-
 import ContentLayout from '@/components/layout/content-layout/content-layout';
+import ErrorComponent from '@/components/layout/error-component/error-component';
 
-import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 import {
   FundSourceList,
   FundSourceListSkeleton,
@@ -20,35 +17,15 @@ const CreateFundSourceTrigger = lazy(
 export const Route = createFileRoute('/_app/fund-sources')({
   staticData: { crumb: 'Nguồn quỹ' },
   component: RouteComponent,
-  errorComponent: RouteError,
+  errorComponent: ({ error, reset }) => (
+    <ErrorComponent
+      error={error}
+      reset={reset}
+      title="Nguồn quỹ"
+      fallbackMessage="Không thể tải danh sách nguồn quỹ."
+    />
+  ),
 });
-
-function RouteError({ error, reset }: { error: unknown; reset: () => void }) {
-  const { reset: resetQueries } = useQueryErrorResetBoundary();
-  const { message } = formatApiError(
-    error,
-    'Không thể tải danh sách nguồn quỹ.',
-  );
-
-  return (
-    <ContentLayout title="Nguồn quỹ">
-      <div className="mt-4 flex flex-col items-center gap-2 p-6 text-sm">
-        <p className="text-muted-foreground">{message}</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            resetQueries();
-            reset();
-          }}
-        >
-          Thử lại
-        </Button>
-      </div>
-    </ContentLayout>
-  );
-}
 
 function RouteComponent() {
   return (

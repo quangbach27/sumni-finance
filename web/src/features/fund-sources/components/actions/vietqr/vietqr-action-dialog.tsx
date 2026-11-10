@@ -29,8 +29,8 @@ import {
   parseAmount,
 } from '@/lib/currency';
 
-import { buildVietQrUrl } from './vietqr';
 import FundSourceAvatar from '../../fund-source-avatar';
+import { buildVietQrUrl } from './vietqr';
 
 import type { FundSource } from '../../../api/types';
 import type { FundSourceActionDialogProps } from '../types';

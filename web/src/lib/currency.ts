@@ -22,6 +22,8 @@ export const CURRENCY_CODES = Object.keys(CURRENCIES) as [
   ...CurrencyCode[],
 ];
 
+export const DEFAULT_CURRENCY: CurrencyCode = 'VND';
+
 const getConfig = (currency: string): CurrencyConfig | undefined =>
   (CURRENCIES as Record<string, CurrencyConfig>)[currency];
 
@@ -90,4 +92,48 @@ export const parseAmount = (text: string, currency: string): number => {
     .slice(0, fractionDigits)}`;
   const value = Number(normalized);
   return Number.isFinite(value) ? value : 0;
+};
+
+/**
+ * Formats text as the user types and returns where the caret belongs: after
+ * the same number of digits as before, whatever separators were added.
+ */
+export const formatAmountInputWithCaret = (
+  text: string,
+  caret: number,
+  currency: string,
+): { formatted: string; caret: number } => {
+  const formatted = formatAmountInput(text, currency);
+  const digitsBeforeCaret = text.slice(0, caret).replace(/\D/g, '').length;
+  let seen = 0;
+  let position = 0;
+  while (position < formatted.length && seen < digitsBeforeCaret) {
+    if (/\d/.test(formatted.charAt(position))) seen++;
+    position++;
+  }
+  return { formatted, caret: position };
+};
+
+/**
+ * Formats text as the user types: digits grouped with the currency's group
+ * separator, plus the decimal part when the currency has fraction digits.
+ * Decimals are not padded, so `12,` and `12,5` survive while typing.
+ */
+export const formatAmountInput = (text: string, currency: string): string => {
+  const fractionDigits = getConfig(currency)?.fractionDigits ?? 0;
+  const parts = getAmountFormatter(currency).formatToParts(1000.1);
+  const group = parts.find((p) => p.type === 'group')?.value ?? '';
+  const decimal = parts.find((p) => p.type === 'decimal')?.value ?? '.';
+
+  // Without decimals every non-digit is just a group separator, not a decimal.
+  const segments = fractionDigits === 0 ? [text] : text.split(decimal);
+  const rawInteger = segments[0] ?? '';
+  const rawFraction = segments.length > 1 ? segments.slice(1).join('') : null;
+  const integer = rawInteger.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, group);
+
+  if (fractionDigits === 0 || rawFraction === null) return grouped;
+  return `${grouped || '0'}${decimal}${rawFraction
+    .replace(/\D/g, '')
+    .slice(0, fractionDigits)}`;
 };

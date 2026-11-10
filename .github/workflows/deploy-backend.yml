@@ -1,0 +1,57 @@
+name: Deploy Backend
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        type: choice
+        options:
+          - dev
+        default: dev
+
+# Never run two deployments to the same environment at the same time.
+concurrency:
+  group: deploy-backend-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  commit-stage:
+    name: Commit stage
+    uses: ./.github/workflows/backend-commit-stage.yml
+    with:
+      environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+
+  deploy:
+    name: Deploy to Cloud Run (${{ inputs.environment }})
+    needs: [commit-stage]
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Only the app image changes. Env, secrets and the Auth Proxy sidecar stay as Terraform declared them.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${{ vars.CLOUD_RUN_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --container app \
+            --image "${{ needs.commit-stage.outputs.image }}" \
+            --quiet

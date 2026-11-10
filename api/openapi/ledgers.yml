@@ -5,6 +5,8 @@ info:
 
 tags:
   - name: fund-sources
+  - name: ledger-periods
+  - name: categories
 
 paths:
   /api/v1/fund-sources:
@@ -44,6 +46,412 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/unlocked:
+    get:
+      tags: [ledger-periods]
+      operationId: getUnlockedLedgerPeriod
+      summary: Get the unlocked ledger period
+      description: >-
+        The single period that is not reconciled yet (opened or closed). The
+        response is the same as getLedgerPeriod.
+      responses:
+        "200":
+          description: The unlocked ledger period.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetLedgerPeriodResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}:
+    get:
+      tags: [ledger-periods]
+      operationId: getLedgerPeriod
+      summary: Get a ledger period
+      description: >-
+        A ledger period of any status, with its fund source statements
+        (including each fund source's current balance) and the total inflow and
+        outflow of its posted entries.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "200":
+          description: The ledger period.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetLedgerPeriodResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods:
+    get:
+      tags: [ledger-periods]
+      operationId: listLedgerPeriods
+      summary: List ledger periods
+      description: Newest period (by open date) first.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          required: false
+          explode: false
+          schema:
+            $ref: "#/components/schemas/LedgerStatus"
+      responses:
+        "200":
+          description: A page of ledger periods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLedgerPeriodsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags: [ledger-periods]
+      operationId: openLedgerPeriod
+      summary: Open a ledger period
+      description: >
+        Opens a new period. Fails with 409 while an unlocked (not reconciled)
+        period exists. The opening balance is taken from the fund sources.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenLedgerPeriodRequest"
+      responses:
+        "201":
+          description: Ledger period opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenLedgerPeriodResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/entries:
+    post:
+      tags: [ledger-periods]
+      operationId: postLedgerEntries
+      summary: Post ledger entries
+      description: >
+        Posts many entries of one period to one fund source at once, all or
+        nothing. The fund source must belong to the period. Each entry is
+        applied to it (inflow tops up, outflow withdraws) and
+        stores the fund source balance before and after. Fails with 409 when the
+        period is not opened.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostLedgerEntriesRequest"
+      responses:
+        "201":
+          description: Ledger entries posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostLedgerEntriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/categories:
+    get:
+      tags: [categories]
+      operationId: listCategories
+      summary: List all categories
+      description: >
+        Categories are shared by all ledger periods. Each category comes with
+        its sub-categories.
+      responses:
+        "200":
+          description: Categories with their sub-categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCategoriesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags: [categories]
+      operationId: upsertCategories
+      summary: Create or update categories with their sub-categories
+      description: >
+        Saves all categories (and their nested sub-categories) or none. An item
+        with a `uuid` updates that category or sub-category (name and
+        description only); an item without one is created. To add a
+        sub-category to an existing category, send the category with its
+        `uuid` and `name` plus the new sub-category. Sub-categories that are
+        not sent are left as they are. Fails with 409 when a name is already
+        used in the same level.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertCategoriesRequest"
+      responses:
+        "200":
+          description: Categories saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpsertCategoriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/close:
+    post:
+      tags: [ledger-periods]
+      operationId: closeLedgerPeriod
+      summary: Close a ledger period
+      description: >
+        Closes an opened period and sets the closing balance of every fund
+        source statement to the current balance of its fund source. Fails with
+        400 `period-not-open` when the period is not opened.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "204":
+          description: Ledger period closed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/reopen:
+    post:
+      tags: [ledger-periods]
+      operationId: reopenLedgerPeriod
+      summary: Reopen a closed ledger period
+      description: >
+        Reopens a closed period and clears the closing balance of its fund
+        source statements. Fails with 400 `period-not-closed` when the period
+        is not closed, 400 `period-locked` when it is reconciled, 400
+        `reopen-reason-required` when the reason is blank, and 409
+        `fund-source-statement-reconciled` when any statement is already
+        reconciled.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReopenLedgerPeriodRequest"
+      responses:
+        "204":
+          description: Ledger period reopened
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/report:
+    post:
+      tags: [ledger-periods]
+      operationId: generateLedgerPeriodReport
+      summary: Generate a report for a ledger period
+      description: >
+        Generates a report for the period and stores its UUID on the period.
+        Currently the report UUID is a placeholder random value.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "200":
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateLedgerPeriodReportResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/statements:
+    get:
+      tags: [ledger-periods]
+      operationId: listFundSourceStatements
+      summary: List the fund source statements of a ledger period
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "200":
+          description: Fund source statements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFundSourceStatementsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/statements/reconcile:
+    post:
+      tags: [ledger-periods]
+      operationId: reconcileFundSourceStatements
+      summary: Reconcile fund source statements
+      description: >
+        Compares the actual balance of each statement with its closing balance,
+        all or nothing. A mismatch fails with 400 and per-statement details
+        (entity_id is the statement uuid). Fails with 409 when the period is
+        not closed.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconcileFundSourceStatementsRequest"
+      responses:
+        "204":
+          description: Fund source statements reconciled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-periods/{ledger_period_uuid}/reconcile:
+    post:
+      tags: [ledger-periods]
+      operationId: reconcileLedgerPeriod
+      summary: Reconcile a ledger period
+      description: >
+        Locks a closed period once every fund source statement is reconciled.
+        The period closing balance becomes the total of the statements' closing
+        balances. Fails with 409 `period-not-closed` when the period is not
+        closed, or `statements-not-reconciled` (details list the statements)
+        when any statement is not reconciled.
+      parameters:
+        - name: ledger_period_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+      responses:
+        "204":
+          description: Ledger period reconciled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -144,6 +552,393 @@ components:
         fund_source_uuid:
           $ref: "#/components/schemas/FundSourceUUID"
 
+    LedgerPeriodUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.LedgerPeriodUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    ReportUUID:
+      type: string
+      format: uuid
+      x-go-type: models.ReportUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/apps/models
+
+    GenerateLedgerPeriodReportResponse:
+      type: object
+      required: [report_uuid]
+      properties:
+        report_uuid:
+          $ref: "#/components/schemas/ReportUUID"
+
+    LedgerStatus:
+      type: string
+      enum: [opened, closed, reconciled]
+      x-go-type: domain.LedgerStatus
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    PageInfo:
+      type: object
+      required: [page, page_size, total_count]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_count:
+          type: integer
+
+    LedgerPeriod:
+      type: object
+      required: [uuid, name, opening_balance, open_date, close_date, status]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/LedgerPeriodUUID"
+        name:
+          type: string
+        opening_balance:
+          $ref: "#/components/schemas/Decimal"
+        closing_balance:
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+          description: Set once the period is reconciled.
+        open_date:
+          type: string
+          format: date-time
+        close_date:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/LedgerStatus"
+        reopen_reason:
+          type: string
+        reopened_at:
+          type: string
+          format: date-time
+        reconciled_at:
+          type: string
+          format: date-time
+        report_uuid:
+          $ref: "#/components/schemas/ReportUUID"
+
+    ListLedgerPeriodsResponse:
+      type: object
+      required: [items, page_info]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerPeriod"
+        page_info:
+          $ref: "#/components/schemas/PageInfo"
+
+    ReopenLedgerPeriodRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+
+    OpenLedgerPeriodRequest:
+      type: object
+      required: [name, open_date, close_date, fund_source_uuids]
+      properties:
+        name:
+          type: string
+        open_date:
+          type: string
+          format: date-time
+        close_date:
+          type: string
+          format: date-time
+        fund_source_uuids:
+          type: array
+          items:
+            $ref: "#/components/schemas/FundSourceUUID"
+
+    OpenLedgerPeriodResponse:
+      type: object
+      required: [ledger_period_uuid]
+      properties:
+        ledger_period_uuid:
+          $ref: "#/components/schemas/LedgerPeriodUUID"
+
+    LedgerEntryUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.LedgerEntryUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    CategoryUUID:
+      type: string
+      format: uuid
+      x-go-type: models.CategoryUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/apps/models
+
+    SubCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        uuid:
+          description: Updates this sub-category when set; otherwise a new one is created.
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        uuid:
+          description: Updates this category when set; otherwise a new one is created.
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+        sub_categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubCategoryInput"
+
+    UpsertCategoriesRequest:
+      type: object
+      required: [categories]
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryInput"
+
+    UpsertCategoriesResponse:
+      type: object
+      required: [category_uuids]
+      properties:
+        category_uuids:
+          description: In the order of the request categories.
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryUUID"
+
+    SubCategory:
+      type: object
+      required: [uuid, name]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+
+    Category:
+      type: object
+      required: [uuid, name, sub_categories]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+        description:
+          type: string
+        sub_categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubCategory"
+
+    ListCategoriesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+
+    Direction:
+      type: string
+      enum: [inflow, outflow]
+      x-go-type: shared.Direction
+      x-go-type-import:
+        path: backend/internal/shared
+
+    LedgerEntryInput:
+      type: object
+      required: [amount, direction, description, occurred_at]
+      properties:
+        amount:
+          $ref: "#/components/schemas/Decimal"
+        direction:
+          $ref: "#/components/schemas/Direction"
+        description:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        category_uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+
+    PostLedgerEntriesRequest:
+      type: object
+      required: [fund_source_uuid, entries]
+      properties:
+        fund_source_uuid:
+          description: The one fund source all entries are posted to. Must belong to the period (have a statement in it).
+          $ref: "#/components/schemas/FundSourceUUID"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntryInput"
+
+    PostLedgerEntriesResponse:
+      type: object
+      required: [ledger_entry_uuids]
+      properties:
+        ledger_entry_uuids:
+          description: In the order of the request entries.
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntryUUID"
+
+    FundSourceStatementUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.FundSourceStatementUUID
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    FundSourceStatement:
+      type: object
+      required: [uuid, fund_source_uuid, opening_balance]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/FundSourceStatementUUID"
+        fund_source_uuid:
+          $ref: "#/components/schemas/FundSourceUUID"
+        opening_balance:
+          $ref: "#/components/schemas/Decimal"
+        closing_balance:
+          description: Set when the period is closed.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        actual_balance:
+          description: Set when reconciled.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        reconciled_by:
+          type: string
+        reconciled_at:
+          type: string
+          format: date-time
+
+    LedgerStatementDetail:
+      type: object
+      required: [uuid, opening_balance, fund_source]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/FundSourceStatementUUID"
+        opening_balance:
+          $ref: "#/components/schemas/Decimal"
+        closing_balance:
+          description: Set when the period is closed.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        actual_balance:
+          description: Set when reconciled.
+          allOf:
+            - $ref: "#/components/schemas/Decimal"
+        reconciled_by:
+          type: string
+        reconciled_at:
+          type: string
+          format: date-time
+        fund_source:
+          description: The fund source this statement belongs to, with its live balance.
+          allOf:
+            - $ref: "#/components/schemas/FundSource"
+
+    LedgerPeriodDetail:
+      allOf:
+        - $ref: "#/components/schemas/LedgerPeriod"
+        - type: object
+          required: [total_inflow, total_outflow, entry_count, statements, category_summaries]
+          properties:
+            total_inflow:
+              $ref: "#/components/schemas/Decimal"
+            total_outflow:
+              $ref: "#/components/schemas/Decimal"
+            entry_count:
+              type: integer
+              format: int64
+              description: Number of posted ledger entries in the period.
+            statements:
+              type: array
+              items:
+                $ref: "#/components/schemas/LedgerStatementDetail"
+            category_summaries:
+              type: array
+              description: Posted entries of the period per top-level category. Sub-category entries count toward their parent.
+              items:
+                $ref: "#/components/schemas/CategorySummary"
+
+    CategorySummary:
+      type: object
+      required: [entry_count, total_inflow, total_outflow]
+      properties:
+        category_uuid:
+          description: Top-level category. Absent for entries without a known category.
+          allOf:
+            - $ref: "#/components/schemas/CategoryUUID"
+        entry_count:
+          type: integer
+          format: int64
+        total_inflow:
+          $ref: "#/components/schemas/Decimal"
+        total_outflow:
+          $ref: "#/components/schemas/Decimal"
+
+    GetLedgerPeriodResponse:
+      type: object
+      required: [ledger_period]
+      properties:
+        ledger_period:
+          $ref: "#/components/schemas/LedgerPeriodDetail"
+
+    ListFundSourceStatementsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FundSourceStatement"
+
+    ReconcileStatementInput:
+      type: object
+      required: [statement_uuid, actual_balance]
+      properties:
+        statement_uuid:
+          $ref: "#/components/schemas/FundSourceStatementUUID"
+        actual_balance:
+          $ref: "#/components/schemas/Decimal"
+
+    ReconcileFundSourceStatementsRequest:
+      type: object
+      required: [statements]
+      properties:
+        statements:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ReconcileStatementInput"
+
     ErrorDetail:
       type: object
       required: [error_slug, message]
@@ -194,6 +989,13 @@ components:
 
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Request conflicts with the current state
       content:
         application/json:
           schema:

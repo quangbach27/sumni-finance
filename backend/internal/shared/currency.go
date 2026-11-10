@@ -11,3 +11,7 @@ type CurrencyValues string
 func (v CurrencyValues) Values() []string {
 	return []string{"VND"}
 }
+
+var (
+	CurrencyVND = common.MustEnum[Currency]("VND")
+)

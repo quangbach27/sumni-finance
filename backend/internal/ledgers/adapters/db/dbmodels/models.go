@@ -7,9 +7,19 @@ package dbmodels
 import (
 	"time"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
+	"backend/internal/shared"
 	"github.com/shopspring/decimal"
 )
+
+type LedgersCategory struct {
+	Uuid        models.CategoryUUID
+	ParentUuid  *models.CategoryUUID
+	Name        string
+	Description *string
+	CreatedAt   time.Time
+}
 
 type LedgersFundSource struct {
 	Uuid          domain.FundSourceUUID
@@ -23,4 +33,57 @@ type LedgersFundSource struct {
 	BankShortName *string
 	AccountNumber *string
 	CreatedAt     time.Time
+}
+
+type LedgersFundSourceStatement struct {
+	Uuid             domain.FundSourceStatementUUID
+	LedgerPeriodUuid domain.LedgerPeriodUUID
+	FundSourceUuid   domain.FundSourceUUID
+	OpeningBalance   decimal.Decimal
+	ClosingBalance   *decimal.Decimal
+	ActualBalance    *decimal.Decimal
+	ReconciledBy     *string
+	ReconciledAt     *time.Time
+	CreatedAt        time.Time
+}
+
+type LedgersLedgerEntry struct {
+	Uuid                domain.LedgerEntryUUID
+	LedgerPeriodUuid    domain.LedgerPeriodUUID
+	FundSourceUuid      domain.FundSourceUUID
+	Amount              decimal.Decimal
+	Direction           shared.Direction
+	Description         string
+	OccurredAt          time.Time
+	CategoryUuid        *models.CategoryUUID
+	FsBalanceBefore     decimal.Decimal
+	FsBalanceAfter      decimal.Decimal
+	Status              domain.EntryStatus
+	Kind                domain.EntryKind
+	ReversedByEntryUuid *domain.LedgerEntryUUID
+	ReversesEntryUuid   *domain.LedgerEntryUUID
+	VoidedReason        *string
+	VoidedBy            *string
+	VoidedAt            *time.Time
+	CreatedAt           time.Time
+}
+
+type LedgersLedgerPeriod struct {
+	Uuid           domain.LedgerPeriodUUID
+	Name           string
+	OpeningBalance decimal.Decimal
+	ClosingBalance *decimal.Decimal
+	OpenDate       time.Time
+	CloseDate      time.Time
+	Status         domain.LedgerStatus
+	ReopenReason   *string
+	ReopenedAt     *time.Time
+	ReconciledAt   *time.Time
+	CreatedAt      time.Time
+	ReportUuid     *models.ReportUUID
+}
+
+type LedgersLedgerPeriodReport struct {
+	Uuid      models.ReportUUID
+	CreatedAt time.Time
 }

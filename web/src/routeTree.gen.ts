@@ -8,72 +8,117 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root';
-import { Route as IndexRouteImport } from './routes/index';
-import { Route as AppRouteRouteImport } from './routes/_app/route';
-import { Route as AppFundSourcesRouteImport } from './routes/_app/fund-sources';
-import { Route as AppLedgerBooksRouteImport } from './routes/_app/ledger-books';
-import { Route as AppReportsRouteImport } from './routes/_app/reports';
-import { Route as AppSettingsRouteImport } from './routes/_app/settings';
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as AppFundSourcesRouteImport } from './routes/_app/fund-sources'
+import { Route as AppLedgerBooksRouteImport } from './routes/_app/ledger-books'
+import { Route as AppReportsRouteImport } from './routes/_app/reports'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppLedgerBooksCategoriesRouteImport } from './routes/_app/ledger-books_.categories'
+import { Route as AppLedgerBooksUuidIndexRouteImport } from './routes/_app/ledger-books_.$uuid.index'
+import { Route as AppLedgerBooksUuidEntriesPostRouteImport } from './routes/_app/ledger-books_.$uuid.entries.post'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppFundSourcesRoute = AppFundSourcesRouteImport.update({
   id: '/fund-sources',
   path: '/fund-sources',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const AppLedgerBooksRoute = AppLedgerBooksRouteImport.update({
   id: '/ledger-books',
   path: '/ledger-books',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const AppReportsRoute = AppReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRouteRoute,
-} as any);
+} as any)
+const AppLedgerBooksCategoriesRoute =
+  AppLedgerBooksCategoriesRouteImport.update({
+    id: '/ledger-books_/categories',
+    path: '/ledger-books/categories',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppLedgerBooksUuidIndexRoute = AppLedgerBooksUuidIndexRouteImport.update({
+  id: '/ledger-books_/$uuid/',
+  path: '/ledger-books/$uuid/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppLedgerBooksUuidEntriesPostRoute =
+  AppLedgerBooksUuidEntriesPostRouteImport.update({
+    id: '/ledger-books_/$uuid/entries/post',
+    path: '/ledger-books/$uuid/entries/post',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute;
-  '/fund-sources': typeof AppFundSourcesRoute;
-  '/ledger-books': typeof AppLedgerBooksRoute;
-  '/reports': typeof AppReportsRoute;
-  '/settings': typeof AppSettingsRoute;
+  '/': typeof IndexRoute
+  '/fund-sources': typeof AppFundSourcesRoute
+  '/ledger-books': typeof AppLedgerBooksRoute
+  '/reports': typeof AppReportsRoute
+  '/settings': typeof AppSettingsRoute
+  '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
+  '/ledger-books/$uuid/': typeof AppLedgerBooksUuidIndexRoute
+  '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute;
-  '/fund-sources': typeof AppFundSourcesRoute;
-  '/ledger-books': typeof AppLedgerBooksRoute;
-  '/reports': typeof AppReportsRoute;
-  '/settings': typeof AppSettingsRoute;
+  '/': typeof IndexRoute
+  '/fund-sources': typeof AppFundSourcesRoute
+  '/ledger-books': typeof AppLedgerBooksRoute
+  '/reports': typeof AppReportsRoute
+  '/settings': typeof AppSettingsRoute
+  '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
+  '/ledger-books/$uuid': typeof AppLedgerBooksUuidIndexRoute
+  '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  '/': typeof IndexRoute;
-  '/_app': typeof AppRouteRouteWithChildren;
-  '/_app/fund-sources': typeof AppFundSourcesRoute;
-  '/_app/ledger-books': typeof AppLedgerBooksRoute;
-  '/_app/reports': typeof AppReportsRoute;
-  '/_app/settings': typeof AppSettingsRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/_app': typeof AppRouteRouteWithChildren
+  '/_app/fund-sources': typeof AppFundSourcesRoute
+  '/_app/ledger-books': typeof AppLedgerBooksRoute
+  '/_app/reports': typeof AppReportsRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/ledger-books_/categories': typeof AppLedgerBooksCategoriesRoute
+  '/_app/ledger-books_/$uuid/': typeof AppLedgerBooksUuidIndexRoute
+  '/_app/ledger-books_/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/fund-sources' | '/ledger-books' | '/reports' | '/settings';
-  fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/fund-sources' | '/ledger-books' | '/reports' | '/settings';
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/fund-sources'
+    | '/ledger-books'
+    | '/reports'
+    | '/settings'
+    | '/ledger-books/categories'
+    | '/ledger-books/$uuid/'
+    | '/ledger-books/$uuid/entries/post'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/fund-sources'
+    | '/ledger-books'
+    | '/reports'
+    | '/settings'
+    | '/ledger-books/categories'
+    | '/ledger-books/$uuid'
+    | '/ledger-books/$uuid/entries/post'
   id:
     | '__root__'
     | '/'
@@ -81,66 +126,93 @@ export interface FileRouteTypes {
     | '/_app/fund-sources'
     | '/_app/ledger-books'
     | '/_app/reports'
-    | '/_app/settings';
-  fileRoutesById: FileRoutesById;
+    | '/_app/settings'
+    | '/_app/ledger-books_/categories'
+    | '/_app/ledger-books_/$uuid/'
+    | '/_app/ledger-books_/$uuid/entries/post'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  AppRouteRoute: typeof AppRouteRouteWithChildren;
+  IndexRoute: typeof IndexRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': {
-      id: '/';
-      path: '/';
-      fullPath: '/';
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
-      id: '/_app';
-      path: '';
-      fullPath: '/';
-      preLoaderRoute: typeof AppRouteRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/fund-sources': {
-      id: '/_app/fund-sources';
-      path: '/fund-sources';
-      fullPath: '/fund-sources';
-      preLoaderRoute: typeof AppFundSourcesRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
+      id: '/_app/fund-sources'
+      path: '/fund-sources'
+      fullPath: '/fund-sources'
+      preLoaderRoute: typeof AppFundSourcesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/ledger-books': {
-      id: '/_app/ledger-books';
-      path: '/ledger-books';
-      fullPath: '/ledger-books';
-      preLoaderRoute: typeof AppLedgerBooksRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
+      id: '/_app/ledger-books'
+      path: '/ledger-books'
+      fullPath: '/ledger-books'
+      preLoaderRoute: typeof AppLedgerBooksRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/reports': {
-      id: '/_app/reports';
-      path: '/reports';
-      fullPath: '/reports';
-      preLoaderRoute: typeof AppReportsRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
+      id: '/_app/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/settings': {
-      id: '/_app/settings';
-      path: '/settings';
-      fullPath: '/settings';
-      preLoaderRoute: typeof AppSettingsRouteImport;
-      parentRoute: typeof AppRouteRoute;
-    };
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/ledger-books_/categories': {
+      id: '/_app/ledger-books_/categories'
+      path: '/ledger-books/categories'
+      fullPath: '/ledger-books/categories'
+      preLoaderRoute: typeof AppLedgerBooksCategoriesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/ledger-books_/$uuid/': {
+      id: '/_app/ledger-books_/$uuid/'
+      path: '/ledger-books/$uuid'
+      fullPath: '/ledger-books/$uuid/'
+      preLoaderRoute: typeof AppLedgerBooksUuidIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/ledger-books_/$uuid/entries/post': {
+      id: '/_app/ledger-books_/$uuid/entries/post'
+      path: '/ledger-books/$uuid/entries/post'
+      fullPath: '/ledger-books/$uuid/entries/post'
+      preLoaderRoute: typeof AppLedgerBooksUuidEntriesPostRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
   }
 }
 
 interface AppRouteRouteChildren {
-  AppFundSourcesRoute: typeof AppFundSourcesRoute;
-  AppLedgerBooksRoute: typeof AppLedgerBooksRoute;
-  AppReportsRoute: typeof AppReportsRoute;
-  AppSettingsRoute: typeof AppSettingsRoute;
+  AppFundSourcesRoute: typeof AppFundSourcesRoute
+  AppLedgerBooksRoute: typeof AppLedgerBooksRoute
+  AppReportsRoute: typeof AppReportsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppLedgerBooksCategoriesRoute: typeof AppLedgerBooksCategoriesRoute
+  AppLedgerBooksUuidIndexRoute: typeof AppLedgerBooksUuidIndexRoute
+  AppLedgerBooksUuidEntriesPostRoute: typeof AppLedgerBooksUuidEntriesPostRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
@@ -148,16 +220,19 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppLedgerBooksRoute: AppLedgerBooksRoute,
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
-};
+  AppLedgerBooksCategoriesRoute: AppLedgerBooksCategoriesRoute,
+  AppLedgerBooksUuidIndexRoute: AppLedgerBooksUuidIndexRoute,
+  AppLedgerBooksUuidEntriesPostRoute: AppLedgerBooksUuidEntriesPostRoute,
+}
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
   AppRouteRouteChildren,
-);
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()

@@ -14,6 +14,7 @@ import (
 
 	"backend/internal"
 	"backend/internal/configs"
+	"backend/internal/ledgers/adapters/bankverifier"
 )
 
 func main() {
@@ -32,7 +33,8 @@ func main() {
 		config,
 		pgxDb,
 		internal.ExternalServices{
-			TokenVerifier: newStubTokenVerifier(),
+			TokenVerifier:       newStubTokenVerifier(),
+			BankAccountVerifier: bankverifier.NewBankAccountVerifierStub(),
 		},
 	)
 	if err != nil {
@@ -74,7 +76,7 @@ func newDbConn(ctx context.Context, dbConfig *configs.DBConfig) (*pgxpool.Pool, 
 
 func newStubTokenVerifier() commonAuth.TokenVerifier {
 	tokenVerifier := commonAuth.NewStubTokenVerifier()
-	tokenVerifier.Add("token-1", &commonAuth.Session{
+	tokenVerifier.Add("pQL8eP0T4ZZc376pOy9X8GA/mP9Ln8PzVC534Jrb/JY=", &commonAuth.Session{
 		Subject:   "user-123",
 		SessionID: "session-123",
 		Role:      "",

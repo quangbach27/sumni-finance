@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 
 import { Banknote, Landmark, Lock, Sparkles } from 'lucide-react';
 import { Controller } from 'react-hook-form';
@@ -6,21 +6,22 @@ import { Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-import StatusAlert from '@/components/shared/status-alert/status-alert';
+import AmountInput from '@/components/shared/form-field/amount-input';
+import FormField from '@/components/shared/form-field/form-field';
+import TextInput from '@/components/shared/form-field/text-input';
+import StatusAlertOutlet from '@/components/shared/status-alert/status-alert-outlet';
+import { useStatusAlertActions } from '@/components/shared/status-alert/status-alert-provider';
 
 import { isApiError } from '@/lib/clients';
-import { formatAmount, getCurrencySymbol, parseAmount } from '@/lib/currency';
 
-import BankCombobox from './bank-combobox';
 import { formatApiError } from '../api/format-api-error';
+import BankCombobox from './bank-combobox';
 
 import type { CreateFundSourceFormValues } from '../api/create-fund-source';
 import type { FundSourceType } from '../api/types';
@@ -64,12 +65,6 @@ type CreateFundSourceFormProps = {
   onSubmit: (values: CreateFundSourceFormValues) => Promise<void>;
 };
 
-type Status = {
-  type: 'success' | 'error';
-  message: string;
-  details?: string[];
-};
-
 const ERROR_FALLBACK = 'Không thể thêm nguồn quỹ. Vui lòng thử lại.';
 
 export default function CreateFundSourceForm({
@@ -85,68 +80,40 @@ export default function CreateFundSourceForm({
 
   const suggestedName = suggestName(ownerName, type);
 
-  const [status, setStatus] = useState<Status | null>(null);
+  const { showAlert, dismissAlert } = useStatusAlertActions();
 
-  const alertRef = useRef<HTMLDivElement>(null);
-
-  // Editing any field dismisses a stale success / error alert.
+  // Editing any field dismisses a stale alert.
   useEffect(() => {
-    const subscription = form.watch(() => setStatus(null));
+    const subscription = form.watch(() => dismissAlert());
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, dismissAlert]);
 
-  useEffect(() => {
-    if (status) alertRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [status]);
-
+  // On success the parent closes the dialog; on failure the field errors stay
+  // on the form and the alert explains what went wrong.
   const handleSubmit = form.handleSubmit(async (values) => {
-    setStatus(null);
     try {
       await onSubmit(values);
-      // Reset first: it notifies watchers, which would clear the alert.
-      form.reset();
-      setStatus({
-        type: 'success',
-        message: `Đã thêm nguồn quỹ "${values.name}".`,
-      });
     } catch (error) {
       const { message, details } = formatApiError(error, ERROR_FALLBACK);
-      // Set field errors first: they must not be wiped by the watch() reset
-      // of the alert, and setError does not notify watchers.
       if (isApiError(error)) {
         for (const detail of error.details) {
           const field = detail.entity_id && ENTITY_TO_FIELD[detail.entity_id];
           if (field) form.setError(field, { message: detail.message });
         }
       }
-      setStatus({ type: 'error', message, details });
+      showAlert({
+        variant: 'destructive',
+        title: 'Không thể thêm nguồn quỹ',
+        message,
+        details,
+      });
     }
   });
 
   return (
     <form id={id} onSubmit={handleSubmit} noValidate>
       <FieldGroup>
-        {status && (
-          <StatusAlert
-            ref={alertRef}
-            variant={status.type === 'success' ? 'success' : 'destructive'}
-            title={
-              status.type === 'success'
-                ? 'Thêm nguồn quỹ thành công'
-                : 'Không thể thêm nguồn quỹ'
-            }
-            onDismiss={() => setStatus(null)}
-          >
-            {status.message}
-            {status.details && status.details.length > 0 && (
-              <ul className="mt-1 list-disc pl-4">
-                {status.details.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )}
-          </StatusAlert>
-        )}
+        <StatusAlertOutlet />
 
         <Controller
           control={form.control}
@@ -231,143 +198,68 @@ export default function CreateFundSourceForm({
             </p>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Controller
+              <FormField
                 control={form.control}
                 name="owner_name"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="fund-source-owner">
-                      Chủ tài khoản
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      id="fund-source-owner"
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                      className="h-10"
-                    />
-                    <FieldError errors={[fieldState.error]} />
-                  </Field>
-                )}
+                label="Chủ tài khoản"
+                Component={TextInput}
+                autoComplete="off"
               />
-              <Controller
+              <FormField
                 control={form.control}
                 name="account_number"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="fund-source-account">
-                      Số tài khoản
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      id="fund-source-account"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                      className="h-10"
-                    />
-                    <FieldError errors={[fieldState.error]} />
-                  </Field>
-                )}
+                label="Số tài khoản"
+                Component={TextInput}
+                autoComplete="off"
+                inputMode="numeric"
               />
             </div>
           </>
         )}
 
         {type === 'cash' && (
-          <Controller
+          <FormField
             control={form.control}
             name="owner_name"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="fund-source-owner">
-                  Người giữ tiền
-                </FieldLabel>
-                <Input
-                  {...field}
-                  id="fund-source-owner"
-                  autoComplete="off"
-                  aria-invalid={fieldState.invalid}
-                  className="h-10"
-                />
-                <FieldDescription>
-                  Người chịu trách nhiệm giữ khoản tiền mặt này.
-                </FieldDescription>
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
+            label="Người giữ tiền"
+            description="Người chịu trách nhiệm giữ khoản tiền mặt này."
+            Component={TextInput}
+            autoComplete="off"
           />
         )}
 
-        <Controller
+        <FormField
           control={form.control}
           name="balance"
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="fund-source-balance">
-                Số dư ban đầu
-              </FieldLabel>
-              <div className="relative">
-                <Input
-                  id="fund-source-balance"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  aria-invalid={fieldState.invalid}
-                  className="h-10 pr-9 text-right"
-                  value={formatAmount(field.value, 'VND')}
-                  onBlur={field.onBlur}
-                  onChange={(e) =>
-                    field.onChange(parseAmount(e.target.value, 'VND'))
-                  }
-                />
-                <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm underline">
-                  {getCurrencySymbol('VND')}
-                </span>
-              </div>
-              <FieldDescription>
-                Số dư tại thời điểm bắt đầu dùng sổ.
-              </FieldDescription>
-              <FieldError errors={[fieldState.error]} />
-            </Field>
-          )}
+          label="Số dư ban đầu"
+          description="Số dư tại thời điểm bắt đầu dùng sổ."
+          Component={AmountInput}
         />
 
-        <Controller
+        <FormField
           control={form.control}
           name="name"
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="fund-source-name">
-                  Tên nguồn quỹ
-                </FieldLabel>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="text-primary rounded-full"
-                  disabled={!suggestedName}
-                  onClick={() => {
-                    form.setValue('name', suggestedName, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    });
-                  }}
-                >
-                  <Sparkles data-icon="inline-start" />
-                  Tự gợi ý
-                </Button>
-              </div>
-              <Input
-                {...field}
-                id="fund-source-name"
-                autoComplete="off"
-                aria-invalid={fieldState.invalid}
-                className="h-10"
-              />
-              <FieldError errors={[fieldState.error]} />
-            </Field>
-          )}
+          label="Tên nguồn quỹ"
+          Component={TextInput}
+          autoComplete="off"
+          labelAction={
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="text-primary rounded-full"
+              disabled={!suggestedName}
+              onClick={() => {
+                form.setValue('name', suggestedName, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+              }}
+            >
+              <Sparkles data-icon="inline-start" />
+              Tự gợi ý
+            </Button>
+          }
         />
       </FieldGroup>
     </form>

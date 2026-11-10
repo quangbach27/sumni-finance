@@ -22,6 +22,101 @@ sql:
               import: "backend/internal/ledgers/domain"
               type: "FundSourceType"
 
+          - column: "ledgers.ledger_periods.uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerPeriodUUID"
+
+          - column: "ledgers.ledger_periods.report_uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "ReportUUID"
+              pointer: true
+
+          - column: "ledgers.ledger_period_reports.uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "ReportUUID"
+
+          - column: "ledgers.ledger_periods.status"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerStatus"
+
+          - column: "ledgers.fund_source_statements.uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceStatementUUID"
+
+          - column: "ledgers.fund_source_statements.ledger_period_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerPeriodUUID"
+
+          - column: "ledgers.fund_source_statements.fund_source_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceUUID"
+
+          - column: "ledgers.ledger_entries.uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerEntryUUID"
+
+          - column: "ledgers.ledger_entries.ledger_period_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerPeriodUUID"
+
+          - column: "ledgers.ledger_entries.fund_source_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "FundSourceUUID"
+
+          - column: "ledgers.ledger_entries.direction"
+            go_type:
+              import: "backend/internal/shared"
+              type: "Direction"
+
+          - column: "ledgers.ledger_entries.status"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "EntryStatus"
+
+          - column: "ledgers.ledger_entries.kind"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "EntryKind"
+
+          - column: "ledgers.ledger_entries.category_uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "CategoryUUID"
+              pointer: true
+
+          - column: "ledgers.categories.uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "CategoryUUID"
+
+          - column: "ledgers.categories.parent_uuid"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "CategoryUUID"
+              pointer: true
+
+          - column: "ledgers.ledger_entries.reversed_by_entry_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerEntryUUID"
+              pointer: true
+
+          - column: "ledgers.ledger_entries.reverses_entry_uuid"
+            go_type:
+              import: "backend/internal/ledgers/domain"
+              type: "LedgerEntryUUID"
+              pointer: true
+
           # Common type overrides
           - db_type: "timestamptz"
             nullable: true
