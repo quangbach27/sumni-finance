@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	commonAuth "github.com/quangbach27/golang-common/http/auth"
 
 	"backend/internal"
 	"backend/internal/configs"
+	"backend/internal/configs/auth"
 	"backend/internal/ledgers/adapters/bankverifier"
 )
 
@@ -28,12 +28,17 @@ func main() {
 		log.Fatalf("failed to create db conn: %s", err.Error())
 	}
 
+	tokenVerifier, err := auth.NewClerkVerifier(config.Clerk.ClerkSecretKey, config.Clerk.AuthorizedParties)
+	if err != nil {
+		log.Fatalf("failed to create clerk verifier: %s", err.Error())
+	}
+
 	svc, err := internal.New(
 		startCtx,
 		config,
 		pgxDb,
 		internal.ExternalServices{
-			TokenVerifier:       newStubTokenVerifier(),
+			TokenVerifier:       tokenVerifier,
 			BankAccountVerifier: bankverifier.NewBankAccountVerifierStub(),
 		},
 	)
@@ -72,18 +77,4 @@ func newDbConn(ctx context.Context, dbConfig *configs.DBConfig) (*pgxpool.Pool, 
 	}
 
 	return pool, nil
-}
-
-func newStubTokenVerifier() commonAuth.TokenVerifier {
-	tokenVerifier := commonAuth.NewStubTokenVerifier()
-	tokenVerifier.Add("pQL8eP0T4ZZc376pOy9X8GA/mP9Ln8PzVC534Jrb/JY=", &commonAuth.Session{
-		Subject:   "user-123",
-		SessionID: "session-123",
-		Role:      "",
-		Extra: map[string]any{
-			"organization": "clb",
-		},
-	})
-
-	return tokenVerifier
 }
