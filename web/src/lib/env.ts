@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const schema = z.object({
   VITE_API_BASE_URL: z.url().default('http://localhost:4000'),
+  VITE_CLERK_PUBLISHABLE_KEY: z.string().min(1),
 });
 
 const parsed = schema.safeParse(import.meta.env);

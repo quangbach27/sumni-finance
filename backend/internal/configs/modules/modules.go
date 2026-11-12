@@ -24,6 +24,9 @@ type Name string
 
 const (
 	LedgersModuleName Name = "ledgers"
+	// AuthorizationModuleName is also the Postgres schema name. It is not
+	// "authorization" because that is a reserved word in Postgres.
+	AuthorizationModuleName Name = "authz"
 )
 
 type Module interface {

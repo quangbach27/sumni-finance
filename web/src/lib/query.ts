@@ -12,7 +12,10 @@ function handleError(error: unknown) {
 
   if (isApiError(error)) {
     if (error.isUnauthorized) {
-      // e.g. redirect to login or refresh the session
+      // Session expired or revoked: send the user back to sign in
+      if (!window.location.pathname.startsWith('/sign-in')) {
+        window.location.assign('/sign-in');
+      }
       return;
     }
 

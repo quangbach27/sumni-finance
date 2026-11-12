@@ -1,0 +1,59 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries"
+    schema: "migrations"
+    gen:
+      go:
+        package: "dbmodels"
+        out: "dbmodels"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          - column: "authz.access_grants.uuid"
+            go_type:
+              import: "backend/internal/authorization/domain"
+              type: "AccessGrantUUID"
+
+          - column: "authz.access_grants.resource"
+            go_type:
+              import: "backend/internal/shared"
+              type: "Resource"
+
+          - column: "authz.access_grants.actions"
+            go_type:
+              import: "backend/internal/shared"
+              type: "Action"
+              slice: true
+
+          - column: "authz.access_grants.scope"
+            go_type:
+              import: "backend/internal/shared"
+              type: "ResourceScope"
+              pointer: true
+
+          # Common type overrides
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+
+          - db_type: "timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/quangbach27/golang-common"
+              type: "UUID"
+
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/quangbach27/golang-common"
+              type: "UUID"
+              pointer: true
