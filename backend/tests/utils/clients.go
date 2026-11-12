@@ -10,11 +10,13 @@ import (
 	"github.com/quangbach27/golang-common/log"
 	"github.com/stretchr/testify/require"
 
+	authzClients "backend/internal/authorization/ports/http/clients"
 	ledgersClients "backend/internal/ledgers/ports/http/clients"
 )
 
 type TestClients struct {
-	Ledgers *ledgersClients.ClientWithResponses
+	Ledgers       *ledgersClients.ClientWithResponses
+	Authorization *authzClients.ClientWithResponses
 }
 
 func NewTestClients(t *testing.T) *TestClients {
@@ -36,7 +38,11 @@ func NewTestClients(t *testing.T) *TestClients {
 	ledgers, err := ledgersClients.NewClientWithResponses(BaseURL, ledgersClients.WithHTTPClient(httpClient), ledgersClients.WithRequestEditorFn(editorFn))
 	require.NoError(t, err)
 
+	authorization, err := authzClients.NewClientWithResponses(BaseURL, authzClients.WithHTTPClient(httpClient), authzClients.WithRequestEditorFn(editorFn))
+	require.NoError(t, err)
+
 	return &TestClients{
-		Ledgers: ledgers,
+		Ledgers:       ledgers,
+		Authorization: authorization,
 	}
 }

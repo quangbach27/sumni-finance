@@ -12,6 +12,7 @@ import (
 	commonAuth "github.com/quangbach27/golang-common/http/auth"
 	"golang.org/x/sync/errgroup"
 
+	"backend/internal/authorization"
 	"backend/internal/configs"
 	"backend/internal/configs/modules"
 	"backend/internal/configs/modules/contracts"
@@ -39,6 +40,7 @@ func New(
 ) (*Svc, error) {
 	moduleContracts := &contracts.Contracts{}
 	modules := []modules.Module{
+		authorization.NewModule(pgxDB),
 		ledgers.NewModule(pgxDB, externalServices.BankAccountVerifier),
 	}
 

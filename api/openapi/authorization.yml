@@ -1,0 +1,285 @@
+openapi: 3.0.3
+info:
+  title: Authorization API
+  version: 1.0.0
+
+tags:
+  - name: access-grants
+
+paths:
+  /api/v1/access-grants:
+    get:
+      tags: [access-grants]
+      operationId: listAccessGrants
+      summary: List access grants of the caller's organization
+      parameters:
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of access grants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccessGrantsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags: [access-grants]
+      operationId: grantAccess
+      summary: Give a user extra actions on a resource
+      description: >
+        The grant is added on top of the user's role. Without a scope it applies to every
+        instance of the resource; with a scope it only applies within that scope
+        (e.g. ledger entries of one fund source).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantAccessRequest"
+      responses:
+        "201":
+          description: Access granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrantAccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/access-grants/{access_grant_uuid}:
+    parameters:
+      - name: access_grant_uuid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/AccessGrantUUID"
+    put:
+      tags: [access-grants]
+      operationId: updateAccessGrant
+      summary: Replace the actions of an access grant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccessGrantRequest"
+      responses:
+        "204":
+          description: Access grant updated
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags: [access-grants]
+      operationId: revokeAccess
+      summary: Revoke an access grant
+      responses:
+        "204":
+          description: Access revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  schemas:
+    AccessGrantUUID:
+      type: string
+      format: uuid
+      x-go-type: domain.AccessGrantUUID
+      x-go-type-import:
+        path: backend/internal/authorization/domain
+
+    Resource:
+      type: string
+      enum: [ledger_period, ledger_entry, fund_source, access_grant]
+      x-go-type: shared.Resource
+      x-go-type-import:
+        path: backend/internal/shared
+
+    Action:
+      type: string
+      enum: [read, create, update, delete]
+      x-go-type: shared.Action
+      x-go-type-import:
+        path: backend/internal/shared
+
+    ResourceScope:
+      type: string
+      description: One instance of a resource, written resource/id.
+      example: fund_source/123
+      x-go-type: shared.ResourceScope
+      x-go-type-import:
+        path: backend/internal/shared
+
+    GrantAccessRequest:
+      type: object
+      required: [user_id, resource, actions]
+      properties:
+        user_id:
+          type: string
+          description: Identity provider user id of the grantee.
+        resource:
+          $ref: "#/components/schemas/Resource"
+        actions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Action"
+        scope:
+          $ref: "#/components/schemas/ResourceScope"
+
+    GrantAccessResponse:
+      type: object
+      required: [uuid]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/AccessGrantUUID"
+
+    UpdateAccessGrantRequest:
+      type: object
+      required: [actions]
+      properties:
+        actions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Action"
+
+    AccessGrant:
+      type: object
+      required: [uuid, user_id, resource, actions, granted_by, created_at, updated_at]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/AccessGrantUUID"
+        user_id:
+          type: string
+        resource:
+          $ref: "#/components/schemas/Resource"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Action"
+        scope:
+          $ref: "#/components/schemas/ResourceScope"
+        granted_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ListAccessGrantsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccessGrant"
+
+    ErrorDetail:
+      type: object
+      required: [error_slug, message]
+      properties:
+        entity_id:
+          type: string
+        entity_type:
+          type: string
+        error_slug:
+          type: string
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [slug, message]
+      properties:
+        slug:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Request conflicts with the current state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
