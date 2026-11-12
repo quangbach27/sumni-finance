@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 	"strings"
 
@@ -58,9 +57,6 @@ func sessionFromClaims(claims *clerk.SessionClaims) *commonAuth.Session {
 	if claims.ActiveOrganizationID != "" {
 		session.Extra = map[string]any{"organization": claims.ActiveOrganizationID}
 	}
-
-	slog.With("session", session).Info("session log")
-	slog.With("claims", claims).Info("claims log")
 
 	return session
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useOrganization, useOrganizationList } from '@clerk/react';
+import { getToken, useOrganization, useOrganizationList } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
@@ -62,7 +62,11 @@ export default function OrgSwitcher() {
     setIsSwitching(true);
     try {
       await setActive({ organization: organizationId });
-      queryClient.clear();
+      // Warm Clerk's token cache with the new-org token so refetches don't
+      // send a stale token from the previous org.
+      await getToken({ skipCache: true });
+      // resetQueries (unlike clear) makes mounted observers refetch.
+      await queryClient.resetQueries();
       await router.invalidate();
       await navigate({ to: '/ledger-books' });
     } finally {
