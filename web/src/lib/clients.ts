@@ -1,3 +1,4 @@
+import { getToken } from '@clerk/react';
 import axios from 'axios';
 
 import { env } from '@/lib/env';
@@ -77,10 +78,9 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  config.headers.set(
-    'Authorization',
-    `Bearer pQL8eP0T4ZZc376pOy9X8GA/mP9Ln8PzVC534Jrb/JY=`,
-  );
+  // Clerk's standalone getToken waits for Clerk to load, so no React hook is needed.
+  const token = await getToken();
+  if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
 });
 

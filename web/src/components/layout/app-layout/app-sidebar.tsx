@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router';
-import { BookOpenIcon } from 'lucide-react';
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
@@ -11,6 +11,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+
+import NavUser from './nav-user';
+import OrgSwitcher from './org-switcher';
 
 import type { NavItem } from './app-layout';
 
@@ -23,11 +26,8 @@ export default function AppSidebar({ navItems }: Props) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex-row items-center justify-center p-5 text-xl font-bold">
-        <span className="bg-primary text-accent rounded-xl p-2">
-          <BookOpenIcon />
-        </span>
-        <h1>Tài Chính Sumni</h1>
+      <SidebarHeader>
+        <OrgSwitcher />
       </SidebarHeader>
 
       <SidebarContent>
@@ -55,6 +55,10 @@ export default function AppSidebar({ navItems }: Props) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter>
+        <NavUser />
+      </SidebarFooter>
     </Sidebar>
   );
 }

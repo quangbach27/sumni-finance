@@ -1,12 +1,20 @@
 import { TanStackDevtools } from '@tanstack/react-devtools';
-import { Outlet, createRootRoute } from '@tanstack/react-router';
+import { Outlet, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 
 import { Toaster } from '@/components/ui/toast';
 
+import type { useAuth } from '@clerk/react';
+import type { QueryClient } from '@tanstack/react-query';
+
 import '../styles.css';
 
-export const Route = createRootRoute({
+export type RouterContext = {
+  queryClient: QueryClient;
+  auth: ReturnType<typeof useAuth>;
+};
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootComponent,
 });
 

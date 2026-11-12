@@ -15,6 +15,7 @@ import { Route as AppFundSourcesRouteImport } from './routes/_app/fund-sources'
 import { Route as AppLedgerBooksRouteImport } from './routes/_app/ledger-books'
 import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 import { Route as AppLedgerBooksCategoriesRouteImport } from './routes/_app/ledger-books_.categories'
 import { Route as AppLedgerBooksUuidIndexRouteImport } from './routes/_app/ledger-books_.$uuid.index'
 import { Route as AppLedgerBooksUuidEntriesPostRouteImport } from './routes/_app/ledger-books_.$uuid.entries.post'
@@ -48,6 +49,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const SignInSplatRoute = SignInSplatRouteImport.update({
+  id: '/sign-in/$',
+  path: '/sign-in/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppLedgerBooksCategoriesRoute =
   AppLedgerBooksCategoriesRouteImport.update({
     id: '/ledger-books_/categories',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/ledger-books': typeof AppLedgerBooksRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/sign-in/$': typeof SignInSplatRoute
   '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
   '/ledger-books/$uuid/': typeof AppLedgerBooksUuidIndexRoute
   '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/ledger-books': typeof AppLedgerBooksRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/sign-in/$': typeof SignInSplatRoute
   '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
   '/ledger-books/$uuid': typeof AppLedgerBooksUuidIndexRoute
   '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/_app/ledger-books': typeof AppLedgerBooksRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/sign-in/$': typeof SignInSplatRoute
   '/_app/ledger-books_/categories': typeof AppLedgerBooksCategoriesRoute
   '/_app/ledger-books_/$uuid/': typeof AppLedgerBooksUuidIndexRoute
   '/_app/ledger-books_/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/ledger-books'
     | '/reports'
     | '/settings'
+    | '/sign-in/$'
     | '/ledger-books/categories'
     | '/ledger-books/$uuid/'
     | '/ledger-books/$uuid/entries/post'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/ledger-books'
     | '/reports'
     | '/settings'
+    | '/sign-in/$'
     | '/ledger-books/categories'
     | '/ledger-books/$uuid'
     | '/ledger-books/$uuid/entries/post'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/_app/ledger-books'
     | '/_app/reports'
     | '/_app/settings'
+    | '/sign-in/$'
     | '/_app/ledger-books_/categories'
     | '/_app/ledger-books_/$uuid/'
     | '/_app/ledger-books_/$uuid/entries/post'
@@ -135,6 +147,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRouteRoute: typeof AppRouteRouteWithChildren
+  SignInSplatRoute: typeof SignInSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/sign-in/$': {
+      id: '/sign-in/$'
+      path: '/sign-in/$'
+      fullPath: '/sign-in/$'
+      preLoaderRoute: typeof SignInSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/ledger-books_/categories': {
       id: '/_app/ledger-books_/categories'
@@ -232,6 +252,7 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
+  SignInSplatRoute: SignInSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
