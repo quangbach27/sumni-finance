@@ -27,8 +27,9 @@ func NewFundSourceRepository(db *pgxpool.Pool) (*FundSourceRepository, error) {
 	return &FundSourceRepository{db: db}, nil
 }
 
-func (r *FundSourceRepository) CreateFundSource(ctx context.Context, fundSource *domain.FundSource) error {
+func (r *FundSourceRepository) CreateFundSource(ctx context.Context, orgID string, fundSource *domain.FundSource) error {
 	params := dbmodels.CreateFundSourceParams{
+		OrgID:    orgID,
 		Uuid:     fundSource.UUID(),
 		Name:     fundSource.Name(),
 		Type:     fundSource.Type(),

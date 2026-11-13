@@ -35,13 +35,14 @@ func NewLedgerPeriodRepository(db *pgxpool.Pool) (*LedgerPeriodRepo, error) {
 
 func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 	ctx context.Context,
+	orgID string,
 	fundSourceUUIDs []domain.FundSourceUUID,
 	createFn func(fundSources []*domain.FundSource) (*domain.LedgerPeriod, error),
 ) error {
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		unlocked, err := q.ExistsUnlockedLedgerPeriod(ctx)
+		unlocked, err := q.ExistsUnlockedLedgerPeriod(ctx, orgID)
 		if err != nil {
 			return err
 		}
@@ -49,7 +50,7 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 			return common.NewConflictError("unlocked-period-exists", "an unlocked ledger period already exists")
 		}
 
-		fundSources, err := listFundSourcesByUUIDs(ctx, q, fundSourceUUIDs)
+		fundSources, err := listFundSourcesByUUIDs(ctx, q, orgID, fundSourceUUIDs)
 		if err != nil {
 			return err
 		}
@@ -62,7 +63,7 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 			return errors.New("createFn returned a nil ledger period")
 		}
 
-		if err := saveLedgerPeriod(ctx, q, period); err != nil {
+		if err := saveLedgerPeriod(ctx, q, orgID, period); err != nil {
 			return err
 		}
 
@@ -82,6 +83,7 @@ func (r *LedgerPeriodRepo) OpenLedgerPeriod(
 
 func (r *LedgerPeriodRepo) PostJournalEntries(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 	fundSourceUUIDs []domain.FundSourceUUID,
 	postFn func(period *domain.LedgerPeriod, fundSources map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error),
@@ -92,12 +94,12 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, ledgerPeriodUUID)
 		if err != nil {
 			return err
 		}
 
-		fundSources, err := listFundSourcesInPeriod(ctx, q, ledgerPeriodUUID, fundSourceUUIDs)
+		fundSources, err := listFundSourcesInPeriod(ctx, q, orgID, ledgerPeriodUUID, fundSourceUUIDs)
 		if err != nil {
 			return err
 		}
@@ -107,7 +109,7 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 			return err
 		}
 
-		if err := validateEntryCategories(ctx, q, entries); err != nil {
+		if err := validateEntryCategories(ctx, q, orgID, entries); err != nil {
 			return err
 		}
 
@@ -115,7 +117,7 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 			return err
 		}
 
-		return updateFundSourceBalances(ctx, q, fundSources)
+		return updateFundSourceBalances(ctx, q, orgID, fundSources)
 	})
 	if err != nil {
 		var cerr common.Error
@@ -132,9 +134,10 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 func getLedgerPeriodByUUID(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) (*domain.LedgerPeriod, error) {
-	row, err := q.GetLedgerPeriodByUUID(ctx, ledgerPeriodUUID)
+	row, err := q.GetLedgerPeriodByUUID(ctx, dbmodels.GetLedgerPeriodByUUIDParams{OrgID: orgID, Uuid: ledgerPeriodUUID})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
@@ -151,6 +154,7 @@ func getLedgerPeriodByUUID(
 func listFundSourcesByUUIDs(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	fundSourceUUIDs []domain.FundSourceUUID,
 ) ([]*domain.FundSource, error) {
 	if err := validateFundSourceUUIDs(fundSourceUUIDs); err != nil {
@@ -159,7 +163,7 @@ func listFundSourcesByUUIDs(
 
 	uuids := toCommonUUIDs(fundSourceUUIDs)
 
-	rows, err := q.ListFundSourcesByUUIDs(ctx, uuids)
+	rows, err := q.ListFundSourcesByUUIDs(ctx, dbmodels.ListFundSourcesByUUIDsParams{OrgID: orgID, Uuids: uuids})
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +193,11 @@ func toCommonUUIDs(ids []domain.FundSourceUUID) []common.UUID {
 	return uuids
 }
 
-func saveLedgerPeriod(ctx context.Context, q *dbmodels.Queries, period *domain.LedgerPeriod) error {
-	return q.CreateLedgerPeriod(ctx, ledgerPeriodToCreateParams(period))
+func saveLedgerPeriod(ctx context.Context, q *dbmodels.Queries, orgID string, period *domain.LedgerPeriod) error {
+	params := ledgerPeriodToCreateParams(period)
+	params.OrgID = orgID
+
+	return q.CreateLedgerPeriod(ctx, params)
 }
 
 // saveFundSourceStatements inserts one statement per fund source, opening at
@@ -222,6 +229,7 @@ func saveFundSourceStatements(
 func listFundSourcesInPeriod(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 	fundSourceUUIDs []domain.FundSourceUUID,
 ) (map[domain.FundSourceUUID]*domain.FundSource, error) {
@@ -232,6 +240,7 @@ func listFundSourcesInPeriod(
 	uuids := toCommonUUIDs(fundSourceUUIDs)
 
 	rows, err := q.ListFundSourcesByUUIDsInPeriod(ctx, dbmodels.ListFundSourcesByUUIDsInPeriodParams{
+		OrgID:            orgID,
 		LedgerPeriodUuid: ledgerPeriodUUID,
 		Uuids:            uuids,
 	})
@@ -260,6 +269,7 @@ func listFundSourcesInPeriod(
 func validateEntryCategories(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	entries []*domain.LedgerEntry,
 ) error {
 	var uuids []common.UUID
@@ -272,7 +282,7 @@ func validateEntryCategories(
 		return nil
 	}
 
-	found, err := q.ListExistingCategoryUUIDs(ctx, uuids)
+	found, err := q.ListExistingCategoryUUIDs(ctx, dbmodels.ListExistingCategoryUUIDsParams{OrgID: orgID, Uuids: uuids})
 	if err != nil {
 		return err
 	}
@@ -330,11 +340,12 @@ func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, entries []*dom
 func updateFundSourceBalances(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	fundSources map[domain.FundSourceUUID]*domain.FundSource,
 ) error {
 	balances := make([]dbmodels.UpdateFundSourceBalanceParams, 0, len(fundSources))
 	for _, fs := range fundSources {
-		balances = append(balances, dbmodels.UpdateFundSourceBalanceParams{Balance: fs.Balance(), Uuid: fs.UUID()})
+		balances = append(balances, dbmodels.UpdateFundSourceBalanceParams{OrgID: orgID, Balance: fs.Balance(), Uuid: fs.UUID()})
 	}
 
 	var batchErr error
@@ -350,6 +361,7 @@ func updateFundSourceBalances(
 func closeFundSourceStatements(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) error {
 	rows, err := q.ListFundSourceStatementsByPeriod(ctx, ledgerPeriodUUID)
@@ -364,7 +376,7 @@ func closeFundSourceStatements(
 		fundSourceUUIDs = append(fundSourceUUIDs, row.FundSourceUuid)
 	}
 
-	fundSources, err := listFundSourcesInPeriod(ctx, q, ledgerPeriodUUID, fundSourceUUIDs)
+	fundSources, err := listFundSourcesInPeriod(ctx, q, orgID, ledgerPeriodUUID, fundSourceUUIDs)
 	if err != nil {
 		return err
 	}
@@ -429,6 +441,7 @@ func validateFundSourceUUIDs(uuids []domain.FundSourceUUID) error {
 // source balance.
 func (r *LedgerPeriodRepo) VoidJournalEntry(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 	ledgerEntryUUID domain.LedgerEntryUUID,
 	voidFn func(period *domain.LedgerPeriod, entry *domain.LedgerEntry, fundSource *domain.FundSource) (*domain.LedgerEntry, error),
@@ -438,6 +451,7 @@ func (r *LedgerPeriodRepo) VoidJournalEntry(
 
 func (r *LedgerPeriodRepo) CloseLedgerPeriod(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) error {
 	if ledgerPeriodUUID.IsZero() {
@@ -447,7 +461,7 @@ func (r *LedgerPeriodRepo) CloseLedgerPeriod(
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, ledgerPeriodUUID)
 		if err != nil {
 			return err
 		}
@@ -456,11 +470,12 @@ func (r *LedgerPeriodRepo) CloseLedgerPeriod(
 			return err
 		}
 
-		if err := closeFundSourceStatements(ctx, q, ledgerPeriodUUID); err != nil {
+		if err := closeFundSourceStatements(ctx, q, orgID, ledgerPeriodUUID); err != nil {
 			return err
 		}
 
 		return q.UpdateLedgerPeriod(ctx, dbmodels.UpdateLedgerPeriodParams{
+			OrgID:  orgID,
 			Status: period.Status(),
 			Uuid:   period.UUID(),
 		})
@@ -479,6 +494,7 @@ func (r *LedgerPeriodRepo) CloseLedgerPeriod(
 
 func (r *LedgerPeriodRepo) ReconcileFundSourceStatements(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 	reconciledBy string,
 	balances []domain.StatementActualBalance,
@@ -498,7 +514,7 @@ func (r *LedgerPeriodRepo) ReconcileFundSourceStatements(
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, ledgerPeriodUUID)
 		if err != nil {
 			return err
 		}
@@ -621,6 +637,7 @@ func validateStatementUUIDs(uuids []domain.FundSourceStatementUUID) error {
 // its statements. It fails with a conflict when any statement is reconciled.
 func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 	reason string,
 ) error {
@@ -631,7 +648,7 @@ func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, ledgerPeriodUUID)
 		if err != nil {
 			return err
 		}
@@ -659,6 +676,7 @@ func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 		}
 
 		return q.UpdateLedgerPeriod(ctx, dbmodels.UpdateLedgerPeriodParams{
+			OrgID:        orgID,
 			Status:       period.Status(),
 			ReopenReason: period.ReopenReason(),
 			ReopenedAt:   period.ReopenedAt(),
@@ -682,6 +700,7 @@ func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 // TODO: the report is an empty placeholder row until real generation is implemented.
 func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) (models.ReportUUID, error) {
 	if ledgerPeriodUUID.IsZero() {
@@ -693,7 +712,7 @@ func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		existing, err := q.GetLedgerPeriodReportUUID(ctx, ledgerPeriodUUID)
+		existing, err := q.GetLedgerPeriodReportUUID(ctx, dbmodels.GetLedgerPeriodReportUUIDParams{OrgID: orgID, Uuid: ledgerPeriodUUID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
@@ -715,6 +734,7 @@ func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
 		}
 
 		return q.UpdateLedgerPeriodReportUUID(ctx, dbmodels.UpdateLedgerPeriodReportUUIDParams{
+			OrgID:      orgID,
 			ReportUuid: &reportUUID,
 			Uuid:       ledgerPeriodUUID,
 		})
@@ -733,6 +753,7 @@ func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
 
 func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) error {
 	if ledgerPeriodUUID.IsZero() {
@@ -742,7 +763,7 @@ func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		period, err := getLedgerPeriodByUUID(ctx, q, ledgerPeriodUUID)
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, ledgerPeriodUUID)
 		if err != nil {
 			return err
 		}
@@ -786,6 +807,7 @@ func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(
 		}
 
 		return q.UpdateLedgerPeriod(ctx, dbmodels.UpdateLedgerPeriodParams{
+			OrgID:          orgID,
 			Status:         period.Status(),
 			ClosingBalance: period.ClosingBalance(),
 			ReconciledAt:   period.ReconciledAt(),

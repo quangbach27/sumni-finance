@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"backend/internal/ledgers/domain"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 )
@@ -22,7 +23,8 @@ var (
 const updateFundSourceBalance = `-- name: UpdateFundSourceBalance :batchexec
 UPDATE ledgers.fund_sources
 SET balance = $1
-WHERE uuid = $2
+WHERE org_id = $2
+  AND uuid = $3
 `
 
 type UpdateFundSourceBalanceBatchResults struct {
@@ -33,6 +35,7 @@ type UpdateFundSourceBalanceBatchResults struct {
 
 type UpdateFundSourceBalanceParams struct {
 	Balance decimal.Decimal
+	OrgID   string
 	Uuid    domain.FundSourceUUID
 }
 
@@ -41,6 +44,7 @@ func (q *Queries) UpdateFundSourceBalance(ctx context.Context, arg []UpdateFundS
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Balance,
+			a.OrgID,
 			a.Uuid,
 		}
 		batch.Queue(updateFundSourceBalance, vals...)

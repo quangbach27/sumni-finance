@@ -28,6 +28,9 @@ type Module struct {
 
 	// External Service
 	bankAccountVerifier domain.BankAccountVerifier
+
+	// contracts of the modules initialized before ledgers (authorization).
+	contracts *contracts.Contracts
 }
 
 var _ modules.Module = (*Module)(nil)
@@ -35,6 +38,7 @@ var _ modules.Module = (*Module)(nil)
 func NewModule(
 	pgxDb *pgxpool.Pool,
 	bankAccountVerifier domain.BankAccountVerifier,
+	moduleContracts *contracts.Contracts,
 ) *Module {
 	var errs []error
 	if pgxDb == nil {
@@ -45,6 +49,10 @@ func NewModule(
 		errs = append(errs, errors.New("bankAccountVerifier can't be nil"))
 	}
 
+	if moduleContracts == nil {
+		errs = append(errs, errors.New("moduleContracts can't be nil"))
+	}
+
 	if len(errs) > 0 {
 		log.Fatalf("failed to create ledgers modules: %s", errors.Join(errs...))
 	}
@@ -52,6 +60,7 @@ func NewModule(
 	return &Module{
 		pgxDb:               pgxDb,
 		bankAccountVerifier: bankAccountVerifier,
+		contracts:           moduleContracts,
 	}
 }
 
@@ -62,6 +71,10 @@ func (m *Module) Name() modules.Name {
 func (m *Module) Init(ctx context.Context) error {
 	if err := m.runMigration(ctx); err != nil {
 		return err
+	}
+
+	if m.contracts.Authorization == nil {
+		return errors.New("authorization contract must be registered before ledgers is initialized")
 	}
 
 	fsRepo, err := db.NewFundSourceRepository(m.pgxDb)
@@ -84,7 +97,7 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	commandHandlers, err := commands.NewHandlers(fsRepo, periodRepo, periodRepo, categoryRepo, fsFactory)
+	commandHandlers, err := commands.NewHandlers(m.contracts, fsRepo, periodRepo, periodRepo, categoryRepo, fsFactory)
 	if err != nil {
 		return err
 	}
@@ -109,7 +122,7 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	queryHandlers, err := queries.NewHandlers(fsReadModel, periodReadModel, statementReadModel, categoryReadModel)
+	queryHandlers, err := queries.NewHandlers(m.contracts, fsReadModel, periodReadModel, statementReadModel, categoryReadModel)
 	if err != nil {
 		return err
 	}

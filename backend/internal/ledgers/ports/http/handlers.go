@@ -53,10 +53,27 @@ func Register(router EchoRouter, handlers *Handlers) {
 	)
 }
 
+// sessionFromRequest returns the authenticated session of the request. The
+// commands and queries authorize it and derive the org id from it.
+func sessionFromRequest(ctx context.Context) (*auth.Session, error) {
+	session, ok := auth.SessionFromContext(ctx)
+	if !ok || session == nil {
+		return nil, common.NewUnauthorizedError("session-required", "an authenticated session is required")
+	}
+
+	return session, nil
+}
+
 func (h *Handlers) CreateFundSource(ctx context.Context, request CreateFundSourceRequestObject) (CreateFundSourceResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	body := request.Body
 
 	cmd := commands.CreateFundSource{
+		Session:      session,
 		Name:         body.Name,
 		Type:         body.Type,
 		StartBalance: body.StartBalance,
@@ -83,9 +100,15 @@ func (h *Handlers) CreateFundSource(ctx context.Context, request CreateFundSourc
 }
 
 func (h *Handlers) OpenLedgerPeriod(ctx context.Context, request OpenLedgerPeriodRequestObject) (OpenLedgerPeriodResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	body := request.Body
 
 	periodUUID, err := h.commandHandlers.OpenLedgerPeriod(ctx, commands.OpenLedgerPeriod{
+		Session:         session,
 		Name:            body.Name,
 		OpenDate:        body.OpenDate,
 		CloseDate:       body.CloseDate,
@@ -99,6 +122,11 @@ func (h *Handlers) OpenLedgerPeriod(ctx context.Context, request OpenLedgerPerio
 }
 
 func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntriesRequestObject) (PostLedgerEntriesResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	body := request.Body
 
 	entries := make([]commands.LedgerEntryInput, 0, len(body.Entries))
@@ -113,6 +141,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntr
 	}
 
 	entryUUIDs, err := h.commandHandlers.PostLedgerEntries(ctx, commands.PostLedgerEntries{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
 		FundSourceUUID:   body.FundSourceUuid,
 		Entries:          entries,
@@ -125,7 +154,13 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, request PostLedgerEntr
 }
 
 func (h *Handlers) CloseLedgerPeriod(ctx context.Context, request CloseLedgerPeriodRequestObject) (CloseLedgerPeriodResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := h.commandHandlers.CloseLedgerPeriod(ctx, commands.CloseLedgerPeriod{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
 	}); err != nil {
 		return nil, err
@@ -135,7 +170,13 @@ func (h *Handlers) CloseLedgerPeriod(ctx context.Context, request CloseLedgerPer
 }
 
 func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, request ReopenLedgerPeriodRequestObject) (ReopenLedgerPeriodResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := h.commandHandlers.ReopenLedgerPeriod(ctx, commands.ReopenLedgerPeriod{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
 		Reason:           request.Body.Reason,
 	}); err != nil {
@@ -146,7 +187,13 @@ func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, request ReopenLedgerP
 }
 
 func (h *Handlers) GenerateLedgerPeriodReport(ctx context.Context, request GenerateLedgerPeriodReportRequestObject) (GenerateLedgerPeriodReportResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	reportUUID, err := h.commandHandlers.GenerateLedgerPeriodReport(ctx, commands.GenerateLedgerPeriodReport{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
 	})
 	if err != nil {
@@ -157,7 +204,13 @@ func (h *Handlers) GenerateLedgerPeriodReport(ctx context.Context, request Gener
 }
 
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, request ReconcileLedgerPeriodRequestObject) (ReconcileLedgerPeriodResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := h.commandHandlers.ReconcileLedgerPeriod(ctx, commands.ReconcileLedgerPeriod{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
 	}); err != nil {
 		return nil, err
@@ -167,9 +220,9 @@ func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, request ReconcileL
 }
 
 func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, request ReconcileFundSourceStatementsRequestObject) (ReconcileFundSourceStatementsResponseObject, error) {
-	session, ok := auth.SessionFromContext(ctx)
-	if !ok || session == nil {
-		return nil, common.NewUnauthorizedError("session-required", "an authenticated session is required")
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	statements := make([]domain.StatementActualBalance, 0, len(request.Body.Statements))
@@ -181,8 +234,8 @@ func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, request Re
 	}
 
 	if err := h.commandHandlers.ReconcileFundSourceStatements(ctx, commands.ReconcileFundSourceStatements{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
-		ReconciledBy:     session.Subject,
 		Statements:       statements,
 	}); err != nil {
 		return nil, err
@@ -192,7 +245,13 @@ func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, request Re
 }
 
 func (h *Handlers) ListFundSourceStatements(ctx context.Context, request ListFundSourceStatementsRequestObject) (ListFundSourceStatementsResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	statements, err := h.queryHandlers.ListFundSourceStatements(ctx, queries.ListFundSourceStatements{
+		Session:          session,
 		LedgerPeriodUUID: request.LedgerPeriodUuid,
 	})
 	if err != nil {
@@ -216,6 +275,11 @@ func (h *Handlers) ListFundSourceStatements(ctx context.Context, request ListFun
 }
 
 func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	params := request.Params
 
 	// Missing params become zero values, which NewPageRequest turns into the defaults.
@@ -225,8 +289,9 @@ func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeri
 	}
 
 	result, err := h.queryHandlers.ListLedgerPeriods(ctx, queries.ListLedgerPeriods{
-		Page:   page,
-		Status: params.Status,
+		Session: session,
+		Page:    page,
+		Status:  params.Status,
 	})
 	if err != nil {
 		return nil, err
@@ -248,7 +313,12 @@ func (h *Handlers) ListLedgerPeriods(ctx context.Context, request ListLedgerPeri
 }
 
 func (h *Handlers) GetLedgerPeriod(ctx context.Context, request GetLedgerPeriodRequestObject) (GetLedgerPeriodResponseObject, error) {
-	period, err := h.queryHandlers.GetLedgerPeriod(ctx, queries.GetLedgerPeriod{LedgerPeriodUUID: request.LedgerPeriodUuid})
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	period, err := h.queryHandlers.GetLedgerPeriod(ctx, queries.GetLedgerPeriod{Session: session, LedgerPeriodUUID: request.LedgerPeriodUuid})
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +327,12 @@ func (h *Handlers) GetLedgerPeriod(ctx context.Context, request GetLedgerPeriodR
 }
 
 func (h *Handlers) GetUnlockedLedgerPeriod(ctx context.Context, _ GetUnlockedLedgerPeriodRequestObject) (GetUnlockedLedgerPeriodResponseObject, error) {
-	period, err := h.queryHandlers.GetUnlockedLedgerPeriod(ctx, queries.GetUnlockedLedgerPeriod{})
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	period, err := h.queryHandlers.GetUnlockedLedgerPeriod(ctx, queries.GetUnlockedLedgerPeriod{Session: session})
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +415,12 @@ func toAPIReportUUID(id *string) *models.ReportUUID {
 }
 
 func (h *Handlers) ListFundSources(ctx context.Context, _ ListFundSourcesRequestObject) (ListFundSourcesResponseObject, error) {
-	fundSources, err := h.queryHandlers.ListFundSources(ctx, queries.ListFundSources{})
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fundSources, err := h.queryHandlers.ListFundSources(ctx, queries.ListFundSources{Session: session})
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +453,12 @@ func toAPIFundSource(fs queries.FundSource) FundSource {
 }
 
 func (h *Handlers) ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error) {
-	categories, err := h.queryHandlers.ListCategories(ctx, queries.ListCategories{})
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	categories, err := h.queryHandlers.ListCategories(ctx, queries.ListCategories{Session: session})
 	if err != nil {
 		return nil, err
 	}
@@ -401,6 +486,11 @@ func (h *Handlers) ListCategories(ctx context.Context, request ListCategoriesReq
 }
 
 func (h *Handlers) UpsertCategories(ctx context.Context, request UpsertCategoriesRequestObject) (UpsertCategoriesResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if request.Body == nil {
 		return nil, common.NewInvalidInputError("body-required", "request body is required")
 	}
@@ -423,6 +513,7 @@ func (h *Handlers) UpsertCategories(ctx context.Context, request UpsertCategorie
 	}
 
 	uuids, err := h.commandHandlers.UpsertCategory(ctx, commands.UpsertCategory{
+		Session:    session,
 		Categories: inputs,
 	})
 	if err != nil {

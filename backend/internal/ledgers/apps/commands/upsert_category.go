@@ -6,9 +6,12 @@ import (
 	"strconv"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/http/auth"
 	"github.com/quangbach27/golang-common/log"
 
+	"backend/internal/authorization/ports/module/client"
 	"backend/internal/ledgers/apps/models"
+	"backend/internal/shared"
 )
 
 // CategoryRepository saves categories, which are shared by all ledger periods.
@@ -16,7 +19,7 @@ type CategoryRepository interface {
 	// UpsertCategories saves the categories with their sub-categories in one
 	// transaction: an existing UUID updates the name and description, a new
 	// one inserts.
-	UpsertCategories(ctx context.Context, categories []models.Category) error
+	UpsertCategories(ctx context.Context, orgID string, categories []models.Category) error
 }
 
 type SubCategoryInput struct {
@@ -35,6 +38,7 @@ type CategoryInput struct {
 }
 
 type UpsertCategory struct {
+	Session    *auth.Session
 	Categories []CategoryInput
 }
 
@@ -44,6 +48,15 @@ type UpsertCategory struct {
 // not sent are left as they are. It returns the saved category UUIDs in the
 // order of cmd.Categories.
 func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]models.CategoryUUID, error) {
+	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+		Session:  cmd.Session,
+		Resource: shared.ResourceLedgerCategory,
+		Action:   shared.ActionCreate,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	if len(cmd.Categories) == 0 {
 		return nil, common.NewInvalidInputError("categories-required", "at least one category is required")
 	}
@@ -53,7 +66,7 @@ func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]mo
 		return nil, err
 	}
 
-	if err := h.categoryRepo.UpsertCategories(ctx, categories); err != nil {
+	if err := h.categoryRepo.UpsertCategories(ctx, res.OrgID, categories); err != nil {
 		return nil, err
 	}
 

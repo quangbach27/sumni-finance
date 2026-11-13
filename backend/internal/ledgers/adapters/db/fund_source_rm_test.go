@@ -36,15 +36,15 @@ func TestFundSourceReadModel_ListFundSources(t *testing.T) {
 	require.NoError(t, err)
 	bankFs, err := factory.CreateFundSource("An - VCB (list)", decimal.NewFromInt(15_000_000), vnd, bankDetails)
 	require.NoError(t, err)
-	require.NoError(t, repo.CreateFundSource(ctx, bankFs))
+	require.NoError(t, repo.CreateFundSource(ctx, testOrgID, bankFs))
 
 	cashDetails, err := factory.CreateCashDetails("Binh")
 	require.NoError(t, err)
 	cashFs, err := factory.CreateFundSource("Binh - Cash (list)", decimal.Zero, vnd, cashDetails)
 	require.NoError(t, err)
-	require.NoError(t, repo.CreateFundSource(ctx, cashFs))
+	require.NoError(t, repo.CreateFundSource(ctx, testOrgID, cashFs))
 
-	got, err := readModel.ListFundSources(ctx)
+	got, err := readModel.ListFundSources(ctx, testOrgID)
 	require.NoError(t, err)
 
 	byUUID := make(map[string]queries.FundSource, len(got))

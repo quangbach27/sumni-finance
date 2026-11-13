@@ -19,9 +19,22 @@ import (
 	"backend/tests/utils"
 )
 
-// newUserToken registers a session for a fresh user and returns its bearer token.
+// newUserToken registers a session for a fresh user in a fresh org and returns its bearer
+// token. Ledgers data is scoped by org, so each test that uses it starts from an empty org.
 func newUserToken() string {
-	return utils.NewSession("user-" + common.NewUUIDv7().String())
+	return newOrgUserToken("org-" + common.NewUUIDv7().String())
+}
+
+// newOrgUserToken registers an office-admin session for a fresh user in the given org and
+// returns its bearer token.
+func newOrgUserToken(orgID string) string {
+	return newOrgRoleToken(orgID, shared.RoleOfficeAdmin)
+}
+
+// newOrgRoleToken registers a session with the given role for a fresh user in the given org
+// and returns its bearer token.
+func newOrgRoleToken(orgID string, role shared.Role) string {
+	return utils.NewOrgSession("user-"+common.NewUUIDv7().String(), orgID, role.String())
 }
 
 // createFundSource creates a valid fund source of the given type (bank or cash) as the user

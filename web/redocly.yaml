@@ -3,3 +3,7 @@ apis:
     root: ../api/openapi/ledgers.yml
     x-openapi-ts:
       output: ./src/features/generated/ledgers.gen.ts
+  authorization:
+    root: ../api/openapi/authorization.yml
+    x-openapi-ts:
+      output: ./src/features/generated/authorization.gen.ts

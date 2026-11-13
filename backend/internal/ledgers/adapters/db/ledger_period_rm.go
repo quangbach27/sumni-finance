@@ -31,6 +31,7 @@ func NewLedgerPeriodReadModel(db *pgxpool.Pool) (*LedgerPeriodReadModel, error) 
 
 func (r *LedgerPeriodReadModel) ListLedgerPeriods(
 	ctx context.Context,
+	orgID string,
 	query queries.ListLedgerPeriods,
 ) (shared.PagedResult[queries.LedgerPeriod], error) {
 	var status *string
@@ -41,12 +42,13 @@ func (r *LedgerPeriodReadModel) ListLedgerPeriods(
 
 	q := dbmodels.New(r.db)
 
-	total, err := q.CountLedgerPeriods(ctx, status)
+	total, err := q.CountLedgerPeriods(ctx, dbmodels.CountLedgerPeriodsParams{OrgID: orgID, Status: status})
 	if err != nil {
 		return shared.PagedResult[queries.LedgerPeriod]{}, fmt.Errorf("count ledger periods: %w", err)
 	}
 
 	rows, err := q.ListLedgerPeriods(ctx, dbmodels.ListLedgerPeriodsParams{
+		OrgID:      orgID,
 		Status:     status,
 		PageLimit:  int32(query.Page.Limit()),
 		PageOffset: int32(query.Page.Offset()),
@@ -75,8 +77,8 @@ func (r *LedgerPeriodReadModel) ListLedgerPeriods(
 	return shared.NewPagedResult(items, query.Page, int(total)), nil
 }
 
-func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (queries.LedgerPeriodDetail, error) {
-	periodUUID, err := dbmodels.New(r.db).GetUnlockedLedgerPeriodUUID(ctx)
+func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context, orgID string) (queries.LedgerPeriodDetail, error) {
+	periodUUID, err := dbmodels.New(r.db).GetUnlockedLedgerPeriodUUID(ctx, orgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return queries.LedgerPeriodDetail{}, common.NewNotFoundError("open-ledger-not-found", "no unlocked ledger period was found")
@@ -85,11 +87,11 @@ func (r *LedgerPeriodReadModel) GetUnlockedLedgerPeriod(ctx context.Context) (qu
 		return queries.LedgerPeriodDetail{}, fmt.Errorf("get unlocked ledger period: %w", err)
 	}
 
-	return r.GetLedgerPeriod(ctx, periodUUID)
+	return r.GetLedgerPeriod(ctx, orgID, periodUUID)
 }
 
-func (r *LedgerPeriodReadModel) GetLedgerPeriod(ctx context.Context, ledgerPeriodUUID domain.LedgerPeriodUUID) (queries.LedgerPeriodDetail, error) {
-	rows, err := dbmodels.New(r.db).GetLedgerPeriodWithStatements(ctx, ledgerPeriodUUID)
+func (r *LedgerPeriodReadModel) GetLedgerPeriod(ctx context.Context, orgID string, ledgerPeriodUUID domain.LedgerPeriodUUID) (queries.LedgerPeriodDetail, error) {
+	rows, err := dbmodels.New(r.db).GetLedgerPeriodWithStatements(ctx, dbmodels.GetLedgerPeriodWithStatementsParams{OrgID: orgID, LedgerPeriodUuid: ledgerPeriodUUID})
 	if err != nil {
 		return queries.LedgerPeriodDetail{}, fmt.Errorf("get ledger period: %w", err)
 	}

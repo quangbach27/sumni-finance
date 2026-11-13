@@ -7,9 +7,11 @@ import (
 	"time"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/http/auth"
 	"github.com/quangbach27/golang-common/log"
 	"github.com/shopspring/decimal"
 
+	"backend/internal/authorization/ports/module/client"
 	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
@@ -24,6 +26,7 @@ type LedgerEntryInput struct {
 }
 
 type PostLedgerEntries struct {
+	Session          *auth.Session
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 	FundSourceUUID   domain.FundSourceUUID
 	Entries          []LedgerEntryInput
@@ -43,6 +46,22 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 		return nil, common.NewInvalidInputError("fund-source-required", "fund source is required")
 	}
 
+	// Scoped to the fund source so an accountant granted this fund source can post.
+	scope, err := shared.NewResourceScope(shared.ResourceFundSource, cmd.FundSourceUUID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+		Session:  cmd.Session,
+		Resource: shared.ResourceLedgerEntry,
+		Action:   shared.ActionCreate,
+		Scope:    &scope,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// Validate the whole batch before touching the database.
 	if _, err := buildLedgerEntries(cmd); err != nil {
 		return nil, err
@@ -50,8 +69,9 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 
 	var entryUUIDs []domain.LedgerEntryUUID
 
-	err := h.periodRepo.PostJournalEntries(
+	err = h.periodRepo.PostJournalEntries(
 		ctx,
+		res.OrgID,
 		cmd.LedgerPeriodUUID,
 		[]domain.FundSourceUUID{cmd.FundSourceUUID},
 		func(period *domain.LedgerPeriod, fundSources map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {

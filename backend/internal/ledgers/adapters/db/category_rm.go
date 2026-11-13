@@ -27,8 +27,8 @@ func NewCategoryReadModel(db *pgxpool.Pool) (*CategoryReadModel, error) {
 }
 
 // ListCategories returns all categories, each with its sub-categories.
-func (r *CategoryReadModel) ListCategories(ctx context.Context) ([]queries.Category, error) {
-	rows, err := dbmodels.New(r.db).ListCategories(ctx)
+func (r *CategoryReadModel) ListCategories(ctx context.Context, orgID string) ([]queries.Category, error) {
+	rows, err := dbmodels.New(r.db).ListCategories(ctx, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list categories: %w", err)
 	}
