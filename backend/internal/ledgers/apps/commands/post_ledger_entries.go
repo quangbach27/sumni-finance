@@ -38,21 +38,28 @@ type PostLedgerEntries struct {
 // before and after. All entries are posted or none is.
 // It returns the new entry UUIDs in the order of cmd.Entries.
 func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries) ([]domain.LedgerEntryUUID, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
-		Session:  cmd.Session,
-		Resource: shared.ResourceLedgerEntry,
-		Action:   shared.ActionCreate,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	if len(cmd.Entries) == 0 {
 		return nil, common.NewInvalidInputError("entries-required", "at least one ledger entry is required")
 	}
 
 	if cmd.FundSourceUUID == (domain.FundSourceUUID{}) {
 		return nil, common.NewInvalidInputError("fund-source-required", "fund source is required")
+	}
+
+	// Scoped to the fund source so an accountant granted this fund source can post.
+	scope, err := shared.NewResourceScope(shared.ResourceFundSource, cmd.FundSourceUUID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+		Session:  cmd.Session,
+		Resource: shared.ResourceLedgerEntry,
+		Action:   shared.ActionCreate,
+		Scope:    &scope,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate the whole batch before touching the database.

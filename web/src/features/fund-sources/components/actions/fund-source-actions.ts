@@ -1,10 +1,13 @@
 import { lazy } from 'react';
 
-import { Copy, List, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { List, Pencil, QrCode, Trash2, Users } from 'lucide-react';
 
 import type { FundSourceAction, FundSourceActionGroup } from './types';
 
 const loadVietQrDialog = () => import('./vietqr/vietqr-action-dialog');
+
+const loadAccountantsDialog = () =>
+  import('./accountants/accountants-action-dialog');
 
 const isBank: FundSourceAction['isVisible'] = (item) => item.type === 'bank';
 
@@ -13,13 +16,6 @@ const isBank: FundSourceAction['isVisible'] = (item) => item.type === 'bank';
 export const FUND_SOURCE_ACTION_GROUPS: FundSourceActionGroup[] = [
   [
     { id: 'edit', label: 'Sửa', icon: Pencil, getDisabledReason: () => true },
-    {
-      id: 'copy-account',
-      label: 'Sao chép số tài khoản',
-      icon: Copy,
-      isVisible: isBank,
-      getDisabledReason: () => true,
-    },
     {
       id: 'vietqr',
       label: 'Tạo mã VietQR',
@@ -32,6 +28,12 @@ export const FUND_SOURCE_ACTION_GROUPS: FundSourceActionGroup[] = [
       label: 'Xem bút toán',
       icon: List,
       getDisabledReason: () => true,
+    },
+    {
+      id: 'accountants',
+      label: 'Phân quyền kế toán',
+      icon: Users,
+      Dialog: lazy(loadAccountantsDialog),
     },
   ],
   [
