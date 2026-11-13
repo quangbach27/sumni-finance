@@ -25,9 +25,16 @@ func newUserToken() string {
 	return newOrgUserToken("org-" + common.NewUUIDv7().String())
 }
 
-// newOrgUserToken registers a session for a fresh user in the given org and returns its bearer token.
+// newOrgUserToken registers an office-admin session for a fresh user in the given org and
+// returns its bearer token.
 func newOrgUserToken(orgID string) string {
-	return utils.NewOrgSession("user-"+common.NewUUIDv7().String(), orgID, "")
+	return newOrgRoleToken(orgID, shared.RoleOfficeAdmin)
+}
+
+// newOrgRoleToken registers a session with the given role for a fresh user in the given org
+// and returns its bearer token.
+func newOrgRoleToken(orgID string, role shared.Role) string {
+	return utils.NewOrgSession("user-"+common.NewUUIDv7().String(), orgID, role.String())
 }
 
 // createFundSource creates a valid fund source of the given type (bank or cash) as the user

@@ -1,12 +1,20 @@
 package commands
 
 import (
+	"context"
 	"errors"
 
+	"backend/internal/authorization/ports/module/client"
 	"backend/internal/ledgers/domain"
 )
 
+// ModulesContract is the part of the module contracts that ledgers uses.
+type ModulesContract interface {
+	Authorize(ctx context.Context, req client.AuthorizeRequest) (client.AuthorizeResponse, error)
+}
+
 type Handlers struct {
+	modules      ModulesContract
 	fsRepo       domain.FundSourceRepository
 	periodRepo   domain.LedgerPeriodRepository
 	reportRepo   LedgerPeriodReportRepository
@@ -15,6 +23,7 @@ type Handlers struct {
 }
 
 func NewHandlers(
+	modules ModulesContract,
 	fsRepo domain.FundSourceRepository,
 	periodRepo domain.LedgerPeriodRepository,
 	reportRepo LedgerPeriodReportRepository,
@@ -22,6 +31,10 @@ func NewHandlers(
 	fsFactory *domain.FundSourceFactory,
 ) (*Handlers, error) {
 	var errs []error
+
+	if modules == nil {
+		errs = append(errs, errors.New("modules contract can't be nil"))
+	}
 
 	if fsRepo == nil {
 		errs = append(errs, errors.New("fundsource repo can't be nil"))
@@ -48,6 +61,7 @@ func NewHandlers(
 	}
 
 	return &Handlers{
+		modules:      modules,
 		fsRepo:       fsRepo,
 		periodRepo:   periodRepo,
 		reportRepo:   reportRepo,

@@ -41,18 +41,10 @@ func New(
 	moduleContracts := &contracts.Contracts{}
 	modules := []modules.Module{
 		authorization.NewModule(pgxDB),
-		ledgers.NewModule(pgxDB, externalServices.BankAccountVerifier),
+		ledgers.NewModule(pgxDB, externalServices.BankAccountVerifier, moduleContracts),
 	}
 
-	if err := initModules(ctx, modules); err != nil {
-		return nil, err
-	}
-
-	if err := registerModuleContracts(
-		ctx,
-		modules,
-		moduleContracts,
-	); err != nil {
+	if err := initModules(ctx, modules, moduleContracts); err != nil {
 		return nil, err
 	}
 
@@ -73,37 +65,22 @@ func New(
 	}, nil
 }
 
+// initModules initializes the modules in order and registers each module's
+// contract right after its Init, so a module can use the contracts of the
+// modules listed before it (ledgers needs authorization).
 func initModules(
-	ctx context.Context,
-	modules []modules.Module,
-) error {
-	var errs []error
-
-	for _, m := range modules {
-		if err := m.Init(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to init module %s: %w", string(m.Name()), err))
-		}
-	}
-
-	return errors.Join(errs...)
-}
-
-func registerModuleContracts(
 	ctx context.Context,
 	modules []modules.Module,
 	moduleContracts *contracts.Contracts,
 ) error {
-	var errs []error
-
 	for _, m := range modules {
-		err := m.RegisterContracts(ctx, moduleContracts)
-		if err != nil {
-			errs = append(errs, err)
+		if err := m.Init(ctx); err != nil {
+			return fmt.Errorf("failed to init module %s: %w", string(m.Name()), err)
 		}
-	}
 
-	if len(errs) != 0 {
-		return fmt.Errorf("failed to register contracts: %w", errors.Join(errs...))
+		if err := m.RegisterContracts(ctx, moduleContracts); err != nil {
+			return fmt.Errorf("failed to register contracts of module %s: %w", string(m.Name()), err)
+		}
 	}
 
 	if err := moduleContracts.Verify(); err != nil {

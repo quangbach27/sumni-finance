@@ -58,11 +58,15 @@ func NewAuthorization(catalog *apps.PolicyCatalog) (*Authorization, error) {
 	return &Authorization{catalog: catalog}, nil
 }
 
-func (a *Authorization) Authorize(ctx context.Context, req client.AuthorizeRequest) error {
+func (a *Authorization) Authorize(ctx context.Context, req client.AuthorizeRequest) (client.AuthorizeResponse, error) {
 	p, err := PrincipalFromSession(req.Session)
 	if err != nil {
-		return err
+		return client.AuthorizeResponse{}, err
 	}
 
-	return a.catalog.Authorize(ctx, p, req.Resource, req.Action, req.Scope)
+	if err := a.catalog.Authorize(ctx, p, req.Resource, req.Action, req.Scope); err != nil {
+		return client.AuthorizeResponse{}, err
+	}
+
+	return client.AuthorizeResponse{UserID: p.UserID, OrgID: p.OrgID}, nil
 }

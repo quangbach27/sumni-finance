@@ -21,8 +21,15 @@ type AuthorizeRequest struct {
 	Scope *shared.ResourceScope
 }
 
+// AuthorizeResponse is the verified identity behind an allowed request. Modules
+// scope their data by OrgID instead of trusting an org id from the request.
+type AuthorizeResponse struct {
+	UserID string
+	OrgID  string
+}
+
 type Authorization interface {
-	// Authorize returns nil when the principal may do the action, or a 403
-	// common.Error when not. Callers can return the error as is.
-	Authorize(ctx context.Context, req AuthorizeRequest) error
+	// Authorize returns the verified identity when the principal may do the action, or a
+	// 401/403 common.Error when not. Callers can return the error as is.
+	Authorize(ctx context.Context, req AuthorizeRequest) (AuthorizeResponse, error)
 }

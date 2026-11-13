@@ -7,9 +7,11 @@ import (
 	"time"
 
 	common "github.com/quangbach27/golang-common"
+	"github.com/quangbach27/golang-common/http/auth"
 	"github.com/quangbach27/golang-common/log"
 	"github.com/shopspring/decimal"
 
+	"backend/internal/authorization/ports/module/client"
 	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
@@ -24,7 +26,7 @@ type LedgerEntryInput struct {
 }
 
 type PostLedgerEntries struct {
-	OrgID            string
+	Session          *auth.Session
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 	FundSourceUUID   domain.FundSourceUUID
 	Entries          []LedgerEntryInput
@@ -36,6 +38,15 @@ type PostLedgerEntries struct {
 // before and after. All entries are posted or none is.
 // It returns the new entry UUIDs in the order of cmd.Entries.
 func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries) ([]domain.LedgerEntryUUID, error) {
+	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+		Session:  cmd.Session,
+		Resource: shared.ResourceLedgerEntry,
+		Action:   shared.ActionCreate,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	if len(cmd.Entries) == 0 {
 		return nil, common.NewInvalidInputError("entries-required", "at least one ledger entry is required")
 	}
@@ -51,9 +62,9 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 
 	var entryUUIDs []domain.LedgerEntryUUID
 
-	err := h.periodRepo.PostJournalEntries(
+	err = h.periodRepo.PostJournalEntries(
 		ctx,
-		cmd.OrgID,
+		res.OrgID,
 		cmd.LedgerPeriodUUID,
 		[]domain.FundSourceUUID{cmd.FundSourceUUID},
 		func(period *domain.LedgerPeriod, fundSources map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {

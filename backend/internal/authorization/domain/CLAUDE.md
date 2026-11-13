@@ -10,7 +10,7 @@ The identity provider gives us user id, org id and a single role (`auth.Session`
 
 ### Policies: `policy.go`
 - The domain only has the generic building blocks: `Rule{resource, actions}` and `Policy{name, rules}` with `Policy.Allows(resource, action)`, validated in `NewRule` / `NewPolicy`.
-- The default role baseline is configuration, not domain logic, so it lives in the app layer (`apps/default_policies.go`, used by `apps.NewDefaultPolicyCatalog`): `office-admin` = `AdministratorAccess` (all resources, all actions); `office-accountant` and `office-viewer` = `ReadOnlyAccess` (read on `fund_source`, `ledger_period`, `ledger_entry`).
+- The default role baseline is configuration, not domain logic, so it lives in the app layer (`apps/default_policies.go`, used by `apps.NewDefaultPolicyCatalog`): `office-admin` = `AdministratorAccess` (all resources, all actions); `office-accountant` and `office-viewer` = `ReadOnlyAccess` (read on `fund_source`, `ledger_period`, `ledger_entry`, `ledger_category`).
 
 ### Access grants: `access_grant.go`
 Extra permissions an admin gives to ONE user on top of the role.

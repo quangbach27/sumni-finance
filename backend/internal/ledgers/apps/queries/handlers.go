@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"backend/internal/authorization/ports/module/client"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -26,7 +27,13 @@ type CategoryReadModel interface {
 	ListCategories(ctx context.Context, orgID string) ([]Category, error)
 }
 
+// ModulesContract is the part of the module contracts that ledgers uses.
+type ModulesContract interface {
+	Authorize(ctx context.Context, req client.AuthorizeRequest) (client.AuthorizeResponse, error)
+}
+
 type Handlers struct {
+	modules            ModulesContract
 	fsReadModel        FundSourceReadModel
 	periodReadModel    LedgerPeriodReadModel
 	statementReadModel FundSourceStatementReadModel
@@ -34,12 +41,17 @@ type Handlers struct {
 }
 
 func NewHandlers(
+	modules ModulesContract,
 	fsReadModel FundSourceReadModel,
 	periodReadModel LedgerPeriodReadModel,
 	statementReadModel FundSourceStatementReadModel,
 	categoryReadModel CategoryReadModel,
 ) (*Handlers, error) {
 	var errs []error
+
+	if modules == nil {
+		errs = append(errs, errors.New("modules contract can't be nil"))
+	}
 
 	if fsReadModel == nil {
 		errs = append(errs, errors.New("fundsource read model can't be nil"))
@@ -62,6 +74,7 @@ func NewHandlers(
 	}
 
 	return &Handlers{
+		modules:            modules,
 		fsReadModel:        fsReadModel,
 		periodReadModel:    periodReadModel,
 		statementReadModel: statementReadModel,

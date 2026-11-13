@@ -3,15 +3,17 @@ package commands
 import (
 	"context"
 
+	"github.com/quangbach27/golang-common/http/auth"
 	"github.com/quangbach27/golang-common/log"
 
+	"backend/internal/authorization/ports/module/client"
 	"backend/internal/ledgers/domain"
+	"backend/internal/shared"
 )
 
 type ReconcileFundSourceStatements struct {
-	OrgID            string
+	Session          *auth.Session
 	LedgerPeriodUUID domain.LedgerPeriodUUID
-	ReconciledBy     string
 	Statements       []domain.StatementActualBalance
 }
 
@@ -19,7 +21,16 @@ type ReconcileFundSourceStatements struct {
 // with its closing balance. The repository validates and reconciles them all
 // or none.
 func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, cmd ReconcileFundSourceStatements) error {
-	if err := h.periodRepo.ReconcileFundSourceStatements(ctx, cmd.OrgID, cmd.LedgerPeriodUUID, cmd.ReconciledBy, cmd.Statements); err != nil {
+	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+		Session:  cmd.Session,
+		Resource: shared.ResourceFundSource,
+		Action:   shared.ActionUpdate,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := h.periodRepo.ReconcileFundSourceStatements(ctx, res.OrgID, cmd.LedgerPeriodUUID, res.UserID, cmd.Statements); err != nil {
 		return err
 	}
 

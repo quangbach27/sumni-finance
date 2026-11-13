@@ -11,14 +11,14 @@ type RoleValues string
 
 func (v RoleValues) Values() []string {
 	return []string{
-		"office-admin",
-		"office-accountant",
-		"office-viewer",
+		"office_admin",
+		"office_accountant",
+		"office_viewer",
 	}
 }
 
 var (
-	RoleOfficeAdmin      = common.MustEnum[Role]("office-admin")
-	RoleOfficeAccountant = common.MustEnum[Role]("office-accountant")
-	RoleOfficeViewer     = common.MustEnum[Role]("office-viewer")
+	RoleOfficeAdmin      = common.MustEnum[Role]("office_admin")
+	RoleOfficeAccountant = common.MustEnum[Role]("office_accountant")
+	RoleOfficeViewer     = common.MustEnum[Role]("office_viewer")
 )
