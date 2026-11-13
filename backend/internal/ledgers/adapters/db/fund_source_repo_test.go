@@ -40,9 +40,10 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 		fs, err := factory.CreateFundSource("An - VCB", decimal.NewFromInt(15_000_000), vnd, details)
 		require.NoError(t, err)
 
-		require.NoError(t, repo.CreateFundSource(ctx, fs))
+		require.NoError(t, repo.CreateFundSource(ctx, testOrgID, fs))
 
 		want := dbmodels.LedgersFundSource{
+			OrgID:         testOrgID,
 			Uuid:          fs.UUID(),
 			Name:          "An - VCB",
 			Type:          domain.FundSourceTypeBank,
@@ -65,9 +66,10 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 		fs, err := factory.CreateFundSource("An - Cash", decimal.Zero, vnd, details)
 		require.NoError(t, err)
 
-		require.NoError(t, repo.CreateFundSource(ctx, fs))
+		require.NoError(t, repo.CreateFundSource(ctx, testOrgID, fs))
 
 		want := dbmodels.LedgersFundSource{
+			OrgID:     testOrgID,
 			Uuid:      fs.UUID(),
 			Name:      "An - Cash",
 			Type:      domain.FundSourceTypeCash,
@@ -83,7 +85,7 @@ func TestFundSourceRepository_CreateFundSource(t *testing.T) {
 func assertFundSourceRow(t *testing.T, ctx context.Context, id domain.FundSourceUUID, want dbmodels.LedgersFundSource) {
 	t.Helper()
 
-	got, err := dbmodels.New(pgxDb).GetFundSourceByID(ctx, id)
+	got, err := dbmodels.New(pgxDb).GetFundSourceByID(ctx, dbmodels.GetFundSourceByIDParams{OrgID: testOrgID, Uuid: id})
 	require.NoError(t, err)
 
 	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(dbmodels.LedgersFundSource{}, "CreatedAt")); diff != "" {

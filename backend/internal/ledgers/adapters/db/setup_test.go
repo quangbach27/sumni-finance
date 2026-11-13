@@ -19,6 +19,9 @@ import (
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
+// testOrgID is the org every integration test acts as, unless it says otherwise.
+const testOrgID = "org_test"
+
 var (
 	dsn   = configs.NewConfig().DB.Dsn()
 	pgxDb = testutils.NewDB(dsn)

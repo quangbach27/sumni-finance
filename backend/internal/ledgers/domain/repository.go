@@ -3,7 +3,7 @@ package domain
 import "context"
 
 type FundSourceRepository interface {
-	CreateFundSource(ctx context.Context, fundSource *FundSource) error
+	CreateFundSource(ctx context.Context, orgID string, fundSource *FundSource) error
 }
 
 type LedgerPeriodRepository interface {
@@ -12,6 +12,7 @@ type LedgerPeriodRepository interface {
 	// It fails if an unlocked (not reconciled) period already exists.
 	OpenLedgerPeriod(
 		ctx context.Context,
+		orgID string,
 		fundSourceUUIDs []FundSourceUUID,
 		createFn func(fundSources []*FundSource) (*LedgerPeriod, error),
 	) error
@@ -20,6 +21,7 @@ type LedgerPeriodRepository interface {
 	// nothing.
 	CloseLedgerPeriod(
 		ctx context.Context,
+		orgID string,
 		ledgerPeriodUUID LedgerPeriodUUID,
 	) error
 	// ReconcileFundSourceStatements reconciles the given statements of a closed
@@ -28,12 +30,14 @@ type LedgerPeriodRepository interface {
 	// with one detail per statement.
 	ReconcileFundSourceStatements(
 		ctx context.Context,
+		orgID string,
 		ledgerPeriodUUID LedgerPeriodUUID,
 		reconciledBy string,
 		balances []StatementActualBalance,
 	) error
 	ReopenLedgerPeriod(
 		ctx context.Context,
+		orgID string,
 		ledgerPeriodUUID LedgerPeriodUUID,
 		reason string,
 	) error
@@ -42,6 +46,7 @@ type LedgerPeriodRepository interface {
 	// the statements' closing balances.
 	ReconcileLedgerPeriod(
 		ctx context.Context,
+		orgID string,
 		ledgerPeriodUUID LedgerPeriodUUID,
 	) error
 	// PostJournalEntries posts many entries of one period at once. It loads the
@@ -53,6 +58,7 @@ type LedgerPeriodRepository interface {
 	// every call.
 	PostJournalEntries(
 		ctx context.Context,
+		orgID string,
 		ledgerPeriodUUID LedgerPeriodUUID,
 		fundSourceUUIDs []FundSourceUUID,
 		postFn func(period *LedgerPeriod, fundSources map[FundSourceUUID]*FundSource) ([]*LedgerEntry, error),
@@ -64,6 +70,7 @@ type LedgerPeriodRepository interface {
 	// and the updated fund source balance, all or nothing.
 	VoidJournalEntry(
 		ctx context.Context,
+		orgID string,
 		ledgerPeriodUUID LedgerPeriodUUID,
 		ledgerEntryUUID LedgerEntryUUID,
 		voidFn func(period *LedgerPeriod, entry *LedgerEntry, fundSource *FundSource) (*LedgerEntry, error),

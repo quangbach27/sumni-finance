@@ -2,6 +2,7 @@ BEGIN;
 
 CREATE TABLE ledgers.ledger_periods (
     uuid            uuid PRIMARY KEY,
+    org_id          text NOT NULL,
     name            text NOT NULL,
     opening_balance numeric(20, 2) NOT NULL CHECK (opening_balance >= 0),
     closing_balance numeric(20, 2) CHECK (closing_balance >= 0),
@@ -19,9 +20,9 @@ CREATE TABLE ledgers.ledger_periods (
     )
 );
 
--- At most one unlocked (opened or closed) period at a time.
+-- At most one unlocked (opened or closed) period at a time per org.
 CREATE UNIQUE INDEX ledger_periods_single_unlocked
-    ON ledgers.ledger_periods ((true))
+    ON ledgers.ledger_periods (org_id)
     WHERE status <> 'reconciled';
 
 COMMIT;

@@ -9,21 +9,21 @@ import (
 )
 
 type FundSourceReadModel interface {
-	ListFundSources(ctx context.Context) ([]FundSource, error)
+	ListFundSources(ctx context.Context, orgID string) ([]FundSource, error)
 }
 
 type LedgerPeriodReadModel interface {
-	ListLedgerPeriods(ctx context.Context, query ListLedgerPeriods) (shared.PagedResult[LedgerPeriod], error)
-	GetLedgerPeriod(ctx context.Context, ledgerPeriodUUID domain.LedgerPeriodUUID) (LedgerPeriodDetail, error)
-	GetUnlockedLedgerPeriod(ctx context.Context) (LedgerPeriodDetail, error)
+	ListLedgerPeriods(ctx context.Context, orgID string, query ListLedgerPeriods) (shared.PagedResult[LedgerPeriod], error)
+	GetLedgerPeriod(ctx context.Context, orgID string, ledgerPeriodUUID domain.LedgerPeriodUUID) (LedgerPeriodDetail, error)
+	GetUnlockedLedgerPeriod(ctx context.Context, orgID string) (LedgerPeriodDetail, error)
 }
 
 type FundSourceStatementReadModel interface {
-	ListFundSourceStatements(ctx context.Context, ledgerPeriodUUID domain.LedgerPeriodUUID) ([]FundSourceStatement, error)
+	ListFundSourceStatements(ctx context.Context, orgID string, ledgerPeriodUUID domain.LedgerPeriodUUID) ([]FundSourceStatement, error)
 }
 
 type CategoryReadModel interface {
-	ListCategories(ctx context.Context) ([]Category, error)
+	ListCategories(ctx context.Context, orgID string) ([]Category, error)
 }
 
 type Handlers struct {

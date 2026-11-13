@@ -16,7 +16,7 @@ type CategoryRepository interface {
 	// UpsertCategories saves the categories with their sub-categories in one
 	// transaction: an existing UUID updates the name and description, a new
 	// one inserts.
-	UpsertCategories(ctx context.Context, categories []models.Category) error
+	UpsertCategories(ctx context.Context, orgID string, categories []models.Category) error
 }
 
 type SubCategoryInput struct {
@@ -35,6 +35,7 @@ type CategoryInput struct {
 }
 
 type UpsertCategory struct {
+	OrgID      string
 	Categories []CategoryInput
 }
 
@@ -53,7 +54,7 @@ func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]mo
 		return nil, err
 	}
 
-	if err := h.categoryRepo.UpsertCategories(ctx, categories); err != nil {
+	if err := h.categoryRepo.UpsertCategories(ctx, cmd.OrgID, categories); err != nil {
 		return nil, err
 	}
 

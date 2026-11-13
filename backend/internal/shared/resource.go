@@ -22,19 +22,21 @@ func (v ResourceValues) Values() []string {
 		"ledger_entry",
 		"fund_source",
 		"access_grant",
+		"ledger_category",
 	}
 }
 
 var (
-	ResourceLedgerPeriod = common.MustEnum[Resource]("ledger_period")
-	ResourceLedgerEntry  = common.MustEnum[Resource]("ledger_entry")
-	ResourceFundSource   = common.MustEnum[Resource]("fund_source")
-	ResourceAccessGrant  = common.MustEnum[Resource]("access_grant")
+	ResourceLedgerPeriod   = common.MustEnum[Resource]("ledger_period")
+	ResourceLedgerEntry    = common.MustEnum[Resource]("ledger_entry")
+	ResourceFundSource     = common.MustEnum[Resource]("fund_source")
+	ResourceAccessGrant    = common.MustEnum[Resource]("access_grant")
+	ResourceLedgerCategory = common.MustEnum[Resource]("ledger_category")
 )
 
 // AllResources returns every resource. The slice is a copy.
 func AllResources() []Resource {
-	return []Resource{ResourceLedgerPeriod, ResourceLedgerEntry, ResourceFundSource, ResourceAccessGrant}
+	return []Resource{ResourceLedgerPeriod, ResourceLedgerEntry, ResourceFundSource, ResourceAccessGrant, ResourceLedgerCategory}
 }
 
 // ResourceScope points at one instance of a resource, written "resource/id"

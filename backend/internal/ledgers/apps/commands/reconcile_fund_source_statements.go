@@ -9,6 +9,7 @@ import (
 )
 
 type ReconcileFundSourceStatements struct {
+	OrgID            string
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 	ReconciledBy     string
 	Statements       []domain.StatementActualBalance
@@ -18,7 +19,7 @@ type ReconcileFundSourceStatements struct {
 // with its closing balance. The repository validates and reconciles them all
 // or none.
 func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, cmd ReconcileFundSourceStatements) error {
-	if err := h.periodRepo.ReconcileFundSourceStatements(ctx, cmd.LedgerPeriodUUID, cmd.ReconciledBy, cmd.Statements); err != nil {
+	if err := h.periodRepo.ReconcileFundSourceStatements(ctx, cmd.OrgID, cmd.LedgerPeriodUUID, cmd.ReconciledBy, cmd.Statements); err != nil {
 		return err
 	}
 

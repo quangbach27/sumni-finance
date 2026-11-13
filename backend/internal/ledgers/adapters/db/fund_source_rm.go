@@ -25,8 +25,8 @@ func NewFundSourceReadModel(db *pgxpool.Pool) (*FundSourceReadModel, error) {
 	return &FundSourceReadModel{db: db}, nil
 }
 
-func (r *FundSourceReadModel) ListFundSources(ctx context.Context) ([]queries.FundSource, error) {
-	rows, err := dbmodels.New(r.db).ListFundSources(ctx)
+func (r *FundSourceReadModel) ListFundSources(ctx context.Context, orgID string) ([]queries.FundSource, error) {
+	rows, err := dbmodels.New(r.db).ListFundSources(ctx, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list fund sources: %w", err)
 	}

@@ -12,6 +12,7 @@ import (
 )
 
 type OpenLedgerPeriod struct {
+	OrgID           string
 	Name            string
 	OpenDate        time.Time
 	CloseDate       time.Time
@@ -24,7 +25,7 @@ type OpenLedgerPeriod struct {
 func (h *Handlers) OpenLedgerPeriod(ctx context.Context, cmd OpenLedgerPeriod) (domain.LedgerPeriodUUID, error) {
 	var periodUUID domain.LedgerPeriodUUID
 
-	err := h.periodRepo.OpenLedgerPeriod(ctx, cmd.FundSourceUUIDs, func(fundSources []*domain.FundSource) (*domain.LedgerPeriod, error) {
+	err := h.periodRepo.OpenLedgerPeriod(ctx, cmd.OrgID, cmd.FundSourceUUIDs, func(fundSources []*domain.FundSource) (*domain.LedgerPeriod, error) {
 		openingBalance := decimal.Zero
 		for _, fs := range fundSources {
 			openingBalance = openingBalance.Add(fs.Balance())

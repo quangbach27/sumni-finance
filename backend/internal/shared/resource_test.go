@@ -117,6 +117,6 @@ func TestEnumParsing(t *testing.T) {
 	_, err = common.NewEnum[shared.Role]("nope")
 	assert.Error(t, err)
 
-	assert.Len(t, shared.AllResources(), 4)
+	assert.Len(t, shared.AllResources(), 5)
 	assert.Len(t, shared.AllActions(), 4)
 }

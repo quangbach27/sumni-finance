@@ -19,6 +19,7 @@ type BankInput struct {
 }
 
 type CreateFundSource struct {
+	OrgID        string
 	Name         string
 	Type         domain.FundSourceType
 	StartBalance decimal.Decimal
@@ -57,7 +58,7 @@ func (h *Handlers) CreateFundSource(ctx context.Context, cmd CreateFundSource) (
 		return domain.FundSourceUUID{}, err
 	}
 
-	if err := h.fsRepo.CreateFundSource(ctx, fundSource); err != nil {
+	if err := h.fsRepo.CreateFundSource(ctx, cmd.OrgID, fundSource); err != nil {
 		return domain.FundSourceUUID{}, err
 	}
 

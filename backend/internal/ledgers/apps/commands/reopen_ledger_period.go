@@ -9,6 +9,7 @@ import (
 )
 
 type ReopenLedgerPeriod struct {
+	OrgID            string
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 	Reason           string
 }
@@ -16,7 +17,7 @@ type ReopenLedgerPeriod struct {
 // ReopenLedgerPeriod reopens a closed period. The repository clears the closing
 // balance of its fund source statements.
 func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, cmd ReopenLedgerPeriod) error {
-	if err := h.periodRepo.ReopenLedgerPeriod(ctx, cmd.LedgerPeriodUUID, cmd.Reason); err != nil {
+	if err := h.periodRepo.ReopenLedgerPeriod(ctx, cmd.OrgID, cmd.LedgerPeriodUUID, cmd.Reason); err != nil {
 		return err
 	}
 

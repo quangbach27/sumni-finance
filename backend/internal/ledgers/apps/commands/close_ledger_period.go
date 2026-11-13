@@ -9,13 +9,14 @@ import (
 )
 
 type CloseLedgerPeriod struct {
+	OrgID            string
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 }
 
 // CloseLedgerPeriod closes the period. The repository sets the closing balance
 // of every fund source statement to the current fund source balance.
 func (h *Handlers) CloseLedgerPeriod(ctx context.Context, cmd CloseLedgerPeriod) error {
-	if err := h.periodRepo.CloseLedgerPeriod(ctx, cmd.LedgerPeriodUUID); err != nil {
+	if err := h.periodRepo.CloseLedgerPeriod(ctx, cmd.OrgID, cmd.LedgerPeriodUUID); err != nil {
 		return err
 	}
 

@@ -24,6 +24,7 @@ type LedgerEntryInput struct {
 }
 
 type PostLedgerEntries struct {
+	OrgID            string
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 	FundSourceUUID   domain.FundSourceUUID
 	Entries          []LedgerEntryInput
@@ -52,6 +53,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 
 	err := h.periodRepo.PostJournalEntries(
 		ctx,
+		cmd.OrgID,
 		cmd.LedgerPeriodUUID,
 		[]domain.FundSourceUUID{cmd.FundSourceUUID},
 		func(period *domain.LedgerPeriod, fundSources map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {

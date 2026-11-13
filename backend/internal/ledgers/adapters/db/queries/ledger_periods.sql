@@ -2,12 +2,14 @@
 SELECT EXISTS (
     SELECT 1
     FROM ledgers.ledger_periods
-    WHERE status <> 'reconciled'
+    WHERE org_id = @org_id
+      AND status <> 'reconciled'
 );
 
 
 -- name: CreateLedgerPeriod :exec
 INSERT INTO ledgers.ledger_periods (
+    org_id,
     uuid,
     name,
     opening_balance,
@@ -16,6 +18,7 @@ INSERT INTO ledgers.ledger_periods (
     status
 )
 VALUES (
+    @org_id,
     @uuid,
     @name,
     @opening_balance,
@@ -41,7 +44,8 @@ VALUES (
 -- name: ListLedgerPeriods :many
 SELECT *
 FROM ledgers.ledger_periods
-WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text)
+WHERE org_id = @org_id
+  AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text)
 ORDER BY open_date DESC, created_at DESC
 LIMIT @page_limit 
 OFFSET @page_offset;
@@ -49,12 +53,14 @@ OFFSET @page_offset;
 -- name: CountLedgerPeriods :one
 SELECT count(*)
 FROM ledgers.ledger_periods
-WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text);
+WHERE org_id = @org_id
+  AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text);
 
 -- name: GetLedgerPeriodByUUID :one
 SELECT *
 FROM ledgers.ledger_periods
-WHERE uuid = @uuid;
+WHERE org_id = @org_id
+  AND uuid = @uuid;
 
 -- name: UpdateLedgerPeriod :exec
 UPDATE ledgers.ledger_periods
@@ -63,30 +69,35 @@ SET status = @status,
     reopen_reason = COALESCE(sqlc.narg('reopen_reason'), reopen_reason),
     reopened_at = COALESCE(sqlc.narg('reopened_at'), reopened_at),
     reconciled_at = COALESCE(sqlc.narg('reconciled_at'), reconciled_at)
-WHERE uuid = @uuid;
+WHERE org_id = @org_id
+  AND uuid = @uuid;
 
 -- name: GetUnlockedLedgerPeriodUUID :one
 SELECT uuid
 FROM ledgers.ledger_periods
-WHERE status <> 'reconciled'
+WHERE org_id = @org_id
+  AND status <> 'reconciled'
 ORDER BY open_date DESC
 LIMIT 1;
 
 -- name: GetLedgerPeriodReportUUID :one
 SELECT report_uuid
 FROM ledgers.ledger_periods
-WHERE uuid = @uuid;
+WHERE org_id = @org_id
+  AND uuid = @uuid;
 
 -- name: UpdateLedgerPeriodReportUUID :exec
 UPDATE ledgers.ledger_periods
 SET report_uuid = @report_uuid
-WHERE uuid = @uuid;
+WHERE org_id = @org_id
+  AND uuid = @uuid;
 
 -- name: GetLedgerPeriodWithStatements :many
 WITH p AS (
     SELECT *
     FROM ledgers.ledger_periods
-    WHERE ledger_periods.uuid = @ledger_period_uuid
+    WHERE ledger_periods.org_id = @org_id
+      AND ledger_periods.uuid = @ledger_period_uuid
 )
 SELECT
     p.uuid,

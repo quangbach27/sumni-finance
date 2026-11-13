@@ -15,6 +15,7 @@ import (
 
 const createFundSource = `-- name: CreateFundSource :exec
 INSERT INTO ledgers.fund_sources (
+    org_id,
     uuid,
     name,
     type,
@@ -36,11 +37,13 @@ VALUES (
     $7,
     $8,
     $9,
-    $10
+    $10,
+    $11
 )
 `
 
 type CreateFundSourceParams struct {
+	OrgID         string
 	Uuid          domain.FundSourceUUID
 	Name          string
 	Type          domain.FundSourceType
@@ -55,6 +58,7 @@ type CreateFundSourceParams struct {
 
 func (q *Queries) CreateFundSource(ctx context.Context, arg CreateFundSourceParams) error {
 	_, err := q.db.Exec(ctx, createFundSource,
+		arg.OrgID,
 		arg.Uuid,
 		arg.Name,
 		arg.Type,
@@ -70,16 +74,23 @@ func (q *Queries) CreateFundSource(ctx context.Context, arg CreateFundSourcePara
 }
 
 const getFundSourceByID = `-- name: GetFundSourceByID :one
-SELECT uuid, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
+SELECT uuid, org_id, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
 FROM ledgers.fund_sources
-WHERE uuid = $1
+WHERE org_id = $1
+  AND uuid = $2
 `
 
-func (q *Queries) GetFundSourceByID(ctx context.Context, uuid domain.FundSourceUUID) (LedgersFundSource, error) {
-	row := q.db.QueryRow(ctx, getFundSourceByID, uuid)
+type GetFundSourceByIDParams struct {
+	OrgID string
+	Uuid  domain.FundSourceUUID
+}
+
+func (q *Queries) GetFundSourceByID(ctx context.Context, arg GetFundSourceByIDParams) (LedgersFundSource, error) {
+	row := q.db.QueryRow(ctx, getFundSourceByID, arg.OrgID, arg.Uuid)
 	var i LedgersFundSource
 	err := row.Scan(
 		&i.Uuid,
+		&i.OrgID,
 		&i.Name,
 		&i.Type,
 		&i.Balance,
@@ -95,13 +106,14 @@ func (q *Queries) GetFundSourceByID(ctx context.Context, uuid domain.FundSourceU
 }
 
 const listFundSources = `-- name: ListFundSources :many
-SELECT uuid, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
+SELECT uuid, org_id, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
 FROM ledgers.fund_sources
+WHERE org_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListFundSources(ctx context.Context) ([]LedgersFundSource, error) {
-	rows, err := q.db.Query(ctx, listFundSources)
+func (q *Queries) ListFundSources(ctx context.Context, orgID string) ([]LedgersFundSource, error) {
+	rows, err := q.db.Query(ctx, listFundSources, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +123,7 @@ func (q *Queries) ListFundSources(ctx context.Context) ([]LedgersFundSource, err
 		var i LedgersFundSource
 		if err := rows.Scan(
 			&i.Uuid,
+			&i.OrgID,
 			&i.Name,
 			&i.Type,
 			&i.Balance,
@@ -133,14 +146,20 @@ func (q *Queries) ListFundSources(ctx context.Context) ([]LedgersFundSource, err
 }
 
 const listFundSourcesByUUIDs = `-- name: ListFundSourcesByUUIDs :many
-SELECT uuid, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
+SELECT uuid, org_id, name, type, balance, currency, owner_name, bank_code, bank_bin, bank_short_name, account_number, created_at
 FROM ledgers.fund_sources
-WHERE uuid = ANY($1::uuid[])
+WHERE org_id = $1
+  AND uuid = ANY($2::uuid[])
 ORDER BY created_at
 `
 
-func (q *Queries) ListFundSourcesByUUIDs(ctx context.Context, uuids []golang_common.UUID) ([]LedgersFundSource, error) {
-	rows, err := q.db.Query(ctx, listFundSourcesByUUIDs, uuids)
+type ListFundSourcesByUUIDsParams struct {
+	OrgID string
+	Uuids []golang_common.UUID
+}
+
+func (q *Queries) ListFundSourcesByUUIDs(ctx context.Context, arg ListFundSourcesByUUIDsParams) ([]LedgersFundSource, error) {
+	rows, err := q.db.Query(ctx, listFundSourcesByUUIDs, arg.OrgID, arg.Uuids)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +169,7 @@ func (q *Queries) ListFundSourcesByUUIDs(ctx context.Context, uuids []golang_com
 		var i LedgersFundSource
 		if err := rows.Scan(
 			&i.Uuid,
+			&i.OrgID,
 			&i.Name,
 			&i.Type,
 			&i.Balance,
@@ -172,21 +192,23 @@ func (q *Queries) ListFundSourcesByUUIDs(ctx context.Context, uuids []golang_com
 }
 
 const listFundSourcesByUUIDsInPeriod = `-- name: ListFundSourcesByUUIDsInPeriod :many
-SELECT fs.uuid, fs.name, fs.type, fs.balance, fs.currency, fs.owner_name, fs.bank_code, fs.bank_bin, fs.bank_short_name, fs.account_number, fs.created_at
+SELECT fs.uuid, fs.org_id, fs.name, fs.type, fs.balance, fs.currency, fs.owner_name, fs.bank_code, fs.bank_bin, fs.bank_short_name, fs.account_number, fs.created_at
 FROM ledgers.fund_sources fs
 JOIN ledgers.fund_source_statements st ON st.fund_source_uuid = fs.uuid
-WHERE st.ledger_period_uuid = $1
-  AND fs.uuid = ANY($2::uuid[])
+WHERE fs.org_id = $1
+  AND st.ledger_period_uuid = $2
+  AND fs.uuid = ANY($3::uuid[])
 ORDER BY fs.created_at
 `
 
 type ListFundSourcesByUUIDsInPeriodParams struct {
+	OrgID            string
 	LedgerPeriodUuid domain.LedgerPeriodUUID
 	Uuids            []golang_common.UUID
 }
 
 func (q *Queries) ListFundSourcesByUUIDsInPeriod(ctx context.Context, arg ListFundSourcesByUUIDsInPeriodParams) ([]LedgersFundSource, error) {
-	rows, err := q.db.Query(ctx, listFundSourcesByUUIDsInPeriod, arg.LedgerPeriodUuid, arg.Uuids)
+	rows, err := q.db.Query(ctx, listFundSourcesByUUIDsInPeriod, arg.OrgID, arg.LedgerPeriodUuid, arg.Uuids)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +218,7 @@ func (q *Queries) ListFundSourcesByUUIDsInPeriod(ctx context.Context, arg ListFu
 		var i LedgersFundSource
 		if err := rows.Scan(
 			&i.Uuid,
+			&i.OrgID,
 			&i.Name,
 			&i.Type,
 			&i.Balance,

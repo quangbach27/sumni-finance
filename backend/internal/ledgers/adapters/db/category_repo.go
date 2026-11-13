@@ -32,9 +32,9 @@ func NewCategoryRepository(db *pgxpool.Pool) (*CategoryRepo, error) {
 	return &CategoryRepo{db: db}, nil
 }
 
-func (r *CategoryRepo) UpsertCategories(ctx context.Context, categories []models.Category) error {
+func (r *CategoryRepo) UpsertCategories(ctx context.Context, orgID string, categories []models.Category) error {
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		return saveCategories(ctx, dbmodels.New(tx), categories)
+		return saveCategories(ctx, dbmodels.New(tx), orgID, categories)
 	})
 	if err != nil {
 		var cerr common.Error
@@ -68,6 +68,7 @@ func flatten(categories []models.Category) []models.Category {
 func saveCategories(
 	ctx context.Context,
 	q *dbmodels.Queries,
+	orgID string,
 	categories []models.Category,
 ) error {
 	items := flatten(categories)
@@ -88,7 +89,7 @@ func saveCategories(
 		}
 	}
 
-	rows, err := q.ListCategoriesByUUIDs(ctx, parentUUIDs)
+	rows, err := q.ListCategoriesByUUIDs(ctx, dbmodels.ListCategoriesByUUIDsParams{OrgID: orgID, Uuids: parentUUIDs})
 	if err != nil {
 		return err
 	}
@@ -106,6 +107,7 @@ func saveCategories(
 		}
 
 		affected, err := q.UpsertCategory(ctx, dbmodels.UpsertCategoryParams{
+			OrgID:       orgID,
 			Uuid:        c.UUID,
 			ParentUuid:  c.ParentUUID,
 			Name:        c.Name,

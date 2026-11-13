@@ -4,6 +4,7 @@ CREATE SCHEMA IF NOT EXISTS ledgers;
 
 CREATE TABLE ledgers.fund_sources (
     uuid            uuid PRIMARY KEY,
+    org_id          text NOT NULL,
     name            text NOT NULL,
     type            text NOT NULL CHECK (type IN ('bank', 'cash')),
     balance         numeric(20, 2) NOT NULL CHECK (balance >= 0),

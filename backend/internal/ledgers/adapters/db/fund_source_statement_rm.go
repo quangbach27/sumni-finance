@@ -30,11 +30,12 @@ func NewFundSourceStatementReadModel(db *pgxpool.Pool) (*FundSourceStatementRead
 
 func (r *FundSourceStatementReadModel) ListFundSourceStatements(
 	ctx context.Context,
+	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
 ) ([]queries.FundSourceStatement, error) {
 	q := dbmodels.New(r.db)
 
-	if _, err := q.GetLedgerPeriodByUUID(ctx, ledgerPeriodUUID); err != nil {
+	if _, err := q.GetLedgerPeriodByUUID(ctx, dbmodels.GetLedgerPeriodByUUIDParams{OrgID: orgID, Uuid: ledgerPeriodUUID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
 		}

@@ -13,13 +13,14 @@ import (
 )
 
 const listCategories = `-- name: ListCategories :many
-SELECT uuid, parent_uuid, name, description, created_at
+SELECT uuid, org_id, parent_uuid, name, description, created_at
 FROM ledgers.categories
+WHERE org_id = $1
 ORDER BY lower(name), uuid
 `
 
-func (q *Queries) ListCategories(ctx context.Context) ([]LedgersCategory, error) {
-	rows, err := q.db.Query(ctx, listCategories)
+func (q *Queries) ListCategories(ctx context.Context, orgID string) ([]LedgersCategory, error) {
+	rows, err := q.db.Query(ctx, listCategories, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -29,6 +30,7 @@ func (q *Queries) ListCategories(ctx context.Context) ([]LedgersCategory, error)
 		var i LedgersCategory
 		if err := rows.Scan(
 			&i.Uuid,
+			&i.OrgID,
 			&i.ParentUuid,
 			&i.Name,
 			&i.Description,
@@ -45,13 +47,19 @@ func (q *Queries) ListCategories(ctx context.Context) ([]LedgersCategory, error)
 }
 
 const listCategoriesByUUIDs = `-- name: ListCategoriesByUUIDs :many
-SELECT uuid, parent_uuid, name, description, created_at
+SELECT uuid, org_id, parent_uuid, name, description, created_at
 FROM ledgers.categories
-WHERE uuid = ANY($1::uuid[])
+WHERE org_id = $1
+  AND uuid = ANY($2::uuid[])
 `
 
-func (q *Queries) ListCategoriesByUUIDs(ctx context.Context, uuids []golang_common.UUID) ([]LedgersCategory, error) {
-	rows, err := q.db.Query(ctx, listCategoriesByUUIDs, uuids)
+type ListCategoriesByUUIDsParams struct {
+	OrgID string
+	Uuids []golang_common.UUID
+}
+
+func (q *Queries) ListCategoriesByUUIDs(ctx context.Context, arg ListCategoriesByUUIDsParams) ([]LedgersCategory, error) {
+	rows, err := q.db.Query(ctx, listCategoriesByUUIDs, arg.OrgID, arg.Uuids)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +69,7 @@ func (q *Queries) ListCategoriesByUUIDs(ctx context.Context, uuids []golang_comm
 		var i LedgersCategory
 		if err := rows.Scan(
 			&i.Uuid,
+			&i.OrgID,
 			&i.ParentUuid,
 			&i.Name,
 			&i.Description,
@@ -79,11 +88,17 @@ func (q *Queries) ListCategoriesByUUIDs(ctx context.Context, uuids []golang_comm
 const listExistingCategoryUUIDs = `-- name: ListExistingCategoryUUIDs :many
 SELECT uuid
 FROM ledgers.categories
-WHERE uuid = ANY($1::uuid[])
+WHERE org_id = $1
+  AND uuid = ANY($2::uuid[])
 `
 
-func (q *Queries) ListExistingCategoryUUIDs(ctx context.Context, uuids []golang_common.UUID) ([]models.CategoryUUID, error) {
-	rows, err := q.db.Query(ctx, listExistingCategoryUUIDs, uuids)
+type ListExistingCategoryUUIDsParams struct {
+	OrgID string
+	Uuids []golang_common.UUID
+}
+
+func (q *Queries) ListExistingCategoryUUIDs(ctx context.Context, arg ListExistingCategoryUUIDsParams) ([]models.CategoryUUID, error) {
+	rows, err := q.db.Query(ctx, listExistingCategoryUUIDs, arg.OrgID, arg.Uuids)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +119,7 @@ func (q *Queries) ListExistingCategoryUUIDs(ctx context.Context, uuids []golang_
 
 const upsertCategory = `-- name: UpsertCategory :execrows
 INSERT INTO ledgers.categories (
+    org_id,
     uuid,
     parent_uuid,
     name,
@@ -113,15 +129,18 @@ VALUES (
     $1,
     $2,
     $3,
-    $4
+    $4,
+    $5
 )
 ON CONFLICT (uuid) DO UPDATE
 SET name = EXCLUDED.name,
     description = EXCLUDED.description
-WHERE ledgers.categories.parent_uuid IS NOT DISTINCT FROM EXCLUDED.parent_uuid
+WHERE ledgers.categories.org_id = EXCLUDED.org_id
+  AND ledgers.categories.parent_uuid IS NOT DISTINCT FROM EXCLUDED.parent_uuid
 `
 
 type UpsertCategoryParams struct {
+	OrgID       string
 	Uuid        models.CategoryUUID
 	ParentUuid  *models.CategoryUUID
 	Name        string
@@ -132,6 +151,7 @@ type UpsertCategoryParams struct {
 // touches no row (0 rows affected), so a category never moves.
 func (q *Queries) UpsertCategory(ctx context.Context, arg UpsertCategoryParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertCategory,
+		arg.OrgID,
 		arg.Uuid,
 		arg.ParentUuid,
 		arg.Name,

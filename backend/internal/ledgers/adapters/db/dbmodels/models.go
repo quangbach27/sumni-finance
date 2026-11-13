@@ -15,6 +15,7 @@ import (
 
 type LedgersCategory struct {
 	Uuid        models.CategoryUUID
+	OrgID       string
 	ParentUuid  *models.CategoryUUID
 	Name        string
 	Description *string
@@ -23,6 +24,7 @@ type LedgersCategory struct {
 
 type LedgersFundSource struct {
 	Uuid          domain.FundSourceUUID
+	OrgID         string
 	Name          string
 	Type          domain.FundSourceType
 	Balance       decimal.Decimal
@@ -70,6 +72,7 @@ type LedgersLedgerEntry struct {
 
 type LedgersLedgerPeriod struct {
 	Uuid           domain.LedgerPeriodUUID
+	OrgID          string
 	Name           string
 	OpeningBalance decimal.Decimal
 	ClosingBalance *decimal.Decimal

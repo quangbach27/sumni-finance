@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	commonLog "github.com/quangbach27/golang-common/log"
 
 	"backend/internal"
 	"backend/internal/configs"
@@ -19,6 +21,8 @@ import (
 
 func main() {
 	config := configs.NewConfig()
+
+	commonLog.Init(slog.LevelInfo)
 
 	startCtx, cancelStart := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelStart()

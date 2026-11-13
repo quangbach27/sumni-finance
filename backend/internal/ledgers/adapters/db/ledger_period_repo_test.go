@@ -43,7 +43,7 @@ func createCashFundSource(t *testing.T, ctx context.Context, balance int64) *dom
 	require.NoError(t, err)
 	fs, err := factory.CreateFundSource("cash", decimal.NewFromInt(balance), shared.CurrencyVND, details)
 	require.NoError(t, err)
-	require.NoError(t, repo.CreateFundSource(ctx, fs))
+	require.NoError(t, repo.CreateFundSource(ctx, testOrgID, fs))
 
 	return fs
 }
@@ -78,7 +78,7 @@ func TestLedgerPeriodRepo_OpenLedgerPeriod(t *testing.T) {
 		fs2 := createCashFundSource(t, ctx, 2_500)
 
 		var period *domain.LedgerPeriod
-		require.NoError(t, repo.OpenLedgerPeriod(ctx, []domain.FundSourceUUID{fs1.UUID(), fs2.UUID()}, createFn(&period)))
+		require.NoError(t, repo.OpenLedgerPeriod(ctx, testOrgID, []domain.FundSourceUUID{fs1.UUID(), fs2.UUID()}, createFn(&period)))
 
 		var openingBalance decimal.Decimal
 		var status string
@@ -112,10 +112,10 @@ func TestLedgerPeriodRepo_OpenLedgerPeriod(t *testing.T) {
 		ids := []domain.FundSourceUUID{fs.UUID()}
 
 		var first *domain.LedgerPeriod
-		require.NoError(t, repo.OpenLedgerPeriod(ctx, ids, createFn(&first)))
+		require.NoError(t, repo.OpenLedgerPeriod(ctx, testOrgID, ids, createFn(&first)))
 
 		var second *domain.LedgerPeriod
-		err := repo.OpenLedgerPeriod(ctx, ids, createFn(&second))
+		err := repo.OpenLedgerPeriod(ctx, testOrgID, ids, createFn(&second))
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "unlocked-period-exists", cerr.ErrorSlug)
@@ -125,20 +125,20 @@ func TestLedgerPeriodRepo_OpenLedgerPeriod(t *testing.T) {
 			first.UUID())
 		require.NoError(t, err)
 
-		require.NoError(t, repo.OpenLedgerPeriod(ctx, ids, createFn(&second)))
+		require.NoError(t, repo.OpenLedgerPeriod(ctx, testOrgID, ids, createFn(&second)))
 	})
 
 	t.Run("invalid fund source lists", func(t *testing.T) {
 		resetPeriods(t, ctx)
 		var p *domain.LedgerPeriod
 
-		require.Error(t, repo.OpenLedgerPeriod(ctx, nil, createFn(&p)))
+		require.Error(t, repo.OpenLedgerPeriod(ctx, testOrgID, nil, createFn(&p)))
 
 		fs := createCashFundSource(t, ctx, 1)
-		require.Error(t, repo.OpenLedgerPeriod(ctx, []domain.FundSourceUUID{fs.UUID(), fs.UUID()}, createFn(&p)))
+		require.Error(t, repo.OpenLedgerPeriod(ctx, testOrgID, []domain.FundSourceUUID{fs.UUID(), fs.UUID()}, createFn(&p)))
 
 		missing := domain.FundSourceUUID{UUID: common.NewUUIDv7()}
-		err := repo.OpenLedgerPeriod(ctx, []domain.FundSourceUUID{fs.UUID(), missing}, createFn(&p))
+		err := repo.OpenLedgerPeriod(ctx, testOrgID, []domain.FundSourceUUID{fs.UUID(), missing}, createFn(&p))
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "fund-source-not-found", cerr.ErrorSlug)
@@ -159,7 +159,7 @@ func openPeriodFor(t *testing.T, ctx context.Context, fundSources ...*domain.Fun
 	open := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 
 	var period *domain.LedgerPeriod
-	require.NoError(t, repo.OpenLedgerPeriod(ctx, uuids, func(fss []*domain.FundSource) (*domain.LedgerPeriod, error) {
+	require.NoError(t, repo.OpenLedgerPeriod(ctx, testOrgID, uuids, func(fss []*domain.FundSource) (*domain.LedgerPeriod, error) {
 		p, err := domain.NewLedgerPeriod("Nov", sumBalances(fss), open, open.AddDate(0, 1, -1))
 		period = p
 
@@ -235,7 +235,7 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 			{fs1, shared.DirectionInflow, 100},
 			{fs2, shared.DirectionInflow, 50},
 		}
-		require.NoError(t, repo.PostJournalEntries(ctx, period.UUID(),
+		require.NoError(t, repo.PostJournalEntries(ctx, testOrgID, period.UUID(),
 			[]domain.FundSourceUUID{fs1.UUID(), fs2.UUID()}, postFnFor(t, specs)))
 
 		assert.True(t, fsBalance(t, ctx, fs1).Equal(decimal.NewFromInt(800)))
@@ -269,7 +269,7 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 			{fs1, shared.DirectionOutflow, 100},
 			{fs2, shared.DirectionOutflow, 999},
 		}
-		err := repo.PostJournalEntries(ctx, period.UUID(),
+		err := repo.PostJournalEntries(ctx, testOrgID, period.UUID(),
 			[]domain.FundSourceUUID{fs1.UUID(), fs2.UUID()}, postFnFor(t, specs))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient-balance")
@@ -286,7 +286,7 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		fs := createCashFundSource(t, ctx, 100)
 		openPeriodFor(t, ctx, fs)
 
-		err := repo.PostJournalEntries(ctx, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()}, []domain.FundSourceUUID{fs.UUID()},
+		err := repo.PostJournalEntries(ctx, testOrgID, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()}, []domain.FundSourceUUID{fs.UUID()},
 			postFnFor(t, []entrySpec{{fs, shared.DirectionInflow, 1}}))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ledger-period-not-found")
@@ -298,7 +298,7 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		outside := createCashFundSource(t, ctx, 100)
 		period := openPeriodFor(t, ctx, inPeriod)
 
-		err := repo.PostJournalEntries(ctx, period.UUID(), []domain.FundSourceUUID{outside.UUID()},
+		err := repo.PostJournalEntries(ctx, testOrgID, period.UUID(), []domain.FundSourceUUID{outside.UUID()},
 			postFnFor(t, []entrySpec{{outside, shared.DirectionInflow, 1}}))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "fund-source-not-in-period")
@@ -320,7 +320,7 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		}
 		for name, tc := range cases {
 			t.Run(name, func(t *testing.T) {
-				err := repo.PostJournalEntries(ctx, period.UUID(), tc.uuids, postFn)
+				err := repo.PostJournalEntries(ctx, testOrgID, period.UUID(), tc.uuids, postFn)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.slug)
 			})
@@ -336,7 +336,7 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		errs := make(chan error, workers)
 		for i := 0; i < workers; i++ {
 			go func() {
-				errs <- repo.PostJournalEntries(ctx, period.UUID(), []domain.FundSourceUUID{fs.UUID()},
+				errs <- repo.PostJournalEntries(ctx, testOrgID, period.UUID(), []domain.FundSourceUUID{fs.UUID()},
 					postFnFor(t, []entrySpec{{fs, shared.DirectionInflow, 10}}))
 			}()
 		}
@@ -394,7 +394,7 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 		_, err := pgxDb.Exec(ctx, "UPDATE ledgers.fund_sources SET balance = 1500 WHERE uuid = $1", fs.UUID())
 		require.NoError(t, err)
 
-		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
 
 		var status string
 		var closing decimal.Decimal
@@ -405,7 +405,7 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 		assert.Equal(t, "closed", status)
 		assert.True(t, closing.Equal(decimal.NewFromInt(1_500)))
 
-		err = repo.CloseLedgerPeriod(ctx, period.UUID())
+		err = repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID())
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "period-not-open", cerr.ErrorSlug)
@@ -414,7 +414,7 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 	t.Run("close of an unknown period is not found", func(t *testing.T) {
 		resetPeriods(t, ctx)
 
-		err := repo.CloseLedgerPeriod(ctx, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()})
+		err := repo.CloseLedgerPeriod(ctx, testOrgID, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()})
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "ledger-period-not-found", cerr.ErrorSlug)
@@ -423,10 +423,10 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 	t.Run("reconcile stores all statements", func(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
-		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
 
 		ids := statementUUIDs(t, period)
-		require.NoError(t, repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balancesFor(ids, 1_000)))
+		require.NoError(t, repo.ReconcileFundSourceStatements(ctx, testOrgID, period.UUID(), "user-1", balancesFor(ids, 1_000)))
 
 		var n int
 		require.NoError(t, pgxDb.QueryRow(ctx,
@@ -438,13 +438,13 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 	t.Run("a mismatch persists nothing and reports the statement", func(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
-		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
 		ids := statementUUIDs(t, period)
 
 		balances := balancesFor(ids, 1_000)
 		balances[1].ActualBalance = decimal.NewFromInt(999)
 
-		err := repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balances)
+		err := repo.ReconcileFundSourceStatements(ctx, testOrgID, period.UUID(), "user-1", balances)
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "invalid-statement-reconciliation", cerr.ErrorSlug)
@@ -463,7 +463,7 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000))
 
-		err := repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balancesFor(statementUUIDs(t, period), 1_000))
+		err := repo.ReconcileFundSourceStatements(ctx, testOrgID, period.UUID(), "user-1", balancesFor(statementUUIDs(t, period), 1_000))
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "period-not-closed", cerr.ErrorSlug)
@@ -472,20 +472,20 @@ func TestLedgerPeriodRepo_CloseAndReconcile(t *testing.T) {
 	t.Run("unknown and duplicate statements are rejected", func(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000))
-		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
 		ids := statementUUIDs(t, period)
 
-		err := repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1",
+		err := repo.ReconcileFundSourceStatements(ctx, testOrgID, period.UUID(), "user-1",
 			balancesFor([]domain.FundSourceStatementUUID{{UUID: common.NewUUIDv7()}}, 1_000))
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "fund-source-statement-not-found", cerr.ErrorSlug)
 
-		err = repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", balancesFor(append(ids, ids...), 1_000))
+		err = repo.ReconcileFundSourceStatements(ctx, testOrgID, period.UUID(), "user-1", balancesFor(append(ids, ids...), 1_000))
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "duplicate-statement", cerr.ErrorSlug)
 
-		err = repo.ReconcileFundSourceStatements(ctx, period.UUID(), "user-1", nil)
+		err = repo.ReconcileFundSourceStatements(ctx, testOrgID, period.UUID(), "user-1", nil)
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "statements-required", cerr.ErrorSlug)
 	})
@@ -508,10 +508,10 @@ func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
 	t.Run("stores status, closing balance and reconciled_at", func(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
-		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
 		reconcileAllStatements(t, period, 1_000)
 
-		require.NoError(t, repo.ReconcileLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.ReconcileLedgerPeriod(ctx, testOrgID, period.UUID()))
 
 		var status string
 		var closing decimal.Decimal
@@ -527,9 +527,9 @@ func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
 	t.Run("an unreconciled statement fails and the period stays closed", func(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000), createCashFundSource(t, ctx, 1_000))
-		require.NoError(t, repo.CloseLedgerPeriod(ctx, period.UUID()))
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
 
-		err := repo.ReconcileLedgerPeriod(ctx, period.UUID())
+		err := repo.ReconcileLedgerPeriod(ctx, testOrgID, period.UUID())
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "statements-not-reconciled", cerr.ErrorSlug)
@@ -544,7 +544,7 @@ func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
 		resetPeriods(t, ctx)
 		period := openPeriodFor(t, ctx, createCashFundSource(t, ctx, 1_000))
 
-		err := repo.ReconcileLedgerPeriod(ctx, period.UUID())
+		err := repo.ReconcileLedgerPeriod(ctx, testOrgID, period.UUID())
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "period-not-closed", cerr.ErrorSlug)
@@ -553,7 +553,7 @@ func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
 	t.Run("unknown period is not found", func(t *testing.T) {
 		resetPeriods(t, ctx)
 
-		err := repo.ReconcileLedgerPeriod(ctx, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()})
+		err := repo.ReconcileLedgerPeriod(ctx, testOrgID, domain.LedgerPeriodUUID{UUID: common.NewUUIDv7()})
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "ledger-period-not-found", cerr.ErrorSlug)

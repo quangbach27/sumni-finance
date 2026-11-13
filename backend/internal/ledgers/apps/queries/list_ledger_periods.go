@@ -8,10 +8,11 @@ import (
 )
 
 type ListLedgerPeriods struct {
+	OrgID  string
 	Page   shared.PageRequest
 	Status *domain.LedgerStatus // nil = any status
 }
 
 func (h *Handlers) ListLedgerPeriods(ctx context.Context, query ListLedgerPeriods) (shared.PagedResult[LedgerPeriod], error) {
-	return h.periodReadModel.ListLedgerPeriods(ctx, query)
+	return h.periodReadModel.ListLedgerPeriods(ctx, query.OrgID, query)
 }

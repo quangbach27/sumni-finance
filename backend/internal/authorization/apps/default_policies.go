@@ -33,12 +33,13 @@ func administratorAccess() (domain.Policy, error) {
 	return domain.NewPolicy("AdministratorAccess", rules...)
 }
 
-// readOnlyAccess allows read on ledger resources.
+// readOnlyAccess allows read on ledger resources (not access grants).
 func readOnlyAccess() (domain.Policy, error) {
 	resources := []shared.Resource{
 		shared.ResourceFundSource,
 		shared.ResourceLedgerPeriod,
 		shared.ResourceLedgerEntry,
+		shared.ResourceLedgerCategory,
 	}
 
 	var errs []error

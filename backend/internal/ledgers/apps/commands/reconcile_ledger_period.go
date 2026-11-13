@@ -9,6 +9,7 @@ import (
 )
 
 type ReconcileLedgerPeriod struct {
+	OrgID            string
 	LedgerPeriodUUID domain.LedgerPeriodUUID
 }
 
@@ -16,7 +17,7 @@ type ReconcileLedgerPeriod struct {
 // is reconciled. The repository checks the statements and sets the closing
 // balance.
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, cmd ReconcileLedgerPeriod) error {
-	if err := h.periodRepo.ReconcileLedgerPeriod(ctx, cmd.LedgerPeriodUUID); err != nil {
+	if err := h.periodRepo.ReconcileLedgerPeriod(ctx, cmd.OrgID, cmd.LedgerPeriodUUID); err != nil {
 		return err
 	}
 
