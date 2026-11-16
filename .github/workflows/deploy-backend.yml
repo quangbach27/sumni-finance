@@ -9,7 +9,7 @@ on:
           - dev
         default: dev
       tag:
-        description: "Image tag to deploy (the commit SHA published by Backend Commit Stage)"
+        description: "Image tag (commit SHA) to deploy"
         type: string
         required: true
 

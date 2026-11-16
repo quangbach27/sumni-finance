@@ -3,18 +3,18 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: "Environment whose variables (VITE_*) are used for the build"
+        description: "Environment to build for"
         type: string
         required: false
         default: dev
     outputs:
       artifact-name:
-        description: "Name of the uploaded artifact that contains the web dist"
+        description: "Artifact name of the web build"
         value: ${{ jobs.build.outputs.artifact-name }}
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment whose variables (VITE_*) are used for the build"
+        description: "Environment to build for"
         type: choice
         options:
           - dev

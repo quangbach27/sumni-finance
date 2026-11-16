@@ -3,18 +3,18 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: "Environment whose variables/secrets (AWS_*, ECR_REPOSITORY_URL) are used to publish the image"
+        description: "Environment to publish to"
         type: string
         required: false
         default: dev
     outputs:
       image:
-        description: "ECR reference (repository:sha) of the published backend image"
+        description: "Published image (repository:sha)"
         value: ${{ jobs.package.outputs.image }}
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment whose variables/secrets (AWS_*, ECR_REPOSITORY_URL) are used to publish the image"
+        description: "Environment to publish to"
         type: choice
         options:
           - dev
