@@ -10,7 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/labstack/echo/v5 v5.4.6
 	github.com/oapi-codegen/runtime v1.9.0
-	github.com/quangbach27/golang-common v0.0.7
+	github.com/quangbach27/golang-common v0.0.8
 	github.com/shopspring/decimal v1.6.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/sync v0.25.0
@@ -40,7 +40,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/MirrexOne/unqueryvet v1.5.4 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
-	github.com/ThreeDotsLabs/humanslog v0.1.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
 	github.com/alecthomas/go-check-sumtype v0.5.1-0.20260828200218-ae6904d28606 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.6 // indirect
