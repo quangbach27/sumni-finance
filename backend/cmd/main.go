@@ -27,6 +27,11 @@ func main() {
 	startCtx, cancelStart := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelStart()
 
+	// Secrets Manager overrides (no-op when the AWS_SECRET_*_ARN vars are unset).
+	if err := configs.LoadSecrets(startCtx, config); err != nil {
+		log.Fatalf("failed to load secrets: %s", err.Error())
+	}
+
 	pgxDb, err := newDbConn(startCtx, config.DB)
 	if err != nil {
 		log.Fatalf("failed to create db conn: %s", err.Error())
