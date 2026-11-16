@@ -21,6 +21,9 @@ jobs:
   commit-stage:
     name: Commit stage
     uses: ./.github/workflows/web-commit-stage.yml
+    permissions:
+      contents: read
+      security-events: write
     with:
       environment: ${{ inputs.environment }}
 
