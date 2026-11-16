@@ -1,4 +1,4 @@
-.PHONY: up down down-clean seed web storybook docs docs-preview docs-lint
+.PHONY: up down down-clean seed web storybook docs docs-preview docs-lint tf-init tf-plan tf-apply ecr-push lightsail-deploy web-deploy
 
 OPENAPI_SPEC := api/openapi/ledgers.yml
 DOCS_OUT := docs/api/ledgers.html
@@ -30,3 +30,27 @@ docs-preview:
 # Lint the OpenAPI spec
 docs-lint:
 	npx @redocly/cli lint $(OPENAPI_SPEC)
+
+# ---- AWS (dev) ----
+TF_DIR := terraform/environments/dev
+
+tf-init:
+	terraform -chdir=$(TF_DIR) init
+
+tf-plan:
+	terraform -chdir=$(TF_DIR) plan
+
+tf-apply:
+	terraform -chdir=$(TF_DIR) apply
+
+# Build + push backend image to ECR (TAG defaults to git short SHA)
+ecr-push:
+	deploy/ecr-push.sh $(TAG)
+
+# Create a Lightsail deployment for an image already in ECR
+lightsail-deploy:
+	deploy/lightsail-deploy.sh $(TAG)
+
+# Build web and publish to S3 + CloudFront
+web-deploy:
+	deploy/web-deploy.sh

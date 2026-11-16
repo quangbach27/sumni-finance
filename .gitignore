@@ -7,3 +7,10 @@
 
 # Generated API docs
 docs/api/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
