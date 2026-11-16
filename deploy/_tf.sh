@@ -20,6 +20,6 @@ need() {
 
 # Local pushes/deploys use the limited deployer profile. CI sets AWS_ACCESS_KEY_ID instead.
 if [ -z "${AWS_ACCESS_KEY_ID:-}" ]; then
-  export AWS_PROFILE="${AWS_PROFILE:-sumni-deployer}"
+  export AWS_PROFILE="${AWS_PROFILE:-sumni-finance-dev}"
 fi
 export AWS_REGION="${AWS_REGION:-ap-southeast-2}"
