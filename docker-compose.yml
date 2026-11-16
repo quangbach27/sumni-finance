@@ -28,7 +28,7 @@ services:
         condition: service_healthy
 
   sumni-finance-db:
-    image: postgres:17.6-alpine3.22
+    image: postgres:18-alpine
     restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
@@ -37,7 +37,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: sumni-finance
     volumes:
-      - sumni-finance-postgres-data:/var/lib/postgresql/data
+      - sumni-finance-postgres-data:/var/lib/postgresql
     healthcheck:
       test: pg_isready -U user -d sumni-finance && psql -U user -d sumni-finance -c 'SELECT 1' >/dev/null
       interval: 1s

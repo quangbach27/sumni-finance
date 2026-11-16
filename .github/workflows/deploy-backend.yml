@@ -8,6 +8,10 @@ on:
         options:
           - dev
         default: dev
+      tag:
+        description: "Image tag to deploy (the commit SHA published by Backend Commit Stage)"
+        type: string
+        required: true
 
 # Never run two deployments to the same environment at the same time.
 concurrency:
@@ -18,40 +22,51 @@ permissions:
   contents: read
 
 jobs:
-  commit-stage:
-    name: Commit stage
-    uses: ./.github/workflows/backend-commit-stage.yml
-    with:
-      environment: ${{ inputs.environment }}
-    permissions:
-      contents: read
-      id-token: write
-      security-events: write
-
   deploy:
-    name: Deploy to Cloud Run (${{ inputs.environment }})
-    needs: [commit-stage]
+    name: Deploy to Lightsail (${{ inputs.environment }})
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
-    permissions:
-      contents: read
-      id-token: write # Workload Identity Federation
     steps:
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v3
-
-      # Only the app image changes. Env, secrets and the Auth Proxy sidecar stay as Terraform declared them.
-      - name: Deploy to Cloud Run
+      - name: Check the image exists in ECR
+        env:
+          ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+          TAG: ${{ inputs.tag }}
         run: |
-          gcloud run deploy "${{ vars.CLOUD_RUN_SERVICE }}" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
-            --region "${{ vars.GCP_REGION }}" \
-            --container app \
-            --image "${{ needs.commit-stage.outputs.image }}" \
-            --quiet
+          repo="${ECR_REPOSITORY_URL#*/}"
+          if ! aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$TAG" >/dev/null 2>&1; then
+            echo "::error::Image tag '$TAG' not found in ECR repository '$repo'. Build it first with the Backend Commit Stage workflow."
+            exit 1
+          fi
+
+      # The backend loads its DB credentials and Clerk keys from Secrets Manager at startup, using
+      # the runtime key below (read-only on those two secrets).
+      - name: Deploy to Lightsail
+        env:
+          IMAGE: ${{ vars.ECR_REPOSITORY_URL }}:${{ inputs.tag }}
+          APP_ENV: ${{ inputs.environment }}
+          LIGHTSAIL_SERVICE: ${{ vars.LIGHTSAIL_SERVICE }}
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          WEB_URL: ${{ vars.WEB_URL }}
+          DB_SECRET_ARN: ${{ vars.DB_SECRET_ARN }}
+          APP_SECRET_ARN: ${{ vars.APP_SECRET_ARN }}
+          RUNTIME_ACCESS_KEY_ID: ${{ secrets.RUNTIME_ACCESS_KEY_ID }}
+          RUNTIME_SECRET_ACCESS_KEY: ${{ secrets.RUNTIME_SECRET_ACCESS_KEY }}
+        run: deploy/lightsail-deploy.sh
+
+      - name: Summary
+        run: |
+          {
+            echo "### Backend deployed"
+            echo "Image: \`${{ vars.ECR_REPOSITORY_URL }}:${{ inputs.tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
