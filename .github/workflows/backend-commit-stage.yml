@@ -17,63 +17,62 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    # services:
-    #   postgres:
-    #     image: postgres:18-alpine
-    #     env:
-    #       POSTGRES_USER: user
-    #       POSTGRES_PASSWORD: password
-    #       POSTGRES_DB: wild-workout
-    #     ports:
-    #       - 5432:5432
-    #     options: >-
-    #       --health-cmd "pg_isready -U user"
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: wild-workout
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v6
-    #
-    #   - name: Set up Go
-    #     uses: actions/setup-go@v5
-    #     with:
-    #       go-version-file: "backend/go.mod"
-    #       cache: true
-    #       cache-dependency-path: backend/go.sum
-    #
-    #   - name: Check go.mod / go.sum are tidy
-    #     working-directory: backend
-    #     run: |
-    #       make tidy
-    #       git diff --exit-code go.mod go.sum
-    #
-    #   - name: Lint
-    #     working-directory: backend
-    #     run: make lint
-    #
-    #   - name: Test
-    #     working-directory: backend
-    #     run: make test-unit
-    #
-    #   - name: Build
-    #     working-directory: backend
-    #     run: go build -v ./...
+          - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "backend/go.mod"
+          cache: true
+          cache-dependency-path: backend/go.sum
+    
+      - name: Check go.mod / go.sum are tidy
+        working-directory: backend
+        run: |
+          make tidy
+          git diff --exit-code go.mod go.sum
+    
+      - name: Lint
+        working-directory: backend
+        run: make lint
+    
+      - name: Test
+        working-directory: backend
+        run: make test-unit
+    
+      - name: Build
+        working-directory: backend
+        run: go build -v ./...
 
-    # - name: Scan backend code (Anchore)
-    #   uses: anchore/scan-action@v7
-    #   id: scan
-    #   with:
-    #     path: "backend"
-    #     fail-build: false
-    #     severity-cutoff: high
+      - name: Scan backend code (Anchore)
+        uses: anchore/scan-action@v7
+        id: scan
+        with:
+          path: "backend"
+          fail-build: false
+          severity-cutoff: high
 
-    # - name: Upload backend code scan SARIF report
-    #   uses: github/codeql-action/upload-sarif@v4
-    #   with:
-    #     sarif_file: ${{ steps.scan.outputs.sarif }}
-    #     category: backend-code
+      - name: Upload backend code scan SARIF report
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: backend-code
 
   package:
     name: Package and Publish
@@ -122,21 +121,21 @@ jobs:
         if: steps.exists.outputs.ghcr != 'true'
         run: docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f backend/docker/app-prod/Dockerfile backend
 
-      # - name: Scan backend image (Anchore)
-      #   if: steps.exists.outputs.ghcr != 'true'
-      #   uses: anchore/scan-action@v7
-      #   id: scan
-      #   with:
-      #     image: ${{ env.IMAGE }}
-      #     fail-build: false
-      #     severity-cutoff: high
+      - name: Scan backend image (Anchore)
+        if: steps.exists.outputs.ghcr != 'true'
+        uses: anchore/scan-action@v7
+        id: scan
+        with:
+          image: ${{ env.IMAGE }}
+          fail-build: false
+          severity-cutoff: high
 
-      # - name: Upload backend image scan SARIF report
-      #   if: steps.exists.outputs.ghcr != 'true'
-      #   uses: github/codeql-action/upload-sarif@v4
-      #   with:
-      #     sarif_file: ${{ steps.scan.outputs.sarif }}
-      #     category: backend-image
+      - name: Upload backend image scan SARIF report
+        if: steps.exists.outputs.ghcr != 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: backend-image
 
       - name: Publish image to GHCR
         if: steps.exists.outputs.ghcr != 'true'

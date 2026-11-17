@@ -69,7 +69,7 @@ Loaded from `terraform output` at run time, so **no GitHub variable is needed** 
 
 ### Web workflow (`deploy-web`)
 
-Builds in `web-commit-stage` (it needs `VITE_API_BASE_URL`, so it also loads the Terraform outputs), then syncs `web/dist` to S3 and invalidates CloudFront. Same `dev` environment and deployer credentials as the backend; nothing extra to configure.
+Lints and scans, then builds (it needs `VITE_API_BASE_URL`, so it loads the Terraform outputs first), then syncs `web/dist` to S3 and invalidates CloudFront. Same `dev` environment and deployer credentials as the backend; nothing extra to configure.
 
 ## Connecting to the dev DB
 

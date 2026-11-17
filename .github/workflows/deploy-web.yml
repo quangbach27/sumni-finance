@@ -18,25 +18,89 @@ permissions:
   contents: read
 
 jobs:
-  commit-stage:
-    name: Commit stage
-    uses: ./.github/workflows/web-commit-stage.yml
+  build:
+    name: Build and Test (${{ inputs.environment }})
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
       security-events: write
-    with:
-      environment: ${{ inputs.environment }}
+    outputs:
+      artifact-name: ${{ steps.meta.outputs.artifact-name }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+
+      - uses: anchore/scan-action@v7
+        id: scan
+        with:
+          path: "web"
+          fail-build: false
+          severity-cutoff: high
+
+      - name: Upload Anchore scan SARIF report
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: web-lib
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Load infra values from Terraform
+        uses: ./.github/actions/terraform-outputs
+
+      - name: Build
+        working-directory: web
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Set artifact name
+        id: meta
+        run: echo "artifact-name=web-dist-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ steps.meta.outputs.artifact-name }}
+          path: web/dist
+          if-no-files-found: error
+          retention-days: 7
 
   deploy:
     name: Deploy to S3 + CloudFront (${{ inputs.environment }})
-    needs: [commit-stage]
+    needs: [build]
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
     steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
       - name: Download dist artifact
         uses: actions/download-artifact@v5
         with:
-          name: ${{ needs.commit-stage.outputs.artifact-name }}
+          name: ${{ needs.build.outputs.artifact-name }}
           path: web/dist
 
       - name: Configure AWS credentials
@@ -46,7 +110,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # Exports LIGHTSAIL_SERVICE, DB_*, *_ARN, WEB_*, VITE_API_BASE_URL from `terraform output`.
       - name: Load infra values from Terraform
         uses: ./.github/actions/terraform-outputs
 
@@ -58,7 +121,6 @@ jobs:
             --cache-control "public,max-age=31536000,immutable"
 
       - name: Upload index.html
-        # Uploaded last and never cached, so clients always get the newest asset hashes.
         run: |
           aws s3 cp web/dist/index.html "s3://$WEB_BUCKET/index.html" \
             --cache-control "no-cache" \

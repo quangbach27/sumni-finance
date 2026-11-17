@@ -27,20 +27,15 @@ func main() {
 	startCtx, cancelStart := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelStart()
 
-	// Secrets Manager overrides (no-op when the AWS_SECRET_*_ARN vars are unset).
-	slog.Info("loading secrets")
 	if err := configs.LoadSecrets(startCtx, config); err != nil {
 		fatal("failed to load secrets", err)
 	}
 
-	slog.Info("connecting to database", "host", config.DB.Host, "port", config.DB.Port)
 	pgxDb, err := newDbConn(startCtx, config.DB)
 	if err != nil {
 		fatal("failed to create db conn", err)
 	}
-	slog.Info("database connected")
 
-	slog.Info("creating clerk verifier")
 	tokenVerifier, err := auth.NewClerkVerifier(config.Clerk.ClerkSecretKey, config.Clerk.AuthorizedParties)
 	if err != nil {
 		fatal("failed to create clerk verifier", err)
