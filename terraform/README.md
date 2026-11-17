@@ -47,7 +47,7 @@ Order matters: deploy the backend *after* the Clerk secrets are set (the app fai
 
 ## CI/CD (GitHub Actions, backend)
 
-Terraform runs **locally only** (it creates the AWS resources). CI never runs terraform: it gets every value from the `dev` GitHub environment below.
+Terraform only **creates** the AWS resources, and runs locally. CI never applies it: each job runs `terraform init` + `terraform output` (read-only) through the `.github/actions/terraform-outputs` action and `deploy/tf-env.sh`, which export the non-secret infra values (service name, DB host, secret ARNs, bucket, distribution id, URLs) for the following steps. The deployer IAM user may read the state object `dev/terraform.tfstate` for that (nothing else in the bucket). Only the values below live in the `dev` GitHub environment.
 
 Two manually triggered workflows, both using the `dev` GitHub environment:
 
@@ -62,35 +62,14 @@ Configure the `dev` environment (values from `terraform output`):
 |---|---|---|
 | secret | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | access key of the `deployer_user` IAM user (setup step 3) |
 | secret | `RUNTIME_ACCESS_KEY_ID`, `RUNTIME_SECRET_ACCESS_KEY` | access key of the `runtime_user` IAM user (setup step 3; handed to Lightsail so the app can read its 2 secrets) |
-| var | `AWS_REGION` | `region` |
-| var | `LIGHTSAIL_SERVICE` | `lightsail_service` |
-| var | `DB_HOST`, `DB_NAME` | `db_host`, `db_name` |
-| var | `WEB_URL` | `web_url` |
-| var | `DB_SECRET_ARN`, `APP_SECRET_ARN` | `db_secret_arn`, `backend_secret_arn` |
+| var | `AWS_REGION` | `ap-southeast-2` (needed before CI can read anything from Terraform) |
+| var | `VITE_CLERK_PUBLISHABLE_KEY` | Clerk publishable key (not in Terraform) |
 
-Set the variables in one pass (`T` as in setup step 2):
-```sh
-setvar() { gh variable set "$1" --env dev --body "$($T output -raw "$2")"; }
-setvar AWS_REGION region;            setvar LIGHTSAIL_SERVICE lightsail_service
-setvar DB_HOST db_host;              setvar DB_NAME db_name
-setvar WEB_URL web_url;              setvar DB_SECRET_ARN db_secret_arn
-setvar APP_SECRET_ARN backend_secret_arn
-setvar WEB_BUCKET web_bucket;        setvar WEB_DISTRIBUTION_ID web_distribution_id
-setvar VITE_API_BASE_URL api_url
-```
+Loaded from `terraform output` at run time, so **no GitHub variable is needed** for them: `LIGHTSAIL_SERVICE`, `DB_HOST`, `DB_NAME`, `DB_SECRET_ARN`, `APP_SECRET_ARN`, `WEB_URL`, `WEB_BUCKET`, `WEB_DISTRIBUTION_ID`, `VITE_API_BASE_URL` (the list is in `deploy/tf-env.sh`). After an infra change nothing has to be copied to GitHub.
 
 ### Web workflow (`deploy-web`)
 
-Builds in `web-commit-stage`, then syncs `web/dist` to S3 and invalidates CloudFront. It uses the same `dev` environment and deployer credentials as the backend, plus:
-
-| Kind | Name | From terraform output |
-|---|---|---|
-| var | `WEB_BUCKET` | `web_bucket` |
-| var | `WEB_DISTRIBUTION_ID` | `web_distribution_id` |
-| var | `VITE_API_BASE_URL` | `api_url` |
-| var | `VITE_CLERK_PUBLISHABLE_KEY` | (Clerk publishable key) |
-
-`AWS_REGION` and `WEB_URL` are shared with the backend workflow.
+Builds in `web-commit-stage` (it needs `VITE_API_BASE_URL`, so it also loads the Terraform outputs), then syncs `web/dist` to S3 and invalidates CloudFront. Same `dev` environment and deployer credentials as the backend; nothing extra to configure.
 
 ## Connecting to the dev DB
 

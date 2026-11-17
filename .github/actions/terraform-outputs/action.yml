@@ -1,0 +1,14 @@
+name: Load Terraform outputs
+description: >
+  Export the non-secret infra values (service name, DB host, secret ARNs, bucket, distribution id,
+  URLs) from the Terraform state as env vars for the following steps. Needs AWS credentials
+  configured first (the deployer user can read the state object) and a checked-out repo.
+runs:
+  using: composite
+  steps:
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+    - name: Read terraform output
+      shell: bash
+      run: deploy/tf-env.sh

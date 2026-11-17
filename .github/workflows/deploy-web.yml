@@ -46,9 +46,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # Exports LIGHTSAIL_SERVICE, DB_*, *_ARN, WEB_*, VITE_API_BASE_URL from `terraform output`.
+      - name: Load infra values from Terraform
+        uses: ./.github/actions/terraform-outputs
+
       - name: Sync hashed assets to S3
         run: |
-          aws s3 sync web/dist "s3://${{ vars.WEB_BUCKET }}" \
+          aws s3 sync web/dist "s3://$WEB_BUCKET" \
             --delete \
             --exclude index.html \
             --cache-control "public,max-age=31536000,immutable"
@@ -56,20 +60,20 @@ jobs:
       - name: Upload index.html
         # Uploaded last and never cached, so clients always get the newest asset hashes.
         run: |
-          aws s3 cp web/dist/index.html "s3://${{ vars.WEB_BUCKET }}/index.html" \
+          aws s3 cp web/dist/index.html "s3://$WEB_BUCKET/index.html" \
             --cache-control "no-cache" \
             --content-type "text/html"
 
       - name: Invalidate CloudFront
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.WEB_DISTRIBUTION_ID }}" \
+            --distribution-id "$WEB_DISTRIBUTION_ID" \
             --paths "/*" > /dev/null
 
       - name: Summary
         run: |
           {
             echo "### Web deployed (${{ inputs.environment }})"
-            echo "- Bucket: \`${{ vars.WEB_BUCKET }}\`"
-            echo "- URL: ${{ vars.WEB_URL }}"
+            echo "- Bucket: \`$WEB_BUCKET\`"
+            echo "- URL: $WEB_URL"
           } >> "$GITHUB_STEP_SUMMARY"

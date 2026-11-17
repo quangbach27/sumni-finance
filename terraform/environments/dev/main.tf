@@ -11,8 +11,14 @@ provider "aws" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   name = "${var.project}-${var.environment}"
+
+  # Bucket created by terraform/bootstrap; the key matches backend "s3" in versions.tf.
+  state_bucket = "${var.project}-tfstate-${data.aws_caller_identity.current.account_id}"
+  state_key    = "${var.environment}/terraform.tfstate"
 }
 
 module "network" {
@@ -60,4 +66,6 @@ module "deployer" {
   lightsail_service_arn       = module.backend.arn
   web_bucket_arn              = module.web.bucket_arn
   cloudfront_distribution_arn = module.web.distribution_arn
+  state_bucket                = local.state_bucket
+  state_key                   = local.state_key
 }

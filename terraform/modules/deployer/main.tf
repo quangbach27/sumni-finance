@@ -29,6 +29,19 @@ data "aws_iam_policy_document" "deployer" {
     resources = ["*"]
   }
 
+  # CI runs `terraform init` + `terraform output` (read-only, no lock) to get the infra values.
+  statement {
+    sid       = "StateList"
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::${var.state_bucket}"]
+  }
+
+  statement {
+    sid       = "StateRead"
+    actions   = ["s3:GetObject"]
+    resources = ["arn:aws:s3:::${var.state_bucket}/${var.state_key}"]
+  }
+
   statement {
     sid       = "WebBucketList"
     actions   = ["s3:ListBucket"]
