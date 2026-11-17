@@ -26,6 +26,11 @@ jobs:
     name: Deploy to Lightsail (${{ inputs.environment }})
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      packages: read # pull the image from GHCR
+    env:
+      REGISTRY: ghcr.io
     steps:
       - name: Checkout source code
         uses: actions/checkout@v6
@@ -41,9 +46,46 @@ jobs:
       - name: Load infra values from Terraform
         uses: ./.github/actions/terraform-outputs
 
-      # The image must already be in the Lightsail registry (published by the Backend Commit Stage,
-      # labelled with the commit SHA); the script fails if it is not, and waits for the deployment
-      # to become active.
+      - name: Log into container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `aws lightsail push-container-image` needs the lightsailctl plugin.
+      - name: Install lightsailctl
+        run: |
+          sudo curl -fsSL "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" \
+            -o /usr/local/bin/lightsailctl
+          sudo chmod +x /usr/local/bin/lightsailctl
+
+      # Lightsail cannot pull from GHCR, so the image published by the Backend Commit Stage is pulled
+      # here and pushed to the service's own registry. The push prints the name to use in the
+      # deployment (":<service>.<label>.<n>"); it is passed on to the deploy step as IMAGE.
+      - name: Push image to Lightsail registry
+        env:
+          TAG: ${{ inputs.tag }}
+          GHCR_IMAGE: ghcr.io/${{ github.repository }}/backend:${{ inputs.tag }}
+        run: |
+          if ! docker pull "$GHCR_IMAGE"; then
+            echo "error: $GHCR_IMAGE not found. Run the Backend Commit Stage for this SHA first." >&2
+            exit 1
+          fi
+          out="$(aws lightsail push-container-image \
+            --service-name "$LIGHTSAIL_SERVICE" --label "$TAG" --image "$GHCR_IMAGE" 2>&1)" || {
+            echo "$out" >&2
+            exit 1
+          }
+          echo "$out"
+          image="$(grep -oE '":[^" ]+"' <<<"$out" | tail -1 | tr -d '"')"
+          if [ -z "$image" ]; then
+            echo "error: could not find the Lightsail image name in the push output above" >&2
+            exit 1
+          fi
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+
+      # Creates the deployment of $IMAGE and waits for it to become active.
       # The backend loads its DB credentials and Clerk keys from Secrets Manager at startup, using
       # the runtime key below (read-only on those two secrets).
       - name: Deploy to Lightsail

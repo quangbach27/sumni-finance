@@ -4,7 +4,7 @@ Region `ap-southeast-2`. Terraform state is remote: an S3 bucket (versioned, enc
 
 | Piece | Service |
 |---|---|
-| Backend | Lightsail container service, image in the service's own registry (CI also keeps a copy in GHCR) |
+| Backend | Lightsail container service. CI builds the image into GHCR; the deploy copies it into the service's own registry |
 | Web | S3 (private) + CloudFront (OAC, SPA fallback to `index.html`) |
 | Database | RDS Postgres 18 (`db.t4g.micro`), **private** (no public endpoint, TLS forced), in the region's default VPC. Only the Lightsail network can reach it, through Lightsail VPC peering |
 | Secrets | Secrets Manager: the RDS-managed DB secret (`rds!db-...`, native rotation) and one app secret `<name>/backend` (Clerk keys) |
@@ -49,12 +49,12 @@ Order matters: deploy the backend *after* the Clerk secrets are set (the app fai
 
 Terraform only **creates** the AWS resources, and runs locally. CI never applies it: each job runs `terraform init` + `terraform output` (read-only) through the `.github/actions/terraform-outputs` action and `deploy/tf-env.sh`, which export the non-secret infra values (service name, DB host, secret ARNs, bucket, distribution id, URLs) for the following steps. The deployer IAM user may read the state object `dev/terraform.tfstate` for that (nothing else in the bucket). Only the values below live in the `dev` GitHub environment.
 
-Two manually triggered workflows, both using the `dev` GitHub environment:
+Two manually triggered workflows. Backend Commit Stage needs no AWS access; Deploy Backend uses the `dev` GitHub environment:
 
-1. **Backend Commit Stage**: lint, test, build, scan and publish the image. It is pushed to **GHCR** (`ghcr.io/<owner>/<repo>/backend:<sha>`, with the workflow's `GITHUB_TOKEN`) and to the **Lightsail service registry** (label = the commit SHA, registered as `:<service>.<sha>.<n>`). The job summary shows the SHA. Re-running on a published SHA skips the pushes.
-2. **Deploy Backend**: takes the image `tag` (a published SHA) as input, finds that image in the Lightsail registry and creates the deployment through `deploy/lightsail-deploy.sh`, then waits for it to become active. Rollback = deploy an older SHA. It does not rebuild or push.
+1. **Backend Commit Stage**: lint, test, build, scan and publish the image to **GHCR** only (`ghcr.io/<owner>/<repo>/backend:<sha>`, logged in with the workflow's `GITHUB_TOKEN`). The job summary shows the SHA. Re-running on a published SHA skips the build and push.
+2. **Deploy Backend**: takes the image `tag` (a published SHA) as input, pulls that image from GHCR and pushes it to the **Lightsail service registry** (label = the tag). The push prints the name Lightsail registered, `:<service>.<label>.<n>` (`<n>` counts the pushes of that label), which is passed to `deploy/lightsail-deploy.sh` as `IMAGE`; the script creates the deployment and waits for it to become active. Rollback = deploy an older SHA (GHCR keeps every published image, even after Lightsail drops it from its registry). It does not rebuild.
 
-Why not private ECR: Lightsail pulls from ECR with a role in an AWS-owned account, and the organization's resource control policy denies principals outside the org (`ecr:BatchGetImage ... explicit deny in a resource control policy`). The deployment then fails without any container log. Lightsail cannot pull from a private GHCR package either, so the image Lightsail runs always comes from its own registry.
+Why not private ECR: Lightsail pulls from ECR with a role in an AWS-owned account, and the organization's resource control policy denies principals outside the org (`ecr:BatchGetImage ... explicit deny in a resource control policy`). The deployment then fails without any container log. Lightsail cannot pull from a private GHCR package either, so the image Lightsail runs always comes from its own registry, and GHCR stays the source of truth.
 
 Configure the `dev` environment (values from `terraform output`):
 

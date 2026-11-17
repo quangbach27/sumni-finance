@@ -10,20 +10,20 @@ data "aws_iam_policy_document" "deployer" {
     sid = "LightsailDeploy"
     actions = [
       "lightsail:CreateContainerServiceDeployment",
-      "lightsail:GetContainerImages",
-      "lightsail:GetContainerLog",
-      "lightsail:GetContainerServiceDeployments",
       "lightsail:RegisterContainerImage",
     ]
     resources = [var.lightsail_service_arn]
   }
 
-  # GetContainerServices is a list-style call and the registry login is account-level:
-  # neither supports resource-level scoping.
+  # These calls have no resource type in IAM (AWS evaluates them against arn:aws:lightsail:<region>:<account>:*),
+  # so they cannot be scoped to the service. All are read-only except the registry login.
   statement {
     sid = "LightsailDescribe"
     actions = [
       "lightsail:CreateContainerServiceRegistryLogin",
+      "lightsail:GetContainerImages",
+      "lightsail:GetContainerLog",
+      "lightsail:GetContainerServiceDeployments",
       "lightsail:GetContainerServices",
     ]
     resources = ["*"]

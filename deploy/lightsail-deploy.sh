@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Create a Lightsail deployment for an image already pushed to the Lightsail service registry
-# (by the Backend Commit Stage workflow, or deploy/image-push.sh), then wait for the result.
+# Create a Lightsail deployment for an image in the Lightsail service registry, then wait for the result.
+# The image is $IMAGE if set (the Deploy Backend workflow pushes it from GHCR first), otherwise the
+# newest one labelled with the tag (pushed by deploy/image-push.sh).
 # Usage: deploy/lightsail-deploy.sh [tag]      (tag defaults to the short git SHA)
 #
 # Every input can be passed as an env var (CI does this). Anything unset is read from
@@ -22,14 +23,17 @@ need APP_SECRET_ARN backend_secret_arn
 need RUNTIME_ACCESS_KEY_ID
 need RUNTIME_SECRET_ACCESS_KEY
 
-# Images are registered as ":<service>.<label>.<n>" with label = tag. Take the newest one.
-IMAGE="$(aws lightsail get-container-images --service-name "$LIGHTSAIL_SERVICE" --output json |
-  jq -r --arg prefix ":$LIGHTSAIL_SERVICE.$TAG." \
-    '[.containerImages[] | select(.image | startswith($prefix))] | sort_by(.createdAt) | last | .image // empty')"
-if [ -z "$IMAGE" ]; then
-  echo "error: no image with label '$TAG' in the registry of $LIGHTSAIL_SERVICE." >&2
-  echo "Publish it first: run the Backend Commit Stage workflow for this SHA (or make image-push TAG=$TAG)." >&2
-  exit 1
+# CI pushes the image itself and passes its Lightsail name (":<service>.<label>.<n>") in IMAGE.
+# Locally (make image-push), look up the newest image registered with the label = tag.
+if [ -z "${IMAGE:-}" ]; then
+  IMAGE="$(aws lightsail get-container-images --service-name "$LIGHTSAIL_SERVICE" --output json |
+    jq -r --arg prefix ":$LIGHTSAIL_SERVICE.$TAG." \
+      '[.containerImages[] | select(.image | startswith($prefix))] | sort_by(.createdAt) | last | .image // empty')"
+  if [ -z "$IMAGE" ]; then
+    echo "error: no image with label '$TAG' in the registry of $LIGHTSAIL_SERVICE." >&2
+    echo "Push it first (make image-push TAG=$TAG), or run the Deploy Backend workflow, which pushes it from GHCR." >&2
+    exit 1
+  fi
 fi
 
 # The containers JSON contains the runtime key: keep it in a private temp file, not in argv.

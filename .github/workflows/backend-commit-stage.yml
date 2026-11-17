@@ -1,24 +1,11 @@
 name: Backend Commit Stage
 on:
   workflow_call:
-    inputs:
-      environment:
-        description: "Environment to publish to"
-        type: string
-        required: false
-        default: dev
     outputs:
       image:
         description: "Published image (repository:sha)"
         value: ${{ jobs.package.outputs.image }}
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment to publish to"
-        type: choice
-        options:
-          - dev
-        default: dev
 
 env:
   VERSION: ${{ github.sha }}
@@ -91,38 +78,21 @@ jobs:
   package:
     name: Package and Publish
     needs: [build]
-    runs-on:
-      ubuntu-24.04
-      # AWS_* come from the selected GitHub environment, LIGHTSAIL_SERVICE from the Terraform outputs.
-    environment: ${{ inputs.environment || 'dev' }}
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
       security-events: write
     env:
       REGISTRY: ghcr.io
-      # Canonical artifact in GHCR. The tag is the commit SHA.
+      # The only artifact of this stage, in GHCR. The tag is the commit SHA.
+      # Deploy Backend pulls it and pushes it to the Lightsail registry.
       IMAGE: ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
-      # Lightsail cannot pull from a private registry here, so the image is also pushed to the
-      # service's own registry, labelled with the commit SHA (":<service>.<sha>.<n>").
-      # LIGHTSAIL_SERVICE is loaded from the Terraform outputs below.
-      AWS_REGION: ${{ vars.AWS_REGION }}
     outputs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v6
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      # Exports LIGHTSAIL_SERVICE, DB_*, *_ARN, WEB_*, VITE_API_BASE_URL from `terraform output`.
-      - name: Load infra values from Terraform
-        uses: ./.github/actions/terraform-outputs
 
       - name: Log into container registry
         uses: docker/login-action@v4
@@ -132,7 +102,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # A commit SHA always maps to the same code, so an already published SHA is skipped
-      # (safe re-runs). Each registry is checked on its own.
+      # (safe re-runs).
       - name: Check if the image is already published
         id: exists
         run: |
@@ -143,16 +113,6 @@ jobs:
             echo "ghcr=false" >> "$GITHUB_OUTPUT"
           fi
 
-          prefix=":$LIGHTSAIL_SERVICE.${{ github.sha }}."
-          found="$(aws lightsail get-container-images --service-name "$LIGHTSAIL_SERVICE" --output json |
-            jq -r --arg prefix "$prefix" '[.containerImages[] | select(.image | startswith($prefix))] | length')"
-          if [ "$found" -gt 0 ]; then
-            echo "lightsail=true" >> "$GITHUB_OUTPUT"
-            echo "Image is already in the Lightsail registry, skipping push."
-          else
-            echo "lightsail=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Set up Docker Buildx
         if: steps.exists.outputs.ghcr != 'true'
         uses: docker/setup-buildx-action@v4
@@ -161,11 +121,6 @@ jobs:
       - name: Build container image
         if: steps.exists.outputs.ghcr != 'true'
         run: docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f backend/docker/app-prod/Dockerfile backend
-
-      # Already in GHCR but not in Lightsail: reuse the published image instead of rebuilding.
-      - name: Pull published image
-        if: steps.exists.outputs.ghcr == 'true' && steps.exists.outputs.lightsail != 'true'
-        run: docker pull "$IMAGE"
 
       # - name: Scan backend image (Anchore)
       #   if: steps.exists.outputs.ghcr != 'true'
@@ -186,22 +141,6 @@ jobs:
       - name: Publish image to GHCR
         if: steps.exists.outputs.ghcr != 'true'
         run: docker push "$IMAGE"
-
-      # `aws lightsail push-container-image` needs the lightsailctl plugin.
-      - name: Install lightsailctl
-        if: steps.exists.outputs.lightsail != 'true'
-        run: |
-          sudo curl -fsSL "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" \
-            -o /usr/local/bin/lightsailctl
-          sudo chmod +x /usr/local/bin/lightsailctl
-
-      - name: Publish image to Lightsail registry
-        if: steps.exists.outputs.lightsail != 'true'
-        run: |
-          aws lightsail push-container-image \
-            --service-name "$LIGHTSAIL_SERVICE" \
-            --label "${{ github.sha }}" \
-            --image "$IMAGE"
 
       - name: Set image output
         id: meta
