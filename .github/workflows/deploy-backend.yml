@@ -37,22 +37,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Check the image exists in ECR
-        env:
-          ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
-          TAG: ${{ inputs.tag }}
-        run: |
-          repo="${ECR_REPOSITORY_URL#*/}"
-          if ! aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$TAG" >/dev/null 2>&1; then
-            echo "::error::Image tag '$TAG' not found in ECR repository '$repo'. Build it first with the Backend Commit Stage workflow."
-            exit 1
-          fi
-
+      # The image must already be in the Lightsail registry (published by the Backend Commit Stage,
+      # labelled with the commit SHA); the script fails if it is not, and waits for the deployment
+      # to become active.
       # The backend loads its DB credentials and Clerk keys from Secrets Manager at startup, using
       # the runtime key below (read-only on those two secrets).
       - name: Deploy to Lightsail
         env:
-          IMAGE: ${{ vars.ECR_REPOSITORY_URL }}:${{ inputs.tag }}
+          TAG: ${{ inputs.tag }}
           APP_ENV: ${{ inputs.environment }}
           LIGHTSAIL_SERVICE: ${{ vars.LIGHTSAIL_SERVICE }}
           DB_HOST: ${{ vars.DB_HOST }}
@@ -68,5 +60,5 @@ jobs:
         run: |
           {
             echo "### Backend deployed"
-            echo "Image: \`${{ vars.ECR_REPOSITORY_URL }}:${{ inputs.tag }}\`"
+            echo "Image tag: \`${{ inputs.tag }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

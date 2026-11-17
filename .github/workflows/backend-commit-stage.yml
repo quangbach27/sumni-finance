@@ -93,14 +93,18 @@ jobs:
     needs: [build]
     runs-on:
       ubuntu-24.04
-      # AWS_* / ECR_REPOSITORY_URL come from the selected GitHub environment.
+      # AWS_* / LIGHTSAIL_SERVICE come from the selected GitHub environment.
     environment: ${{ inputs.environment || 'dev' }}
     permissions:
       contents: read
+      packages: write
       security-events: write
     env:
-      # ECR repository URL from `terraform output ecr_repository_url`. The tag is the commit SHA.
-      IMAGE: ${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}
+      # Canonical artifact in GHCR. The tag is the commit SHA.
+      IMAGE: ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+      # Lightsail cannot pull from a private registry here, so the image is also pushed to the
+      # service's own registry, labelled with the commit SHA (":<service>.<sha>.<n>").
+      LIGHTSAIL_SERVICE: ${{ vars.LIGHTSAIL_SERVICE }}
       AWS_REGION: ${{ vars.AWS_REGION }}
     outputs:
       image: ${{ steps.meta.outputs.image }}
@@ -115,32 +119,44 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # ECR tags are immutable and a commit SHA always maps to the same code, so an already
-      # published SHA is skipped (safe re-runs).
+      # A commit SHA always maps to the same code, so an already published SHA is skipped
+      # (safe re-runs). Each registry is checked on its own.
       - name: Check if the image is already published
         id: exists
         run: |
-          repo="${ECR_REPOSITORY_URL#*/}"
-          if aws ecr describe-images --repository-name "$repo" --image-ids imageTag="${{ github.sha }}" >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-            echo "Image tag ${{ github.sha }} is already in ECR, skipping build and push."
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "ghcr=true" >> "$GITHUB_OUTPUT"
+            echo "Image is already in GHCR, skipping build and push."
           else
-            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "ghcr=false" >> "$GITHUB_OUTPUT"
           fi
-        env:
-          ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+
+          prefix=":$LIGHTSAIL_SERVICE.${{ github.sha }}."
+          found="$(aws lightsail get-container-images --service-name "$LIGHTSAIL_SERVICE" --output json |
+            jq -r --arg prefix "$prefix" '[.containerImages[] | select(.image | startswith($prefix))] | length')"
+          if [ "$found" -gt 0 ]; then
+            echo "lightsail=true" >> "$GITHUB_OUTPUT"
+            echo "Image is already in the Lightsail registry, skipping push."
+          else
+            echo "lightsail=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
-        if: steps.exists.outputs.published != 'true'
+        if: steps.exists.outputs.ghcr != 'true'
         uses: docker/setup-buildx-action@v4
 
       # Lightsail runs on amd64.
       - name: Build container image
-        if: steps.exists.outputs.published != 'true'
+        if: steps.exists.outputs.ghcr != 'true'
         run: docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f backend/docker/app-prod/Dockerfile backend
 
+      # Already in GHCR but not in Lightsail: reuse the published image instead of rebuilding.
+      - name: Pull published image
+        if: steps.exists.outputs.ghcr == 'true' && steps.exists.outputs.lightsail != 'true'
+        run: docker pull "$IMAGE"
+
       # - name: Scan backend image (Anchore)
-      #   if: steps.exists.outputs.published != 'true'
+      #   if: steps.exists.outputs.ghcr != 'true'
       #   uses: anchore/scan-action@v7
       #   id: scan
       #   with:
@@ -149,19 +165,31 @@ jobs:
       #     severity-cutoff: high
 
       # - name: Upload backend image scan SARIF report
-      #   if: steps.exists.outputs.published != 'true'
+      #   if: steps.exists.outputs.ghcr != 'true'
       #   uses: github/codeql-action/upload-sarif@v4
       #   with:
       #     sarif_file: ${{ steps.scan.outputs.sarif }}
       #     category: backend-image
 
-      - name: Log in to Amazon ECR
-        if: steps.exists.outputs.published != 'true'
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Publish image
-        if: steps.exists.outputs.published != 'true'
+      - name: Publish image to GHCR
+        if: steps.exists.outputs.ghcr != 'true'
         run: docker push "$IMAGE"
+
+      # `aws lightsail push-container-image` needs the lightsailctl plugin.
+      - name: Install lightsailctl
+        if: steps.exists.outputs.lightsail != 'true'
+        run: |
+          sudo curl -fsSL "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" \
+            -o /usr/local/bin/lightsailctl
+          sudo chmod +x /usr/local/bin/lightsailctl
+
+      - name: Publish image to Lightsail registry
+        if: steps.exists.outputs.lightsail != 'true'
+        run: |
+          aws lightsail push-container-image \
+            --service-name "$LIGHTSAIL_SERVICE" \
+            --label "${{ github.sha }}" \
+            --image "$IMAGE"
 
       - name: Set image output
         id: meta

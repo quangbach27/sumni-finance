@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# Create a Lightsail deployment for an image already pushed to ECR.
+# Create a Lightsail deployment for an image already pushed to the Lightsail service registry
+# (by the Backend Commit Stage workflow, or deploy/image-push.sh), then wait for the result.
 # Usage: deploy/lightsail-deploy.sh [tag]      (tag defaults to the short git SHA)
 #
 # Every input can be passed as an env var (CI does this). Anything unset is read from
-# `terraform output` (local use). Needs aws, jq. The backend loads its secrets from Secrets Manager at startup.
+# `terraform output` (local use), except RUNTIME_ACCESS_KEY_ID / RUNTIME_SECRET_ACCESS_KEY, which
+# must always be set. Needs aws, jq. The backend loads its secrets from Secrets Manager at startup.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/_tf.sh
 
-if [ -z "${IMAGE:-}" ]; then
-  TAG="${1:-$(git rev-parse --short HEAD)}"
-  IMAGE="$(tfout ecr_repository_url):$TAG"
-fi
+TAG="${TAG:-${1:-$(git rev-parse --short HEAD)}}"
 APP_ENV="${APP_ENV:-dev}"
 need LIGHTSAIL_SERVICE lightsail_service
 need DB_HOST db_host
@@ -19,8 +18,19 @@ need DB_NAME db_name
 need WEB_URL web_url
 need DB_SECRET_ARN db_secret_arn
 need APP_SECRET_ARN backend_secret_arn
-need RUNTIME_ACCESS_KEY_ID runtime_access_key_id
-need RUNTIME_SECRET_ACCESS_KEY runtime_secret_access_key
+# The runtime key is not in Terraform: it must be passed in (CI: GitHub secrets).
+need RUNTIME_ACCESS_KEY_ID
+need RUNTIME_SECRET_ACCESS_KEY
+
+# Images are registered as ":<service>.<label>.<n>" with label = tag. Take the newest one.
+IMAGE="$(aws lightsail get-container-images --service-name "$LIGHTSAIL_SERVICE" --output json |
+  jq -r --arg prefix ":$LIGHTSAIL_SERVICE.$TAG." \
+    '[.containerImages[] | select(.image | startswith($prefix))] | sort_by(.createdAt) | last | .image // empty')"
+if [ -z "$IMAGE" ]; then
+  echo "error: no image with label '$TAG' in the registry of $LIGHTSAIL_SERVICE." >&2
+  echo "Publish it first: run the Backend Commit Stage workflow for this SHA (or make image-push TAG=$TAG)." >&2
+  exit 1
+fi
 
 # The containers JSON contains the runtime key: keep it in a private temp file, not in argv.
 CONTAINERS_FILE="$(mktemp)"
@@ -73,9 +83,28 @@ PUBLIC_ENDPOINT='{
   }
 }'
 
-aws lightsail create-container-service-deployment \
+VERSION="$(aws lightsail create-container-service-deployment \
   --service-name "$LIGHTSAIL_SERVICE" \
   --containers "file://$CONTAINERS_FILE" \
-  --public-endpoint "$PUBLIC_ENDPOINT" >/dev/null
+  --public-endpoint "$PUBLIC_ENDPOINT" \
+  --query 'containerService.nextDeployment.version' --output text)"
 
-echo "Deployed $IMAGE to $LIGHTSAIL_SERVICE"
+echo "Created deployment $VERSION of $IMAGE on $LIGHTSAIL_SERVICE, waiting for it to become active..."
+
+# Lightsail gives up on its own after a few failed starts; the timeout is only a safety net.
+STATE="ACTIVATING"
+for _ in $(seq 1 60); do
+  STATE="$(aws lightsail get-container-service-deployments --service-name "$LIGHTSAIL_SERVICE" \
+    --query "deployments[?version==\`$VERSION\`].state | [0]" --output text)"
+  [ "$STATE" = "ACTIVATING" ] || break
+  sleep 10
+done
+
+if [ "$STATE" != "ACTIVE" ]; then
+  echo "error: deployment $VERSION is $STATE. Last container log lines:" >&2
+  aws lightsail get-container-log --service-name "$LIGHTSAIL_SERVICE" --container-name backend \
+    --output json | jq -r '.logEvents[-30:][].message' >&2 || true
+  exit 1
+fi
+
+echo "Deployed $IMAGE to $LIGHTSAIL_SERVICE (deployment $VERSION)"
