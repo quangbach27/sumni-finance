@@ -1,8 +1,4 @@
-output "access_key_id" {
-  value = aws_iam_access_key.deployer.id
-}
-
-output "secret_access_key" {
-  value     = aws_iam_access_key.deployer.secret
-  sensitive = true
+output "user_name" {
+  description = "IAM user used by CI to push and deploy. Create its access key outside Terraform."
+  value       = aws_iam_user.deployer.name
 }

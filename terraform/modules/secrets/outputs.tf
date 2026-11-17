@@ -3,11 +3,7 @@ output "secret_arn" {
   value       = aws_secretsmanager_secret.backend.arn
 }
 
-output "runtime_access_key_id" {
-  value = aws_iam_access_key.runtime.id
-}
-
-output "runtime_secret_access_key" {
-  value     = aws_iam_access_key.runtime.secret
-  sensitive = true
+output "runtime_user_name" {
+  description = "IAM user the backend container runs as. Create its access key outside Terraform."
+  value       = aws_iam_user.runtime.name
 }

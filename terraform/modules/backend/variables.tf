@@ -13,15 +13,11 @@ variable "scale" {
   default = 1
 }
 
-variable "enable_vpc_peering" {
-  description = <<-EOT
-    Enable Lightsail VPC peering (account+region wide). Not needed while the DB is public.
-    Note: Lightsail only peers with the region's DEFAULT VPC, so a private DB must live there.
-  EOT
-  type        = bool
-  default     = false
-}
-
 variable "region" {
   type = string
+}
+
+variable "aws_profile" {
+  description = "AWS CLI profile used to enable Lightsail VPC peering."
+  type        = string
 }

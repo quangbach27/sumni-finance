@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
@@ -7,7 +7,14 @@ terraform {
       version = "~> 6.0"
     }
   }
-}
 
-# Local state (single developer). terraform.tfstate holds the IAM access keys' secrets:
-# keep it private (it is gitignored) and back it up.
+  # Remote state in the bucket created by terraform/bootstrap. The bucket name and the AWS profile
+  # are passed by `make tf-init` (-backend-config). use_lockfile locks the state with an S3 object,
+  # so no DynamoDB table is needed.
+  backend "s3" {
+    key          = "dev/terraform.tfstate"
+    region       = "ap-southeast-2"
+    encrypt      = true
+    use_lockfile = true
+  }
+}

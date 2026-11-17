@@ -10,15 +10,10 @@ variable "db_subnet_group_name" {
   type = string
 }
 
-variable "db_public" {
-  description = "Whether the instance gets a public endpoint. Must match the network module."
-  type        = bool
-  default     = false
-}
-
-variable "db_allowed_cidrs" {
-  description = "CIDRs allowed to reach Postgres (5432)."
-  type        = list(string)
+variable "lightsail_cidr" {
+  description = "CIDR of the Lightsail VPC in this region, the only network allowed to reach Postgres (5432)."
+  type        = string
+  default     = "172.26.0.0/16"
 }
 
 variable "engine_version" {

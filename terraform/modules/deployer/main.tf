@@ -1,43 +1,31 @@
+# The access key is created outside Terraform (see terraform/README.md) so the secret never
+# lands in the state or in an output.
 resource "aws_iam_user" "deployer" {
   name = "${var.name}-deployer"
 }
 
 data "aws_iam_policy_document" "deployer" {
-  statement {
-    sid       = "EcrLogin"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid = "EcrPushBackendImage"
-    actions = [
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:BatchGetImage",
-      "ecr:CompleteLayerUpload",
-      "ecr:DescribeImages",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:InitiateLayerUpload",
-      "ecr:PutImage",
-      "ecr:UploadLayerPart",
-    ]
-    resources = [var.ecr_repository_arn]
-  }
-
+  # Push images to the service's own registry (aws lightsail push-container-image) and deploy them.
   statement {
     sid = "LightsailDeploy"
     actions = [
       "lightsail:CreateContainerServiceDeployment",
+      "lightsail:GetContainerImages",
       "lightsail:GetContainerLog",
       "lightsail:GetContainerServiceDeployments",
+      "lightsail:RegisterContainerImage",
     ]
     resources = [var.lightsail_service_arn]
   }
 
-  # GetContainerServices is a list-style call without resource-level scoping.
+  # GetContainerServices is a list-style call and the registry login is account-level:
+  # neither supports resource-level scoping.
   statement {
-    sid       = "LightsailDescribe"
-    actions   = ["lightsail:GetContainerServices"]
+    sid = "LightsailDescribe"
+    actions = [
+      "lightsail:CreateContainerServiceRegistryLogin",
+      "lightsail:GetContainerServices",
+    ]
     resources = ["*"]
   }
 
@@ -64,8 +52,4 @@ resource "aws_iam_user_policy" "deployer" {
   name   = "deploy"
   user   = aws_iam_user.deployer.name
   policy = data.aws_iam_policy_document.deployer.json
-}
-
-resource "aws_iam_access_key" "deployer" {
-  user = aws_iam_user.deployer.name
 }

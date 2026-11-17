@@ -18,12 +18,6 @@ variable "environment" {
   default = "dev"
 }
 
-variable "db_allowed_cidrs" {
-  description = "CIDRs allowed to reach the public dev database. Lightsail has no static egress IP, so dev defaults to open (TLS + password enforced)."
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
-}
-
 variable "db_instance_class" {
   type    = string
   default = "db.t4g.micro"

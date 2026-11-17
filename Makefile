@@ -1,4 +1,4 @@
-.PHONY: up down down-clean seed web storybook docs docs-preview docs-lint tf-init tf-plan tf-apply ecr-push lightsail-deploy web-deploy
+.PHONY: up down down-clean seed web storybook docs docs-preview docs-lint tf-bootstrap tf-init tf-plan tf-apply image-push lightsail-deploy web-deploy
 
 OPENAPI_SPEC := api/openapi/ledgers.yml
 DOCS_OUT := docs/api/ledgers.html
@@ -33,9 +33,18 @@ docs-lint:
 
 # ---- AWS (dev) ----
 TF_DIR := terraform/environments/dev
+TF_BOOTSTRAP_DIR := terraform/bootstrap
+AWS_PROFILE ?= sumni-finance-dev
+
+# One-off: create the S3 bucket that holds the remote Terraform state
+tf-bootstrap:
+	terraform -chdir=$(TF_BOOTSTRAP_DIR) init
+	terraform -chdir=$(TF_BOOTSTRAP_DIR) apply
 
 tf-init:
-	terraform -chdir=$(TF_DIR) init
+	terraform -chdir=$(TF_DIR) init \
+		-backend-config="bucket=$$(terraform -chdir=$(TF_BOOTSTRAP_DIR) output -raw state_bucket)" \
+		-backend-config="profile=$(AWS_PROFILE)"
 
 tf-plan:
 	terraform -chdir=$(TF_DIR) plan
@@ -43,11 +52,11 @@ tf-plan:
 tf-apply:
 	terraform -chdir=$(TF_DIR) apply
 
-# Build + push backend image to ECR (TAG defaults to git short SHA)
-ecr-push:
-	deploy/ecr-push.sh $(TAG)
+# Build + push backend image to the Lightsail registry (TAG defaults to git short SHA)
+image-push:
+	deploy/image-push.sh $(TAG)
 
-# Create a Lightsail deployment for an image already in ECR
+# Create a Lightsail deployment for an image already in the Lightsail registry
 lightsail-deploy:
 	deploy/lightsail-deploy.sh $(TAG)
 

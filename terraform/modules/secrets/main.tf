@@ -9,6 +9,8 @@ resource "aws_secretsmanager_secret" "backend" {
 }
 
 # Runtime identity for the Lightsail container (Lightsail has no instance role).
+# Its access key is created outside Terraform (see terraform/README.md) so the secret never
+# lands in the state or in an output.
 resource "aws_iam_user" "runtime" {
   name = "${var.name}-backend-runtime"
 }
@@ -28,8 +30,4 @@ resource "aws_iam_user_policy" "runtime" {
   name   = "read-backend-secrets"
   user   = aws_iam_user.runtime.name
   policy = data.aws_iam_policy_document.runtime.json
-}
-
-resource "aws_iam_access_key" "runtime" {
-  user = aws_iam_user.runtime.name
 }

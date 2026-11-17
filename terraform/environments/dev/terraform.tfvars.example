@@ -1,5 +1,2 @@
 # cp terraform.tfvars.example terraform.tfvars   (gitignored)
 region = "ap-southeast-2"
-
-# Restrict to your IP if you don't need Lightsail to reach the DB yet:
-# db_allowed_cidrs = ["203.0.113.7/32"]

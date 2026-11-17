@@ -10,12 +10,12 @@ resource "aws_security_group" "db" {
   tags = { Name = "${var.name}-db" }
 }
 
+# The database has no public endpoint. Only the Lightsail network (reached through VPC peering)
+# is allowed in.
 resource "aws_vpc_security_group_ingress_rule" "postgres" {
-  for_each = toset(var.db_allowed_cidrs)
-
   security_group_id = aws_security_group.db.id
-  description       = "Postgres from ${each.value}"
-  cidr_ipv4         = each.value
+  description       = "Postgres from the Lightsail VPC"
+  cidr_ipv4         = var.lightsail_cidr
   from_port         = 5432
   to_port           = 5432
   ip_protocol       = "tcp"
@@ -29,6 +29,8 @@ resource "aws_db_parameter_group" "this" {
   parameter {
     name  = "rds.force_ssl"
     value = "1"
+    # RDS stores this parameter as pending-reboot; matching it avoids a permanent plan diff.
+    apply_method = "pending-reboot"
   }
 
   lifecycle {
@@ -56,7 +58,7 @@ resource "aws_db_instance" "this" {
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [aws_security_group.db.id]
   parameter_group_name   = aws_db_parameter_group.this.name
-  publicly_accessible    = var.db_public
+  publicly_accessible    = false
   multi_az               = false
 
   backup_retention_period    = var.backup_retention_days

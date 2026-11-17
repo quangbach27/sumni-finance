@@ -24,10 +24,6 @@ output "lightsail_service" {
   value = module.backend.name
 }
 
-output "ecr_repository_url" {
-  value = module.ecr.repository_url
-}
-
 output "db_host" {
   value = module.database.address
 }
@@ -45,20 +41,12 @@ output "backend_secret_arn" {
   value       = module.secrets.secret_arn
 }
 
-output "runtime_access_key_id" {
-  value = module.secrets.runtime_access_key_id
+# Access keys are not managed by Terraform. Create them for these users with
+# `aws iam create-access-key` (see terraform/README.md).
+output "runtime_user" {
+  value = module.secrets.runtime_user_name
 }
 
-output "runtime_secret_access_key" {
-  value     = module.secrets.runtime_secret_access_key
-  sensitive = true
-}
-
-output "deployer_access_key_id" {
-  value = module.deployer.access_key_id
-}
-
-output "deployer_secret_access_key" {
-  value     = module.deployer.secret_access_key
-  sensitive = true
+output "deployer_user" {
+  value = module.deployer.user_name
 }
