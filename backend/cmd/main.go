@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -20,21 +19,26 @@ import (
 )
 
 func main() {
-	config := configs.NewConfig()
-
 	commonLog.Init(slog.LevelInfo)
+
+	config := configs.NewConfig()
+	slog.Info("starting backend", "env", config.App.Env, "port", config.App.Port)
 
 	startCtx, cancelStart := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelStart()
 
+	if err := configs.LoadSecrets(startCtx, config); err != nil {
+		fatal("failed to load secrets", err)
+	}
+
 	pgxDb, err := newDbConn(startCtx, config.DB)
 	if err != nil {
-		log.Fatalf("failed to create db conn: %s", err.Error())
+		fatal("failed to create db conn", err)
 	}
 
 	tokenVerifier, err := auth.NewClerkVerifier(config.Clerk.ClerkSecretKey, config.Clerk.AuthorizedParties)
 	if err != nil {
-		log.Fatalf("failed to create clerk verifier: %s", err.Error())
+		fatal("failed to create clerk verifier", err)
 	}
 
 	svc, err := internal.New(
@@ -47,21 +51,29 @@ func main() {
 		},
 	)
 	if err != nil {
-		log.Fatalf("failed to create svc: %s", err.Error())
+		fatal("failed to create svc", err)
 	}
+	slog.Info("service initialised")
 
-	ctx, cancelStart := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancelStart()
+	ctx, cancelRun := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancelRun()
 
+	slog.Info("service listening", "port", config.App.Port)
 	if err = svc.Run(ctx); err != nil {
-		log.Fatalf("failed to run svc: %s", err.Error())
+		fatal("failed to run svc", err)
 	}
+}
+
+// fatal logs err as structured JSON on stderr and exits, so the failure shows up in container logs.
+func fatal(msg string, err error) {
+	slog.Error(msg, "error", err)
+	os.Exit(1)
 }
 
 func newDbConn(ctx context.Context, dbConfig *configs.DBConfig) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dbConfig.Dsn())
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to parse db config: %w", err)
 	}
 
 	cfg.MaxConns = 10                      // max connections in the pool

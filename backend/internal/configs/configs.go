@@ -3,6 +3,8 @@ package configs
 import (
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -34,7 +36,14 @@ type ClerkConfig struct {
 }
 
 func (db *DBConfig) Dsn() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", db.Username, db.Password, db.Host, db.Port, db.Name, db.SSLMode)
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(db.Username, db.Password),
+		Host:     net.JoinHostPort(db.Host, db.Port),
+		Path:     "/" + db.Name,
+		RawQuery: url.Values{"sslmode": {db.SSLMode}}.Encode(),
+	}
+	return u.String()
 }
 
 type Config struct {

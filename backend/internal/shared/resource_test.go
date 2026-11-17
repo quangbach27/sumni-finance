@@ -110,7 +110,7 @@ func TestResourceScope_SQL(t *testing.T) {
 func TestEnumParsing(t *testing.T) {
 	t.Parallel()
 
-	role, err := common.NewEnum[shared.Role]("office-accountant")
+	role, err := common.NewEnum[shared.Role]("office_accountant")
 	require.NoError(t, err)
 	assert.Equal(t, shared.RoleOfficeAccountant, role)
 

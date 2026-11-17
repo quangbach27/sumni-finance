@@ -1,24 +1,11 @@
 name: Backend Commit Stage
 on:
   workflow_call:
-    inputs:
-      environment:
-        description: "Environment whose variables (GCP_*) are used to publish the image"
-        type: string
-        required: false
-        default: dev
     outputs:
       image:
-        description: "Artifact Registry reference of the published backend image"
+        description: "Published image (repository:sha)"
         value: ${{ jobs.package.outputs.image }}
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment whose variables (GCP_*) are used to publish the image"
-        type: choice
-        options:
-          - dev
-        default: dev
 
 env:
   VERSION: ${{ github.sha }}
@@ -32,7 +19,7 @@ jobs:
       security-events: write
     services:
       postgres:
-        image: postgres:17.6-alpine3.22
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: user
           POSTGRES_PASSWORD: password
@@ -48,7 +35,6 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v6
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -92,29 +78,51 @@ jobs:
     name: Package and Publish
     needs: [build]
     runs-on: ubuntu-24.04
-    # GCP_* variables come from the selected GitHub environment.
-    environment: ${{ inputs.environment || 'dev' }}
     permissions:
       contents: read
-      id-token: write # Workload Identity Federation
+      packages: write
       security-events: write
     env:
-      # Artifact Registry path from `terraform output image_path`.
-      IMAGE: ${{ vars.GCP_ARTIFACT_REPO }}/backend:${{ github.sha }}
+      REGISTRY: ghcr.io
+      # The only artifact of this stage, in GHCR. The tag is the commit SHA.
+      # Deploy Backend pulls it and pushes it to the Lightsail registry.
+      IMAGE: ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
     outputs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v6
 
+      - name: Log into container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A commit SHA always maps to the same code, so an already published SHA is skipped
+      # (safe re-runs).
+      - name: Check if the image is already published
+        id: exists
+        run: |
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "ghcr=true" >> "$GITHUB_OUTPUT"
+            echo "Image is already in GHCR, skipping build and push."
+          else
+            echo "ghcr=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Docker Buildx
+        if: steps.exists.outputs.ghcr != 'true'
         uses: docker/setup-buildx-action@v4
 
-      # Cloud Run runs on amd64.
+      # Lightsail runs on amd64.
       - name: Build container image
+        if: steps.exists.outputs.ghcr != 'true'
         run: docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f backend/docker/app-prod/Dockerfile backend
 
       - name: Scan backend image (Anchore)
+        if: steps.exists.outputs.ghcr != 'true'
         uses: anchore/scan-action@v7
         id: scan
         with:
@@ -123,26 +131,21 @@ jobs:
           severity-cutoff: high
 
       - name: Upload backend image scan SARIF report
+        if: steps.exists.outputs.ghcr != 'true'
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
           category: backend-image
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
-
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v3
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
-
-      - name: Publish image
+      - name: Publish image to GHCR
+        if: steps.exists.outputs.ghcr != 'true'
         run: docker push "$IMAGE"
 
       - name: Set image output
         id: meta
-        run: echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Backend image"
+            echo "Tag to deploy: \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
