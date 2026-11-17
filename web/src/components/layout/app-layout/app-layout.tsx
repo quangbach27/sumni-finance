@@ -1,7 +1,7 @@
 import {
   BookOpenIcon,
-  ChartColumnIcon,
-  SettingsIcon,
+  // ChartColumnIcon,
+  // SettingsIcon,
   WalletIcon,
 } from 'lucide-react';
 
@@ -33,16 +33,16 @@ const navItems = [
     href: '/ledger-books',
     icon: BookOpenIcon,
   },
-  {
-    label: 'Báo cáo',
-    href: '/reports',
-    icon: ChartColumnIcon,
-  },
-  {
-    label: 'Cài đặt',
-    href: '/settings',
-    icon: SettingsIcon,
-  },
+  // {
+  //   label: 'Báo cáo',
+  //   href: '/reports',
+  //   icon: ChartColumnIcon,
+  // },
+  // {
+  //   label: 'Cài đặt',
+  //   href: '/settings',
+  //   icon: SettingsIcon,
+  // },
 ] satisfies NavItem[];
 
 export default function AppLayout({ children }: Props) {
