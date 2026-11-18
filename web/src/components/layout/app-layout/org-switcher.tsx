@@ -1,8 +1,3 @@
-import { useState } from 'react';
-
-import { getToken, useOrganization, useOrganizationList } from '@clerk/react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useRouter } from '@tanstack/react-router';
 import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,7 +16,10 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 
+import { useSwitchOrg } from '@/hooks/use-switch-org';
 import { cn } from '@/lib/utils';
+
+import OrgSwitchOverlay from './org-switch/org-switch-overlay';
 
 function OrgLogo({
   name,
@@ -41,41 +39,18 @@ function OrgLogo({
 }
 
 export default function OrgSwitcher() {
-  const { organization } = useOrganization();
-  const { userMemberships, setActive } = useOrganizationList({
-    userMemberships: { infinite: true },
-  });
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const router = useRouter();
+  const { activeOrg, orgs, isSwitching, handleSwitchOrg } = useSwitchOrg();
   const { isMobile } = useSidebar();
-  const [isSwitching, setIsSwitching] = useState(false);
 
-  const orgName = organization?.name ?? 'Chọn tổ chức';
+  const orgName = activeOrg?.name ?? 'Chọn tổ chức';
 
-  // Switch the active org in the Clerk session (the token then carries the new
-  // org), without a page reload: refresh data and re-run route guards.
-  const handleSelect = async (organizationId: string) => {
-    if (!setActive || isSwitching || organizationId === organization?.id) {
-      return;
-    }
-    setIsSwitching(true);
-    try {
-      await setActive({ organization: organizationId });
-      // Warm Clerk's token cache with the new-org token so refetches don't
-      // send a stale token from the previous org.
-      await getToken({ skipCache: true });
-      // resetQueries (unlike clear) makes mounted observers refetch.
-      await queryClient.resetQueries();
-      await router.invalidate();
-      await navigate({ to: '/ledger-books' });
-    } finally {
-      setIsSwitching(false);
-    }
+  const handleSelect = (organizationId: string) => {
+    void handleSwitchOrg(organizationId);
   };
 
   return (
     <SidebarMenu>
+      {isSwitching && <OrgSwitchOverlay />}
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -83,7 +58,7 @@ export default function OrgSwitcher() {
           >
             <OrgLogo
               name={orgName}
-              imageUrl={organization?.imageUrl}
+              imageUrl={activeOrg?.imageUrl}
               className="size-10"
             />
             <div className="grid flex-1 text-left leading-tight">
@@ -102,7 +77,7 @@ export default function OrgSwitcher() {
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel>Văn Phòng</DropdownMenuLabel>
-              {userMemberships.data?.map(({ organization: org }) => (
+              {orgs.map((org) => (
                 <DropdownMenuItem
                   key={org.id}
                   disabled={isSwitching}
@@ -115,7 +90,7 @@ export default function OrgSwitcher() {
                     className="size-6"
                   />
                   <span className="truncate">{org.name}</span>
-                  {org.id === organization?.id && (
+                  {org.id === activeOrg?.id && (
                     <CheckIcon className="ml-auto" />
                   )}
                 </DropdownMenuItem>
