@@ -1,4 +1,4 @@
-import { useClerk, useUser } from '@clerk/react';
+import { useClerk, useOrganization, useUser } from '@clerk/react';
 import { ChevronsUpDownIcon, LogOutIcon } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,14 +18,18 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 
+import { RoleBadge } from '@/components/shared/role-badge';
+
 function UserSummary({
   name,
   email,
   imageUrl,
+  role,
 }: {
   name: string;
   email: string;
   imageUrl?: string;
+  role?: string;
 }) {
   return (
     <>
@@ -36,7 +40,10 @@ function UserSummary({
         </AvatarFallback>
       </Avatar>
       <div className="grid flex-1 text-left text-sm leading-tight">
-        <span className="truncate font-medium">{name}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="truncate font-medium">{name}</span>
+          <RoleBadge role={role} />
+        </div>
         <span className="text-muted-foreground group-hover/footer:text-muted truncate text-xs">
           {email}
         </span>
@@ -47,6 +54,8 @@ function UserSummary({
 
 export default function NavUser() {
   const { user } = useUser();
+  const { membership } = useOrganization();
+  const role = membership?.role;
   const { signOut } = useClerk();
   const { isMobile } = useSidebar();
 
@@ -62,7 +71,12 @@ export default function NavUser() {
           <DropdownMenuTrigger
             render={<SidebarMenuButton size="lg" className="group/footer" />}
           >
-            <UserSummary name={name} email={email} imageUrl={user.imageUrl} />
+            <UserSummary
+              name={name}
+              email={email}
+              imageUrl={user.imageUrl}
+              role={role}
+            />
             <ChevronsUpDownIcon className="ml-auto size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -77,6 +91,7 @@ export default function NavUser() {
                   name={name}
                   email={email}
                   imageUrl={user.imageUrl}
+                  role={role}
                 />
               </DropdownMenuLabel>
             </DropdownMenuGroup>
