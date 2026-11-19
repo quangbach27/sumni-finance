@@ -81,8 +81,16 @@ export default function PostEntryStep({ periodUuid }: { periodUuid: string }) {
             </div>
             {isOpen && (
               <div className="flex flex-wrap gap-3">
-                {/* TODO: enable once the entries list page exists. */}
-                <Button variant="outline" disabled>
+                <Button
+                  variant="outline"
+                  render={
+                    <Link
+                      to="/ledger-books/$uuid/entries"
+                      params={{ uuid: period.uuid }}
+                      search={{ page: 1 }}
+                    />
+                  }
+                >
                   <BookOpen data-icon="inline-start" />
                   Tất cả bút toán
                 </Button>

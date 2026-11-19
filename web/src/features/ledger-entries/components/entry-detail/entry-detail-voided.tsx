@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Badge } from '@/components/ui/badge';
 
+import { useUser } from '@/hooks/use-user';
 import { formatAmount } from '@/lib/currency';
 import { formatDate } from '@/lib/date';
 
-import { getLedgerEntryQueryOptions } from '../../../api/get-ledger-entry';
+import { getLedgerEntryQueryOptions } from '../../api/get-ledger-entry';
 import EntryDetailField from './entry-detail-field';
 import {
   formatDayTime,
@@ -13,7 +14,7 @@ import {
   isInflow,
 } from './entry-detail-format';
 
-import type { LedgerEntry } from '../../../api/types';
+import type { LedgerEntry } from '../../api/types';
 
 export const voidedEntrySubtitle = (entry: LedgerEntry) =>
   [
@@ -35,6 +36,8 @@ export default function EntryDetailVoided({
   /** Opens the details of another entry (the reversal). */
   onSelectEntry: (uuid: string) => void;
 }) {
+  const creator = useUser(entry.created_by);
+  const voider = useUser(entry.voided_by ?? '');
   const reversalUuid = entry.reversed_by_entry_uuid;
   const { data: reversal } = useQuery({
     ...getLedgerEntryQueryOptions(reversalUuid ?? ''),
@@ -52,7 +55,7 @@ export default function EntryDetailVoided({
       <div className="rounded-xl border">
         <div className="flex items-center gap-3 border-b px-4 py-3">
           <span className="text-muted-foreground w-12">
-            {formatDate(new Date(entry.occurred_at)).slice(0, 5)}
+            {formatDate(new Date(entry.occurred_at))}
           </span>
           <span className="font-medium">Bút toán gốc</span>
           <Badge
@@ -67,9 +70,7 @@ export default function EntryDetailVoided({
         </div>
         <div className="flex items-center gap-3 border-b px-4 py-3">
           <span className="text-muted-foreground w-12">
-            {reversal
-              ? formatDate(new Date(reversal.occurred_at)).slice(0, 5)
-              : ''}
+            {reversal ? formatDate(new Date(reversal.occurred_at)) : ''}
           </span>
           <span className="font-medium">Bút toán đảo</span>
           {reversalUuid && (
@@ -102,6 +103,7 @@ export default function EntryDetailVoided({
         <p className="mt-1 text-lg font-medium">{entry.voided_reason ?? '—'}</p>
         {entry.voided_at && (
           <p className="text-muted-foreground text-sm">
+            {entry.voided_by ? `${voider.name} · ` : ''}
             {formatDayTime(entry.voided_at)}
           </p>
         )}
@@ -128,9 +130,7 @@ export default function EntryDetailVoided({
           <EntryDetailField label="Ngày phát sinh">
             {formatDate(new Date(entry.occurred_at))}
           </EntryDetailField>
-          <EntryDetailField label="Người ghi">
-            {entry.created_by}
-          </EntryDetailField>
+          <EntryDetailField label="Người ghi">{creator.name}</EntryDetailField>
           <EntryDetailField label="Ghi lúc">
             {formatDayTime(entry.created_at)}
           </EntryDetailField>

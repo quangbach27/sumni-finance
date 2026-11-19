@@ -2,7 +2,7 @@ import { endOfDay, startOfDay } from '@/lib/date';
 
 import { useEntriesSearch } from './use-entries-search';
 
-import type { ListLedgerEntriesParams } from '../../api/list-ledger-entries';
+import type { ListLedgerEntriesParams } from '@/features/ledger-entries/api/list-ledger-entries';
 
 /** API params of the entries of one fund source for the current filters. */
 export function useEntriesParams(

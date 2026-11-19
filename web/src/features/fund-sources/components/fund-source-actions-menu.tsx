@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { LazyDialogTrigger } from '@/components/shared/lazy-trigger/lazy-trigger';
+import { ROW_ACTION_ITEM_CLASS_NAME } from '@/components/shared/row-actions/row-actions-menu';
 
 import { getFundSourceActionGroups } from './actions/fund-source-actions';
 
@@ -74,6 +75,11 @@ export default function FundSourceActionsMenu({
                           <DropdownMenuItem
                             key={action.id}
                             variant={action.variant}
+                            className={
+                              action.variant === 'destructive'
+                                ? 'font-medium'
+                                : ROW_ACTION_ITEM_CLASS_NAME
+                            }
                             disabled={
                               !action.onSelect || Boolean(action.disabledReason)
                             }

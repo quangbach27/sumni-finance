@@ -22,7 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 
-import { getLedgerEntryQueryOptions } from '../../../api/get-ledger-entry';
+import { getLedgerEntryQueryOptions } from '../../api/get-ledger-entry';
+import { canCancelEntry } from './entry-detail-format';
 import EntryDetailNormal, { normalEntrySubtitle } from './entry-detail-normal';
 import EntryDetailVoided, { voidedEntrySubtitle } from './entry-detail-voided';
 
@@ -30,11 +31,14 @@ type EntryDetailDialogProps = {
   /** Entry to show; the dialog is closed when undefined. */
   entryUuid: string | undefined;
   onEntryChange: (uuid: string | undefined) => void;
+  /** Shows a cancel button for entries that can be cancelled (open period). */
+  onCancelEntry?: (uuid: string) => void;
 };
 
 export default function EntryDetailDialog({
   entryUuid,
   onEntryChange,
+  onCancelEntry,
 }: EntryDetailDialogProps) {
   const isMobile = useIsMobile();
   const { data: entry } = useQuery({
@@ -74,7 +78,22 @@ export default function EntryDetailDialog({
     ? 'Chỉ để xem. Không tính vào tổng thu chi của kỳ.'
     : undefined;
   const close = () => onEntryChange(undefined);
-  const closeButton = <Button onClick={close}>Đóng</Button>;
+  const canCancel =
+    entry !== undefined && Boolean(onCancelEntry) && canCancelEntry(entry);
+  const closeButton = (
+    <div className="flex flex-wrap gap-2">
+      {canCancel && (
+        <Button
+          variant="outline"
+          className="text-destructive"
+          onClick={() => onCancelEntry?.(entry.uuid)}
+        >
+          Hủy bút toán
+        </Button>
+      )}
+      <Button onClick={close}>Đóng</Button>
+    </div>
+  );
 
   if (isMobile) {
     return (

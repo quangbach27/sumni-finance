@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 
+import { orgRoleName } from '@/hooks/use-org-members';
 import { cn } from '@/lib/utils';
 
 const roles: Partial<Record<string, { label: string; className: string }>> = {
@@ -20,11 +21,9 @@ const roles: Partial<Record<string, { label: string; className: string }>> = {
   },
 };
 
-const clerkOrgRolePrefix = 'org:';
-
 export function RoleBadge({ role }: { role?: string }) {
   if (!role) return null;
-  const config = roles[role.replace(clerkOrgRolePrefix, '')];
+  const config = roles[orgRoleName(role)];
   if (!config) return null;
 
   return (

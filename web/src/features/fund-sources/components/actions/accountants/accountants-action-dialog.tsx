@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/input-group';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { useOrgMembers } from '@/hooks/use-org-members';
 import { isApiError } from '@/lib/clients';
 
 import {
@@ -37,12 +38,11 @@ import {
   useGrantAccountants,
   useRevokeAccountant,
 } from '../../../api/access-grants';
-import { useOrgMembers } from '../../../api/use-org-members';
 
 import type { AccessGrant } from '../../../api/access-grants';
 import type { FundSource } from '../../../api/types';
-import type { OrgMember } from '../../../api/use-org-members';
 import type { FundSourceActionDialogProps } from '../types';
+import type { OrgMember } from '@/hooks/use-org-members';
 import type { ReactNode } from 'react';
 
 const getInitials = (name: string) =>
@@ -119,6 +119,7 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
       owner && normalize(member.name).includes(owner) ? 0 : 1;
 
     return members
+      .filter((member) => member.role === 'office_accountant')
       .filter((member) => !userIds.includes(member.userId))
       .filter(
         (member) =>
@@ -135,6 +136,7 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
       name: userId,
       email: '',
       imageUrl: '',
+      role: '',
     };
 
   const submit = () =>
@@ -233,7 +235,9 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
           {membersLoading && <Skeleton className="h-14 w-full" />}
           {!membersLoading && suggestions.length === 0 && (
             <span className="text-muted-foreground py-3 text-sm">
-              Không có thành viên phù hợp.
+              {search.trim()
+                ? 'Không có thành viên phù hợp.'
+                : 'Chưa có thành viên nào có vai trò Kế toán.'}
             </span>
           )}
           {suggestions.map((member) => (

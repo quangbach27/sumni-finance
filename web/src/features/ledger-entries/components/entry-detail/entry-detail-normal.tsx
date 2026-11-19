@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 
+import { useUser } from '@/hooks/use-user';
 import { formatAmount } from '@/lib/currency';
 import { formatDate } from '@/lib/date';
 
@@ -12,7 +13,7 @@ import {
   isInflow,
 } from './entry-detail-format';
 
-import type { LedgerEntry } from '../../../api/types';
+import type { LedgerEntry } from '../../api/types';
 
 export const normalEntrySubtitle = (entry: LedgerEntry) =>
   [
@@ -25,6 +26,7 @@ export const normalEntrySubtitle = (entry: LedgerEntry) =>
 
 export default function EntryDetailNormal({ entry }: { entry: LedgerEntry }) {
   const inflow = isInflow(entry);
+  const creator = useUser(entry.created_by);
 
   return (
     <div className="flex flex-col gap-5">
@@ -71,9 +73,7 @@ export default function EntryDetailNormal({ entry }: { entry: LedgerEntry }) {
         <EntryDetailField label="Nguồn quỹ">
           {formatEntryFundSource(entry)}
         </EntryDetailField>
-        <EntryDetailField label="Người ghi">
-          {entry.created_by}
-        </EntryDetailField>
+        <EntryDetailField label="Người ghi">{creator.name}</EntryDetailField>
         <EntryDetailField label="Ghi lúc">
           {formatDayTime(entry.created_at)}
         </EntryDetailField>

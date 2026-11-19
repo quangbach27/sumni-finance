@@ -79,6 +79,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ledger-entries/{ledger_entry_uuid}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void a ledger entry
+         * @description Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+         */
+        post: operations["voidLedgerEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ledger-periods/unlocked": {
         parameters: {
             query?: never;
@@ -405,11 +425,6 @@ export interface components {
              * @description Set on a voided entry; its reversal entry.
              */
             reversed_by_entry_uuid?: string;
-            /**
-             * Format: uuid
-             * @description Set on a reversal entry; the voided entry it compensates.
-             */
-            reverses_entry_uuid?: string;
             voided_reason?: string;
             voided_by?: string;
             /** Format: date-time */
@@ -459,6 +474,9 @@ export interface components {
             page_info: components["schemas"]["PageInfo"];
         };
         ReopenLedgerPeriodRequest: {
+            reason: string;
+        };
+        VoidLedgerEntryRequest: {
             reason: string;
         };
         OpenLedgerPeriodRequest: {
@@ -798,6 +816,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    voidLedgerEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ledger_entry_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidLedgerEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Ledger entry voided */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalServerError"];
         };
     };

@@ -1,23 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -28,18 +14,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import RowActionsMenu from '@/components/shared/row-actions/row-actions-menu';
+
+import { getLedgerEntryQueryOptions } from '@/features/ledger-entries/api/get-ledger-entry';
+import { listLedgerEntriesQueryOptions } from '@/features/ledger-entries/api/list-ledger-entries';
+import EntriesPagination from '@/features/ledger-entries/components/entries-pagination';
+import EntryDetailDialog from '@/features/ledger-entries/components/entry-detail/entry-detail-dialog';
+import { VOIDED_STRIKE_CLASS_NAME } from '@/features/ledger-entries/components/entry-detail/entry-detail-format';
+
 import { formatAmount } from '@/lib/currency';
 import { formatDate } from '@/lib/date';
 
-import { getLedgerEntryQueryOptions } from '../../api/get-ledger-entry';
-import { listLedgerEntriesQueryOptions } from '../../api/list-ledger-entries';
-import EntryDetailDialog from './entry-detail/entry-detail-dialog';
 import FundSourceEntriesFilterBar from './fund-source-entries-filter-bar';
 import { useEntriesParams } from './use-entries-params';
 import { useEntriesSearch } from './use-entries-search';
 
-import type { LedgerEntriesOrderBy } from '../../api/list-ledger-entries';
-import type { LedgerEntry } from '../../api/types';
+import type { LedgerEntriesOrderBy } from '@/features/ledger-entries/api/list-ledger-entries';
+import type { LedgerEntry } from '@/features/ledger-entries/api/types';
 
 const dash = <span className="text-muted-foreground">—</span>;
 
@@ -78,13 +69,6 @@ function SortableHead({
   );
 }
 
-/** Page numbers around the current page, e.g. 1 2 3. */
-function pageNumbers(current: number, last: number) {
-  const start = Math.max(1, Math.min(current - 1, last - 2));
-  const end = Math.min(last, start + 2);
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-}
-
 export default function FundSourceEntriesTable({
   fundSourceUuid,
 }: {
@@ -98,9 +82,6 @@ export default function FundSourceEntriesTable({
   const totalCount = data?.page_info.total_count;
   const pageSize = data?.page_info.page_size ?? 10;
   const page = params.page ?? 1;
-  const lastPage = Math.max(1, Math.ceil((totalCount ?? 0) / pageSize));
-  const from = totalCount ? (page - 1) * pageSize + 1 : 0;
-  const to = Math.min(page * pageSize, totalCount ?? 0);
 
   // Seed the details query with the row so the dialog opens instantly.
   const openEntry = (entry: LedgerEntry) => {
@@ -140,7 +121,7 @@ export default function FundSourceEntriesTable({
             {data?.items.map((entry) => {
               const isInflow = entry.direction === 'inflow';
               const voided = entry.status === 'voided';
-              const strike = voided ? 'line-through' : undefined;
+              const strike = voided ? VOIDED_STRIKE_CLASS_NAME : undefined;
               return (
                 <TableRow
                   key={entry.uuid}
@@ -148,7 +129,7 @@ export default function FundSourceEntriesTable({
                   onClick={() => openEntry(entry)}
                 >
                   <TableCell className="text-muted-foreground">
-                    {formatDate(new Date(entry.occurred_at)).slice(0, 5)}
+                    {formatDate(new Date(entry.occurred_at))}
                   </TableCell>
                   <TableCell className={strike}>
                     {entry.category?.name ?? dash}
@@ -162,6 +143,14 @@ export default function FundSourceEntriesTable({
                         >
                           Đã hủy
                         </Badge>
+                      )}
+                      {voided && entry.voided_reason && (
+                        <span
+                          className="text-muted-foreground truncate text-xs"
+                          title={entry.voided_reason}
+                        >
+                          {entry.voided_reason}
+                        </span>
                       )}
                       {entry.tag ? (
                         <Badge
@@ -193,24 +182,16 @@ export default function FundSourceEntriesTable({
                     )}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Tùy chọn"
-                          />
-                        }
-                      >
-                        <MoreHorizontal />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEntry(entry)}>
-                          Xem chi tiết
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      actions={[
+                        {
+                          key: 'view',
+                          label: 'Xem chi tiết',
+                          icon: Eye,
+                          onSelect: () => openEntry(entry),
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -227,55 +208,12 @@ export default function FundSourceEntriesTable({
           </Empty>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
-          <span className="text-muted-foreground text-sm">
-            Hiển thị {from}–{to} / {totalCount ?? 0} bút toán
-          </span>
-          <Pagination className="mx-0 w-auto">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  text="Trước"
-                  aria-disabled={page <= 1}
-                  className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    update({ page: page - 1 });
-                  }}
-                />
-              </PaginationItem>
-              {pageNumbers(page, lastPage).map((n) => (
-                <PaginationItem key={n}>
-                  <PaginationLink
-                    href="#"
-                    isActive={n === page}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      update({ page: n });
-                    }}
-                  >
-                    {n}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  text="Sau"
-                  aria-disabled={page >= lastPage}
-                  className={
-                    page >= lastPage ? 'pointer-events-none opacity-50' : ''
-                  }
-                  onClick={(e) => {
-                    e.preventDefault();
-                    update({ page: page + 1 });
-                  }}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        <EntriesPagination
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount ?? 0}
+          onPageChange={(p) => update({ page: p })}
+        />
       </div>
       <EntryDetailDialog
         entryUuid={search.entry}
