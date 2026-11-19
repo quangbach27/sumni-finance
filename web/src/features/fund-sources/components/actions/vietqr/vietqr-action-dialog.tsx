@@ -224,10 +224,11 @@ const VietQrContent = ({ fundSource }: { fundSource: FundSource }) => {
 
 export default function VietQrActionDialog({
   fundSource,
-  onClose,
+  open,
+  onOpenChange,
 }: FundSourceActionDialogProps) {
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <VietQrContent fundSource={fundSource} />
       </DialogContent>

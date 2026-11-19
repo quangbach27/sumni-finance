@@ -40,6 +40,7 @@ import {
 import { useOrgMembers } from '../../../api/use-org-members';
 
 import type { AccessGrant } from '../../../api/access-grants';
+import type { FundSource } from '../../../api/types';
 import type { OrgMember } from '../../../api/use-org-members';
 import type { FundSourceActionDialogProps } from '../types';
 import type { ReactNode } from 'react';
@@ -81,7 +82,12 @@ const AccountantRow = ({
   </div>
 );
 
-type ContentProps = FundSourceActionDialogProps & {
+type DialogBodyProps = {
+  fundSource: FundSource;
+  onClose: () => void;
+};
+
+type ContentProps = DialogBodyProps & {
   grants: AccessGrant[];
 };
 
@@ -324,7 +330,7 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
   );
 };
 
-const AccountantsLoader = (props: FundSourceActionDialogProps) => {
+const AccountantsLoader = (props: DialogBodyProps) => {
   const query = useQuery(accountantGrantsQueryOptions(props.fundSource.uuid));
 
   if (query.isPending) return <Skeleton className="h-48 w-full" />;
@@ -353,13 +359,18 @@ const AccountantsLoader = (props: FundSourceActionDialogProps) => {
   return <AccountantsContent {...props} grants={query.data} />;
 };
 
-export default function AccountantsActionDialog(
-  props: FundSourceActionDialogProps,
-) {
+export default function AccountantsActionDialog({
+  fundSource,
+  open,
+  onOpenChange,
+}: FundSourceActionDialogProps) {
   return (
-    <Dialog open onOpenChange={(open) => !open && props.onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <AccountantsLoader {...props} />
+        <AccountantsLoader
+          fundSource={fundSource}
+          onClose={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );

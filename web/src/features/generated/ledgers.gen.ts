@@ -22,6 +22,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fund-sources/{fund_source_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a fund source */
+        get: operations["getFundSource"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ledger entries
+         * @description Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+         */
+        get: operations["listLedgerEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger-entries/{ledger_entry_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a ledger entry
+         * @description Any entry, including a reversal entry.
+         */
+        get: operations["getLedgerEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ledger-periods/unlocked": {
         parameters: {
             query?: never;
@@ -292,6 +349,78 @@ export interface components {
         };
         CreateFundSourceResponse: {
             fund_source_uuid: components["schemas"]["FundSourceUUID"];
+        };
+        GetFundSourceResponse: {
+            fund_source: components["schemas"]["FundSource"];
+            /**
+             * Format: date-time
+             * @description occurred_at of the latest entry; absent without entries.
+             */
+            latest_entry_at?: string;
+        };
+        LedgerEntryCategoryRef: {
+            uuid: components["schemas"]["CategoryUUID"];
+            name: string;
+        };
+        /** @enum {string} */
+        LedgerEntryDirection: "inflow" | "outflow";
+        /** @enum {string} */
+        LedgerEntryKind: "normal" | "reversal";
+        /** @enum {string} */
+        LedgerEntryStatus: "posted" | "voided";
+        LedgerEntryListItem: {
+            /** Format: uuid */
+            uuid: string;
+            ledger_period: {
+                uuid: components["schemas"]["LedgerPeriodUUID"];
+                name: string;
+                status: components["schemas"]["LedgerStatus"];
+            };
+            fund_source: {
+                uuid: components["schemas"]["FundSourceUUID"];
+                name: string;
+                /** @description Bank only. */
+                bank_code?: string;
+                /** @description Bank only. */
+                account_number?: string;
+            };
+            /** Format: date-time */
+            occurred_at: string;
+            description: string;
+            direction: components["schemas"]["LedgerEntryDirection"];
+            amount: components["schemas"]["Decimal"];
+            balance_before: components["schemas"]["Decimal"];
+            balance_after: components["schemas"]["Decimal"];
+            category?: components["schemas"]["LedgerEntryCategoryRef"];
+            /** @description The sub-category, when the entry has one. */
+            tag?: components["schemas"]["LedgerEntryCategoryRef"];
+            status: components["schemas"]["LedgerEntryStatus"];
+            kind: components["schemas"]["LedgerEntryKind"];
+            /** Format: date-time */
+            created_at: string;
+            /** @description Id of the user who created the entry. */
+            created_by: string;
+            /**
+             * Format: uuid
+             * @description Set on a voided entry; its reversal entry.
+             */
+            reversed_by_entry_uuid?: string;
+            /**
+             * Format: uuid
+             * @description Set on a reversal entry; the voided entry it compensates.
+             */
+            reverses_entry_uuid?: string;
+            voided_reason?: string;
+            voided_by?: string;
+            /** Format: date-time */
+            voided_at?: string;
+        };
+        GetLedgerEntryResponse: {
+            entry: components["schemas"]["LedgerEntryListItem"];
+        };
+        ListLedgerEntriesResponse: {
+            items: components["schemas"]["LedgerEntryListItem"][];
+            page_info: components["schemas"]["PageInfo"];
         };
         /** Format: uuid */
         LedgerPeriodUUID: string;
@@ -581,6 +710,94 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getFundSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fund_source_uuid: components["schemas"]["FundSourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The fund source. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetFundSourceResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listLedgerEntries: {
+        parameters: {
+            query?: {
+                fund_source_uuid?: components["schemas"]["FundSourceUUID"];
+                /** @description A category; also matches entries of its sub-categories (tags). */
+                category_uuid?: components["schemas"]["CategoryUUID"];
+                ledger_period_uuid?: components["schemas"]["LedgerPeriodUUID"];
+                /** @description Inclusive lower bound of occurred_at. */
+                from_date?: string;
+                /** @description Inclusive upper bound of occurred_at. */
+                to_date?: string;
+                /** @description Only entries of this kind; omit for both. */
+                kind?: components["schemas"]["LedgerEntryKind"];
+                order_by?: "occurred_at" | "fund_source_uuid" | "category_uuid";
+                order?: "asc" | "desc";
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of ledger entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLedgerEntriesResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getLedgerEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ledger_entry_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ledger entry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetLedgerEntryResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

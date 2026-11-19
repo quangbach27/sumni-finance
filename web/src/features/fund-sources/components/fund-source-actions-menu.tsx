@@ -1,5 +1,6 @@
-import { Fragment, Suspense, useState } from 'react';
+import { Fragment } from 'react';
 
+import { useNavigate } from '@tanstack/react-router';
 import { MoreHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -13,83 +14,92 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import { FUND_SOURCE_ACTION_GROUPS } from './actions/fund-source-actions';
+import { LazyDialogTrigger } from '@/components/shared/lazy-trigger/lazy-trigger';
+
+import { getFundSourceActionGroups } from './actions/fund-source-actions';
 
 import type { FundSource } from '../api/types';
-import type { FundSourceAction } from './actions/types';
+import type { FundSourceActionDialogProps } from './actions/types';
+import type { ComponentType } from 'react';
+
+const loadAccountants = () =>
+  import('./actions/accountants/accountants-action-dialog') as Promise<{
+    default: ComponentType<FundSourceActionDialogProps>;
+  }>;
+const loadVietQr = () => import('./actions/vietqr/vietqr-action-dialog');
 
 type FundSourceActionsMenuProps = { item: FundSource };
 
+// The dialogs are rendered by LazyDialogTrigger *around* the menu: the menu
+// content unmounts on close and would take an inner dialog down with it.
 export default function FundSourceActionsMenu({
   item,
 }: FundSourceActionsMenuProps) {
-  const [activeAction, setActiveAction] = useState<FundSourceAction | null>(
-    null,
-  );
-
-  const groups = FUND_SOURCE_ACTION_GROUPS.map((group) =>
-    group.filter((action) => action.isVisible?.(item) ?? true),
-  ).filter((group) => group.length > 0);
-
-  const select = (action: FundSourceAction) => {
-    if (action.Dialog) setActiveAction(action);
-    else action.onSelect?.(item);
-  };
-
-  const ActiveDialog = activeAction?.Dialog;
+  const navigate = useNavigate();
+  const dialogProps = { fundSource: item };
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<Button variant="ghost" size="icon" aria-label="Tùy chọn" />}
-        >
-          <MoreHorizontal />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-56">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>{item.name}</DropdownMenuLabel>
-          </DropdownMenuGroup>
-          {groups.map((group, index) => (
-            <Fragment key={index}>
-              <DropdownMenuSeparator />
-              {group.map((action) => {
-                const reason = action.getDisabledReason?.(item);
-                const implemented = Boolean(action.Dialog ?? action.onSelect);
-                const Icon = action.icon;
-                return (
-                  <DropdownMenuItem
-                    key={action.id}
-                    variant={action.variant}
-                    disabled={!implemented || Boolean(reason)}
-                    onClick={() => select(action)}
-                  >
-                    <Icon />
-                    <span className="flex flex-col">
-                      {action.label}
-                      {typeof reason === 'string' && (
-                        <span className="text-muted-foreground text-xs">
-                          {reason}
-                        </span>
-                      )}
-                    </span>
-                  </DropdownMenuItem>
-                );
-              })}
-            </Fragment>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <LazyDialogTrigger load={loadAccountants} dialogProps={dialogProps}>
+      {(accountants) => (
+        <LazyDialogTrigger load={loadVietQr} dialogProps={dialogProps}>
+          {(vietQr) => {
+            const groups = getFundSourceActionGroups({
+              item,
+              navigate,
+              vietQr,
+              accountants,
+            })
+              .map((group) => group.filter((action) => !action.hidden))
+              .filter((group) => group.length > 0);
 
-      {/* Rendered outside the menu so it survives the menu closing. */}
-      {ActiveDialog && (
-        <Suspense fallback={null}>
-          <ActiveDialog
-            fundSource={item}
-            onClose={() => setActiveAction(null)}
-          />
-        </Suspense>
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button variant="ghost" size="icon" aria-label="Tùy chọn" />
+                  }
+                >
+                  <MoreHorizontal />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-56">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>{item.name}</DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  {groups.map((group, index) => (
+                    <Fragment key={index}>
+                      <DropdownMenuSeparator />
+                      {group.map((action) => {
+                        const Icon = action.icon;
+                        return (
+                          <DropdownMenuItem
+                            key={action.id}
+                            variant={action.variant}
+                            disabled={
+                              !action.onSelect || Boolean(action.disabledReason)
+                            }
+                            {...action.triggerProps}
+                            onClick={action.onSelect}
+                          >
+                            <Icon />
+                            <span className="flex flex-col">
+                              {action.label}
+                              {typeof action.disabledReason === 'string' && (
+                                <span className="text-muted-foreground text-xs">
+                                  {action.disabledReason}
+                                </span>
+                              )}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          }}
+        </LazyDialogTrigger>
       )}
-    </>
+    </LazyDialogTrigger>
   );
 }
