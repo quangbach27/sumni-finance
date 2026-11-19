@@ -6,17 +6,171 @@
 package dbmodels
 
 import (
+	"context"
 	"time"
 
 	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
-
+	golang_common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
 )
 
+const countLedgerEntries = `-- name: CountLedgerEntries :one
+SELECT count(*)
+FROM ledgers.ledger_entries e
+LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+WHERE e.org_id = $1
+  AND ($2::timestamptz IS NULL OR e.occurred_at >= $2::timestamptz)
+  AND ($3::timestamptz IS NULL OR e.occurred_at <= $3::timestamptz)
+  AND ($4::uuid IS NULL OR e.ledger_period_uuid = $4::uuid)
+  AND ($5::uuid IS NULL OR e.fund_source_uuid = $5::uuid)
+  AND ($6::text IS NULL OR e.kind = $6::text)
+  AND ($7::uuid IS NULL OR c.uuid = $7::uuid OR c.parent_uuid = $7::uuid)
+`
+
+type CountLedgerEntriesParams struct {
+	OrgID            string
+	FromDate         *time.Time
+	ToDate           *time.Time
+	LedgerPeriodUuid *golang_common.UUID
+	FundSourceUuid   *golang_common.UUID
+	Kind             *string
+	CategoryUuid     *golang_common.UUID
+}
+
+// Same predicate order as ListLedgerEntries.
+func (q *Queries) CountLedgerEntries(ctx context.Context, arg CountLedgerEntriesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countLedgerEntries,
+		arg.OrgID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.LedgerPeriodUuid,
+		arg.FundSourceUuid,
+		arg.Kind,
+		arg.CategoryUuid,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getLatestLedgerEntryOccurredAt = `-- name: GetLatestLedgerEntryOccurredAt :one
+SELECT occurred_at
+FROM ledgers.ledger_entries
+WHERE org_id = $1
+  AND fund_source_uuid = $2
+ORDER BY occurred_at DESC
+LIMIT 1
+`
+
+type GetLatestLedgerEntryOccurredAtParams struct {
+	OrgID          string
+	FundSourceUuid domain.FundSourceUUID
+}
+
+func (q *Queries) GetLatestLedgerEntryOccurredAt(ctx context.Context, arg GetLatestLedgerEntryOccurredAtParams) (time.Time, error) {
+	row := q.db.QueryRow(ctx, getLatestLedgerEntryOccurredAt, arg.OrgID, arg.FundSourceUuid)
+	var occurred_at time.Time
+	err := row.Scan(&occurred_at)
+	return occurred_at, err
+}
+
+const getLedgerEntry = `-- name: GetLedgerEntry :one
+SELECT
+    e.uuid, e.org_id, e.ledger_period_uuid, e.fund_source_uuid, e.amount, e.direction, e.description, e.occurred_at, e.category_uuid, e.fs_balance_before, e.fs_balance_after, e.status, e.kind, e.reversed_by_entry_uuid, e.reverses_entry_uuid, e.voided_reason, e.voided_by, e.voided_at, e.created_by, e.created_at,
+    fs.name AS fund_source_name,
+    fs.bank_code AS fund_source_bank_code,
+    fs.account_number AS fund_source_account_number,
+    lp.name AS period_name,
+    lp.status AS period_status,
+    c.name AS entry_category_name,
+    c.parent_uuid AS parent_category_uuid,
+    p.name AS parent_category_name
+FROM ledgers.ledger_entries e
+JOIN ledgers.fund_sources fs ON fs.uuid = e.fund_source_uuid
+JOIN ledgers.ledger_periods lp ON lp.uuid = e.ledger_period_uuid
+LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
+WHERE e.org_id = $1
+  AND e.uuid = $2
+`
+
+type GetLedgerEntryParams struct {
+	OrgID string
+	Uuid  domain.LedgerEntryUUID
+}
+
+type GetLedgerEntryRow struct {
+	Uuid                    domain.LedgerEntryUUID
+	OrgID                   string
+	LedgerPeriodUuid        domain.LedgerPeriodUUID
+	FundSourceUuid          domain.FundSourceUUID
+	Amount                  decimal.Decimal
+	Direction               shared.Direction
+	Description             string
+	OccurredAt              time.Time
+	CategoryUuid            *models.CategoryUUID
+	FsBalanceBefore         decimal.Decimal
+	FsBalanceAfter          decimal.Decimal
+	Status                  domain.EntryStatus
+	Kind                    domain.EntryKind
+	ReversedByEntryUuid     *domain.LedgerEntryUUID
+	ReversesEntryUuid       *domain.LedgerEntryUUID
+	VoidedReason            *string
+	VoidedBy                *string
+	VoidedAt                *time.Time
+	CreatedBy               string
+	CreatedAt               time.Time
+	FundSourceName          string
+	FundSourceBankCode      *string
+	FundSourceAccountNumber *string
+	PeriodName              string
+	PeriodStatus            domain.LedgerStatus
+	EntryCategoryName       *string
+	ParentCategoryUuid      *models.CategoryUUID
+	ParentCategoryName      *string
+}
+
+func (q *Queries) GetLedgerEntry(ctx context.Context, arg GetLedgerEntryParams) (GetLedgerEntryRow, error) {
+	row := q.db.QueryRow(ctx, getLedgerEntry, arg.OrgID, arg.Uuid)
+	var i GetLedgerEntryRow
+	err := row.Scan(
+		&i.Uuid,
+		&i.OrgID,
+		&i.LedgerPeriodUuid,
+		&i.FundSourceUuid,
+		&i.Amount,
+		&i.Direction,
+		&i.Description,
+		&i.OccurredAt,
+		&i.CategoryUuid,
+		&i.FsBalanceBefore,
+		&i.FsBalanceAfter,
+		&i.Status,
+		&i.Kind,
+		&i.ReversedByEntryUuid,
+		&i.ReversesEntryUuid,
+		&i.VoidedReason,
+		&i.VoidedBy,
+		&i.VoidedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FundSourceName,
+		&i.FundSourceBankCode,
+		&i.FundSourceAccountNumber,
+		&i.PeriodName,
+		&i.PeriodStatus,
+		&i.EntryCategoryName,
+		&i.ParentCategoryUuid,
+		&i.ParentCategoryName,
+	)
+	return i, err
+}
+
 type InsertLedgerEntriesParams struct {
 	Uuid             domain.LedgerEntryUUID
+	OrgID            string
 	LedgerPeriodUuid domain.LedgerPeriodUUID
 	FundSourceUuid   domain.FundSourceUUID
 	Amount           decimal.Decimal
@@ -28,4 +182,151 @@ type InsertLedgerEntriesParams struct {
 	FsBalanceAfter   decimal.Decimal
 	Status           domain.EntryStatus
 	Kind             domain.EntryKind
+	CreatedBy        string
+}
+
+const listLedgerEntries = `-- name: ListLedgerEntries :many
+SELECT
+    e.uuid, e.org_id, e.ledger_period_uuid, e.fund_source_uuid, e.amount, e.direction, e.description, e.occurred_at, e.category_uuid, e.fs_balance_before, e.fs_balance_after, e.status, e.kind, e.reversed_by_entry_uuid, e.reverses_entry_uuid, e.voided_reason, e.voided_by, e.voided_at, e.created_by, e.created_at,
+    fs.name AS fund_source_name,
+    fs.bank_code AS fund_source_bank_code,
+    fs.account_number AS fund_source_account_number,
+    lp.name AS period_name,
+    lp.status AS period_status,
+    c.name AS entry_category_name,
+    c.parent_uuid AS parent_category_uuid,
+    p.name AS parent_category_name
+FROM ledgers.ledger_entries e
+JOIN ledgers.fund_sources fs ON fs.uuid = e.fund_source_uuid
+JOIN ledgers.ledger_periods lp ON lp.uuid = e.ledger_period_uuid
+LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
+WHERE e.org_id = $1
+  AND ($2::timestamptz IS NULL OR e.occurred_at >= $2::timestamptz)
+  AND ($3::timestamptz IS NULL OR e.occurred_at <= $3::timestamptz)
+  AND ($4::uuid IS NULL OR e.ledger_period_uuid = $4::uuid)
+  AND ($5::uuid IS NULL OR e.fund_source_uuid = $5::uuid)
+  AND ($6::text IS NULL OR e.kind = $6::text)
+  AND ($7::uuid IS NULL OR c.uuid = $7::uuid OR c.parent_uuid = $7::uuid)
+ORDER BY
+    (CASE WHEN $8::text = 'fund_source_uuid' AND $9::text = 'asc' THEN fs.name END) ASC,
+    (CASE WHEN $8::text = 'fund_source_uuid' AND $9::text = 'desc' THEN fs.name END) DESC,
+    (CASE WHEN $8::text = 'category_uuid' AND $9::text = 'asc' THEN COALESCE(p.name, c.name) END) ASC,
+    (CASE WHEN $8::text = 'category_uuid' AND $9::text = 'desc' THEN COALESCE(p.name, c.name) END) DESC,
+    (CASE WHEN $8::text = 'occurred_at' AND $9::text = 'asc' THEN e.occurred_at END) ASC,
+    e.occurred_at DESC,
+    e.created_at DESC,
+    e.uuid
+LIMIT $11
+OFFSET $10
+`
+
+type ListLedgerEntriesParams struct {
+	OrgID            string
+	FromDate         *time.Time
+	ToDate           *time.Time
+	LedgerPeriodUuid *golang_common.UUID
+	FundSourceUuid   *golang_common.UUID
+	Kind             *string
+	CategoryUuid     *golang_common.UUID
+	OrderBy          string
+	OrderDir         string
+	PageOffset       int32
+	PageLimit        int32
+}
+
+type ListLedgerEntriesRow struct {
+	Uuid                    domain.LedgerEntryUUID
+	OrgID                   string
+	LedgerPeriodUuid        domain.LedgerPeriodUUID
+	FundSourceUuid          domain.FundSourceUUID
+	Amount                  decimal.Decimal
+	Direction               shared.Direction
+	Description             string
+	OccurredAt              time.Time
+	CategoryUuid            *models.CategoryUUID
+	FsBalanceBefore         decimal.Decimal
+	FsBalanceAfter          decimal.Decimal
+	Status                  domain.EntryStatus
+	Kind                    domain.EntryKind
+	ReversedByEntryUuid     *domain.LedgerEntryUUID
+	ReversesEntryUuid       *domain.LedgerEntryUUID
+	VoidedReason            *string
+	VoidedBy                *string
+	VoidedAt                *time.Time
+	CreatedBy               string
+	CreatedAt               time.Time
+	FundSourceName          string
+	FundSourceBankCode      *string
+	FundSourceAccountNumber *string
+	PeriodName              string
+	PeriodStatus            domain.LedgerStatus
+	EntryCategoryName       *string
+	ParentCategoryUuid      *models.CategoryUUID
+	ParentCategoryName      *string
+}
+
+// A tag is a sub-category: when the entry's category has a parent, the parent is
+// the category and the entry's own category is the tag.
+// Predicate order: tenant (e.org_id, first column of every index) first, then the date range (the filter users pick
+// most), then the scope filters. Keep identical in CountLedgerEntries.
+func (q *Queries) ListLedgerEntries(ctx context.Context, arg ListLedgerEntriesParams) ([]ListLedgerEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listLedgerEntries,
+		arg.OrgID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.LedgerPeriodUuid,
+		arg.FundSourceUuid,
+		arg.Kind,
+		arg.CategoryUuid,
+		arg.OrderBy,
+		arg.OrderDir,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLedgerEntriesRow{}
+	for rows.Next() {
+		var i ListLedgerEntriesRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.OrgID,
+			&i.LedgerPeriodUuid,
+			&i.FundSourceUuid,
+			&i.Amount,
+			&i.Direction,
+			&i.Description,
+			&i.OccurredAt,
+			&i.CategoryUuid,
+			&i.FsBalanceBefore,
+			&i.FsBalanceAfter,
+			&i.Status,
+			&i.Kind,
+			&i.ReversedByEntryUuid,
+			&i.ReversesEntryUuid,
+			&i.VoidedReason,
+			&i.VoidedBy,
+			&i.VoidedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.FundSourceName,
+			&i.FundSourceBankCode,
+			&i.FundSourceAccountNumber,
+			&i.PeriodName,
+			&i.PeriodStatus,
+			&i.EntryCategoryName,
+			&i.ParentCategoryUuid,
+			&i.ParentCategoryName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

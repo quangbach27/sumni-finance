@@ -60,7 +60,7 @@ One fund source's balances within a period (the rows of the reconcile screen). F
 - Movement (closing - opening), difference and totals are computed in the service/read model, not stored.
 - Close, reconcile and reopen are implemented (see use cases below). Void is not (its repo method is a stub).
 
-### Category model (`apps/models/category.go`, table `ledgers.categories`, migration 00006)
+### Category model (`apps/models/category.go`, table `ledgers.categories`, migration 00005)
 Not an aggregate: a plain value with public fields (`UUID`, optional `ParentUUID`, `Name`, optional `Description`, `Children`). `models.NewCategory` validates and returns a value (not a pointer). One type serves both levels: a category has no parent and holds its sub-categories in `Children`; a sub-category has `ParentUUID` and no children (two levels at most, `category-too-deep`). Categories are global (shared by all ledger periods) and will belong to an office later (`office_uuid` is to be added to the table and the top-level unique name index). Names are unique within their level, case-insensitive (409 `category-name-taken`).
 
 ### Use cases

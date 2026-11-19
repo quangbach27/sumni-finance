@@ -113,7 +113,7 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 			return err
 		}
 
-		if err := saveJournalEntries(ctx, q, entries); err != nil {
+		if err := saveJournalEntries(ctx, q, orgID, entries); err != nil {
 			return err
 		}
 
@@ -315,7 +315,7 @@ func validateEntryCategories(
 
 // saveJournalEntries inserts the entries. Each entry must have its fund source
 // snapshot recorded.
-func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, entries []*domain.LedgerEntry) error {
+func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, orgID string, entries []*domain.LedgerEntry) error {
 	if len(entries) == 0 {
 		return errors.New("postFn returned no ledger entries")
 	}
@@ -329,7 +329,7 @@ func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, entries []*dom
 			return fmt.Errorf("ledger entry %s has no fund source snapshot", e.UUID().String())
 		}
 
-		params = append(params, ledgerEntryToInsertParams(e))
+		params = append(params, ledgerEntryToInsertParams(orgID, e))
 	}
 
 	_, err := q.InsertLedgerEntries(ctx, params)

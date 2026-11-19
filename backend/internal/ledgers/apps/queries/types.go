@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+
+	"backend/internal/ledgers/domain"
 )
 
 type FundSource struct {
@@ -83,4 +85,54 @@ type Category struct {
 	Name          string
 	Description   *string
 	SubCategories []Category
+}
+
+// FundSourceDetail is a fund source with the time of its latest entry.
+type FundSourceDetail struct {
+	FundSource
+	LatestEntryAt *time.Time // nil without entries
+}
+
+// LedgerEntryListItem is a ledger entry with the names needed to display it.
+// Category is the top-level category; Tag is the sub-category, when the entry
+// has one.
+type LedgerEntryListItem struct {
+	UUID                string
+	LedgerPeriod        LedgerEntryPeriod
+	FundSource          LedgerEntryFundSource
+	OccurredAt          time.Time
+	Description         string
+	Direction           string // "inflow" | "outflow"
+	Amount              decimal.Decimal
+	BalanceBefore       decimal.Decimal
+	BalanceAfter        decimal.Decimal
+	Category            *CategoryRef
+	Tag                 *CategoryRef
+	Status              domain.EntryStatus
+	Kind                domain.EntryKind
+	CreatedAt           time.Time
+	CreatedBy           string
+	ReversedByEntryUUID *string
+	ReversesEntryUUID   *string
+	VoidedReason        *string
+	VoidedBy            *string
+	VoidedAt            *time.Time
+}
+
+type LedgerEntryPeriod struct {
+	UUID   string
+	Name   string
+	Status string // "opened" | "closed" | "reconciled"
+}
+
+type LedgerEntryFundSource struct {
+	UUID          string
+	Name          string
+	BankCode      *string // bank only
+	AccountNumber *string // bank only
+}
+
+type CategoryRef struct {
+	UUID string
+	Name string
 }

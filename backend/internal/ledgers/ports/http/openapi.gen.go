@@ -17,8 +17,66 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/shopspring/decimal"
 )
+
+// Defines values for LedgerEntryDirection.
+const (
+	Inflow  LedgerEntryDirection = "inflow"
+	Outflow LedgerEntryDirection = "outflow"
+)
+
+// Valid indicates whether the value is a known member of the LedgerEntryDirection enum.
+func (e LedgerEntryDirection) Valid() bool {
+	switch e {
+	case Inflow:
+		return true
+	case Outflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListLedgerEntriesParamsOrderBy.
+const (
+	CategoryUuid   ListLedgerEntriesParamsOrderBy = "category_uuid"
+	FundSourceUuid ListLedgerEntriesParamsOrderBy = "fund_source_uuid"
+	OccurredAt     ListLedgerEntriesParamsOrderBy = "occurred_at"
+)
+
+// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrderBy enum.
+func (e ListLedgerEntriesParamsOrderBy) Valid() bool {
+	switch e {
+	case CategoryUuid:
+		return true
+	case FundSourceUuid:
+		return true
+	case OccurredAt:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListLedgerEntriesParamsOrder.
+const (
+	Asc  ListLedgerEntriesParamsOrder = "asc"
+	Desc ListLedgerEntriesParamsOrder = "desc"
+)
+
+// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrder enum.
+func (e ListLedgerEntriesParamsOrder) Valid() bool {
+	switch e {
+	case Asc:
+		return true
+	case Desc:
+		return true
+	default:
+		return false
+	}
+}
 
 // Category defines model for Category.
 type Category struct {
@@ -140,10 +198,32 @@ type GenerateLedgerPeriodReportResponse struct {
 	ReportUuid ReportUUID `json:"report_uuid"`
 }
 
+// GetFundSourceResponse defines model for GetFundSourceResponse.
+type GetFundSourceResponse struct {
+	FundSource FundSource `json:"fund_source"`
+
+	// LatestEntryAt occurred_at of the latest entry; absent without entries.
+	LatestEntryAt *time.Time `json:"latest_entry_at,omitempty"`
+}
+
+// GetLedgerEntryResponse defines model for GetLedgerEntryResponse.
+type GetLedgerEntryResponse struct {
+	Entry LedgerEntryListItem `json:"entry"`
+}
+
 // GetLedgerPeriodResponse defines model for GetLedgerPeriodResponse.
 type GetLedgerPeriodResponse struct {
 	LedgerPeriod LedgerPeriodDetail `json:"ledger_period"`
 }
+
+// LedgerEntryCategoryRef defines model for LedgerEntryCategoryRef.
+type LedgerEntryCategoryRef struct {
+	Name string       `json:"name"`
+	Uuid CategoryUUID `json:"uuid"`
+}
+
+// LedgerEntryDirection defines model for LedgerEntryDirection.
+type LedgerEntryDirection string
 
 // LedgerEntryInput defines model for LedgerEntryInput.
 type LedgerEntryInput struct {
@@ -153,6 +233,56 @@ type LedgerEntryInput struct {
 	Direction    Direction     `json:"direction"`
 	OccurredAt   time.Time     `json:"occurred_at"`
 }
+
+// LedgerEntryKind defines model for LedgerEntryKind.
+type LedgerEntryKind = domain.EntryKind
+
+// LedgerEntryListItem defines model for LedgerEntryListItem.
+type LedgerEntryListItem struct {
+	Amount        Decimal                 `json:"amount"`
+	BalanceAfter  Decimal                 `json:"balance_after"`
+	BalanceBefore Decimal                 `json:"balance_before"`
+	Category      *LedgerEntryCategoryRef `json:"category,omitempty"`
+	CreatedAt     time.Time               `json:"created_at"`
+
+	// CreatedBy Id of the user who created the entry.
+	CreatedBy   string               `json:"created_by"`
+	Description string               `json:"description"`
+	Direction   LedgerEntryDirection `json:"direction"`
+	FundSource  struct {
+		// AccountNumber Bank only.
+		AccountNumber *string `json:"account_number,omitempty"`
+
+		// BankCode Bank only.
+		BankCode *string        `json:"bank_code,omitempty"`
+		Name     string         `json:"name"`
+		Uuid     FundSourceUUID `json:"uuid"`
+	} `json:"fund_source"`
+	Kind         LedgerEntryKind `json:"kind"`
+	LedgerPeriod struct {
+		Name   string           `json:"name"`
+		Status LedgerStatus     `json:"status"`
+		Uuid   LedgerPeriodUUID `json:"uuid"`
+	} `json:"ledger_period"`
+	OccurredAt time.Time `json:"occurred_at"`
+
+	// ReversedByEntryUuid Set on a voided entry; its reversal entry.
+	ReversedByEntryUuid *openapi_types.UUID `json:"reversed_by_entry_uuid,omitempty"`
+
+	// ReversesEntryUuid Set on a reversal entry; the voided entry it compensates.
+	ReversesEntryUuid *openapi_types.UUID `json:"reverses_entry_uuid,omitempty"`
+	Status            LedgerEntryStatus   `json:"status"`
+
+	// Tag The sub-category, when the entry has one.
+	Tag          *LedgerEntryCategoryRef `json:"tag,omitempty"`
+	Uuid         openapi_types.UUID      `json:"uuid"`
+	VoidedAt     *time.Time              `json:"voided_at,omitempty"`
+	VoidedBy     *string                 `json:"voided_by,omitempty"`
+	VoidedReason *string                 `json:"voided_reason,omitempty"`
+}
+
+// LedgerEntryStatus defines model for LedgerEntryStatus.
+type LedgerEntryStatus = domain.EntryStatus
 
 // LedgerEntryUUID defines model for LedgerEntryUUID.
 type LedgerEntryUUID = domain.LedgerEntryUUID
@@ -234,6 +364,12 @@ type ListFundSourceStatementsResponse struct {
 // ListFundSourcesResponse defines model for ListFundSourcesResponse.
 type ListFundSourcesResponse struct {
 	FundSources []FundSource `json:"fund_sources"`
+}
+
+// ListLedgerEntriesResponse defines model for ListLedgerEntriesResponse.
+type ListLedgerEntriesResponse struct {
+	Items    []LedgerEntryListItem `json:"items"`
+	PageInfo PageInfo              `json:"page_info"`
 }
 
 // ListLedgerPeriodsResponse defines model for ListLedgerPeriodsResponse.
@@ -333,6 +469,34 @@ type NotFound = ErrorResponse
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorResponse
 
+// ListLedgerEntriesParams defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParams struct {
+	FundSourceUuid *FundSourceUUID `form:"fund_source_uuid,omitempty" json:"fund_source_uuid,omitempty"`
+
+	// CategoryUuid A category; also matches entries of its sub-categories (tags).
+	CategoryUuid     *CategoryUUID     `form:"category_uuid,omitempty" json:"category_uuid,omitempty"`
+	LedgerPeriodUuid *LedgerPeriodUUID `form:"ledger_period_uuid,omitempty" json:"ledger_period_uuid,omitempty"`
+
+	// FromDate Inclusive lower bound of occurred_at.
+	FromDate *time.Time `form:"from_date,omitempty" json:"from_date,omitempty"`
+
+	// ToDate Inclusive upper bound of occurred_at.
+	ToDate *time.Time `form:"to_date,omitempty" json:"to_date,omitempty"`
+
+	// Kind Only entries of this kind; omit for both.
+	Kind     *LedgerEntryKind                `form:"kind,omitempty" json:"kind,omitempty"`
+	OrderBy  *ListLedgerEntriesParamsOrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+	Order    *ListLedgerEntriesParamsOrder   `form:"order,omitempty" json:"order,omitempty"`
+	Page     *int                            `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int                            `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListLedgerEntriesParamsOrderBy defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParamsOrderBy string
+
+// ListLedgerEntriesParamsOrder defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParamsOrder string
+
 // ListLedgerPeriodsParams defines parameters for ListLedgerPeriods.
 type ListLedgerPeriodsParams struct {
 	Page     *int          `form:"page,omitempty" json:"page,omitempty"`
@@ -372,6 +536,15 @@ type ServerInterface interface {
 	// CreateFundSource Create a fund source
 	// (POST /api/v1/fund-sources)
 	CreateFundSource(ctx *echo.Context) error
+	// GetFundSource Get a fund source
+	// (GET /api/v1/fund-sources/{fund_source_uuid})
+	GetFundSource(ctx *echo.Context, fundSourceUuid FundSourceUUID) error
+	// ListLedgerEntries List ledger entries
+	// (GET /api/v1/ledger-entries)
+	ListLedgerEntries(ctx *echo.Context, params ListLedgerEntriesParams) error
+	// GetLedgerEntry Get a ledger entry
+	// (GET /api/v1/ledger-entries/{ledger_entry_uuid})
+	GetLedgerEntry(ctx *echo.Context, ledgerEntryUuid openapi_types.UUID) error
 	// ListLedgerPeriods List ledger periods
 	// (GET /api/v1/ledger-periods)
 	ListLedgerPeriods(ctx *echo.Context, params ListLedgerPeriodsParams) error
@@ -445,6 +618,119 @@ func (w *ServerInterfaceWrapper) CreateFundSource(ctx *echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.CreateFundSource(ctx)
+	return err
+}
+
+// GetFundSource converts echo context to params.
+func (w *ServerInterfaceWrapper) GetFundSource(ctx *echo.Context) error {
+	var err error
+	// ------------- Path parameter "fund_source_uuid" -------------
+	var fundSourceUuid FundSourceUUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fund_source_uuid", ctx.Param("fund_source_uuid"), &fundSourceUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter fund_source_uuid: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetFundSource(ctx, fundSourceUuid)
+	return err
+}
+
+// ListLedgerEntries converts echo context to params.
+func (w *ServerInterfaceWrapper) ListLedgerEntries(ctx *echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListLedgerEntriesParams
+	// ------------- Optional query parameter "fund_source_uuid" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "fund_source_uuid", ctx.QueryParams(), &params.FundSourceUuid, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter fund_source_uuid: %s", err))
+	}
+
+	// ------------- Optional query parameter "category_uuid" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "category_uuid", ctx.QueryParams(), &params.CategoryUuid, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter category_uuid: %s", err))
+	}
+
+	// ------------- Optional query parameter "ledger_period_uuid" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "ledger_period_uuid", ctx.QueryParams(), &params.LedgerPeriodUuid, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter ledger_period_uuid: %s", err))
+	}
+
+	// ------------- Optional query parameter "from_date" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from_date", ctx.QueryParams(), &params.FromDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter from_date: %s", err))
+	}
+
+	// ------------- Optional query parameter "to_date" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to_date", ctx.QueryParams(), &params.ToDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter to_date: %s", err))
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "kind", ctx.QueryParams(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter kind: %s", err))
+	}
+
+	// ------------- Optional query parameter "order_by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "order_by", ctx.QueryParams(), &params.OrderBy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter order_by: %s", err))
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", ctx.QueryParams(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter order: %s", err))
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", ctx.QueryParams(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page: %s", err))
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", ctx.QueryParams(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page_size: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListLedgerEntries(ctx, params)
+	return err
+}
+
+// GetLedgerEntry converts echo context to params.
+func (w *ServerInterfaceWrapper) GetLedgerEntry(ctx *echo.Context) error {
+	var err error
+	// ------------- Path parameter "ledger_entry_uuid" -------------
+	var ledgerEntryUuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ledger_entry_uuid", ctx.Param("ledger_entry_uuid"), &ledgerEntryUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter ledger_entry_uuid: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetLedgerEntry(ctx, ledgerEntryUuid)
 	return err
 }
 
@@ -675,6 +961,9 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 
 	router.GET(options.BaseURL+"/api/v1/fund-sources", wrapper.ListFundSources, options.OperationMiddlewares["listFundSources"]...)
 	router.POST(options.BaseURL+"/api/v1/fund-sources", wrapper.CreateFundSource, options.OperationMiddlewares["createFundSource"]...)
+	router.GET(options.BaseURL+"/api/v1/fund-sources/:fund_source_uuid", wrapper.GetFundSource, options.OperationMiddlewares["getFundSource"]...)
+	router.GET(options.BaseURL+"/api/v1/ledger-entries", wrapper.ListLedgerEntries, options.OperationMiddlewares["listLedgerEntries"]...)
+	router.GET(options.BaseURL+"/api/v1/ledger-entries/:ledger_entry_uuid", wrapper.GetLedgerEntry, options.OperationMiddlewares["getLedgerEntry"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods/unlocked", wrapper.GetUnlockedLedgerPeriod, options.OperationMiddlewares["getUnlockedLedgerPeriod"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid", wrapper.GetLedgerPeriod, options.OperationMiddlewares["getLedgerPeriod"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods", wrapper.ListLedgerPeriods, options.OperationMiddlewares["listLedgerPeriods"]...)
@@ -938,6 +1227,204 @@ type CreateFundSource500JSONResponse struct {
 }
 
 func (response CreateFundSource500JSONResponse) VisitCreateFundSourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFundSourceRequestObject struct {
+	FundSourceUuid FundSourceUUID `json:"fund_source_uuid"`
+}
+
+type GetFundSourceResponseObject interface {
+	VisitGetFundSourceResponse(w http.ResponseWriter) error
+}
+
+type GetFundSource200JSONResponse GetFundSourceResponse
+
+func (response GetFundSource200JSONResponse) VisitGetFundSourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFundSource401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetFundSource401JSONResponse) VisitGetFundSourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFundSource404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetFundSource404JSONResponse) VisitGetFundSourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFundSource500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetFundSource500JSONResponse) VisitGetFundSourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLedgerEntriesRequestObject struct {
+	Params ListLedgerEntriesParams
+}
+
+type ListLedgerEntriesResponseObject interface {
+	VisitListLedgerEntriesResponse(w http.ResponseWriter) error
+}
+
+type ListLedgerEntries200JSONResponse ListLedgerEntriesResponse
+
+func (response ListLedgerEntries200JSONResponse) VisitListLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLedgerEntries400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListLedgerEntries400JSONResponse) VisitListLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLedgerEntries401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListLedgerEntries401JSONResponse) VisitListLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLedgerEntries500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ListLedgerEntries500JSONResponse) VisitListLedgerEntriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerEntryRequestObject struct {
+	LedgerEntryUuid openapi_types.UUID `json:"ledger_entry_uuid"`
+}
+
+type GetLedgerEntryResponseObject interface {
+	VisitGetLedgerEntryResponse(w http.ResponseWriter) error
+}
+
+type GetLedgerEntry200JSONResponse GetLedgerEntryResponse
+
+func (response GetLedgerEntry200JSONResponse) VisitGetLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerEntry401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetLedgerEntry401JSONResponse) VisitGetLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerEntry404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetLedgerEntry404JSONResponse) VisitGetLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLedgerEntry500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetLedgerEntry500JSONResponse) VisitGetLedgerEntryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1849,6 +2336,15 @@ type StrictServerInterface interface {
 	// CreateFundSource Create a fund source
 	// (POST /api/v1/fund-sources)
 	CreateFundSource(ctx context.Context, request CreateFundSourceRequestObject) (CreateFundSourceResponseObject, error)
+	// GetFundSource Get a fund source
+	// (GET /api/v1/fund-sources/{fund_source_uuid})
+	GetFundSource(ctx context.Context, request GetFundSourceRequestObject) (GetFundSourceResponseObject, error)
+	// ListLedgerEntries List ledger entries
+	// (GET /api/v1/ledger-entries)
+	ListLedgerEntries(ctx context.Context, request ListLedgerEntriesRequestObject) (ListLedgerEntriesResponseObject, error)
+	// GetLedgerEntry Get a ledger entry
+	// (GET /api/v1/ledger-entries/{ledger_entry_uuid})
+	GetLedgerEntry(ctx context.Context, request GetLedgerEntryRequestObject) (GetLedgerEntryResponseObject, error)
 	// ListLedgerPeriods List ledger periods
 	// (GET /api/v1/ledger-periods)
 	ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error)
@@ -2028,6 +2524,81 @@ func (sh *strictHandler) CreateFundSource(ctx *echo.Context) error {
 		return err
 	} else if validResponse, ok := response.(CreateFundSourceResponseObject); ok {
 		return validResponse.VisitCreateFundSourceResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetFundSource operation middleware
+func (sh *strictHandler) GetFundSource(ctx *echo.Context, fundSourceUuid FundSourceUUID) error {
+	var request GetFundSourceRequestObject
+
+	request.FundSourceUuid = fundSourceUuid
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFundSource(ctx.Request().Context(), request.(GetFundSourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFundSource")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetFundSourceResponseObject); ok {
+		return validResponse.VisitGetFundSourceResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListLedgerEntries operation middleware
+func (sh *strictHandler) ListLedgerEntries(ctx *echo.Context, params ListLedgerEntriesParams) error {
+	var request ListLedgerEntriesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListLedgerEntries(ctx.Request().Context(), request.(ListLedgerEntriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListLedgerEntries")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListLedgerEntriesResponseObject); ok {
+		return validResponse.VisitListLedgerEntriesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetLedgerEntry operation middleware
+func (sh *strictHandler) GetLedgerEntry(ctx *echo.Context, ledgerEntryUuid openapi_types.UUID) error {
+	var request GetLedgerEntryRequestObject
+
+	request.LedgerEntryUuid = ledgerEntryUuid
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLedgerEntry(ctx.Request().Context(), request.(GetLedgerEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLedgerEntry")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetLedgerEntryResponseObject); ok {
+		return validResponse.VisitGetLedgerEntryResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

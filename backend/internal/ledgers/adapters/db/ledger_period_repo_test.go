@@ -183,7 +183,7 @@ func postFnFor(t *testing.T, specs []entrySpec) func(*domain.LedgerPeriod, map[d
 		entries := make([]*domain.LedgerEntry, 0, len(specs))
 		for _, s := range specs {
 			e, err := domain.NewLedgerEntry(period.UUID(), s.fs.UUID(), decimal.NewFromInt(s.amount), s.direction,
-				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), nil)
+				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), nil, "user_test")
 			if err != nil {
 				return nil, err
 			}
@@ -257,6 +257,28 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		// 1000 -> 700 (outflow 300), 700 -> 800 (inflow 100)
 		assert.True(t, got[0].before.Equal(decimal.NewFromInt(1000)) && got[0].after.Equal(decimal.NewFromInt(700)))
 		assert.True(t, got[1].before.Equal(decimal.NewFromInt(700)) && got[1].after.Equal(decimal.NewFromInt(800)))
+
+		var createdBy []string
+		creators, err := pgxDb.Query(ctx, "SELECT DISTINCT created_by FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs1.UUID())
+		require.NoError(t, err)
+		defer creators.Close()
+		for creators.Next() {
+			var c string
+			require.NoError(t, creators.Scan(&c))
+			createdBy = append(createdBy, c)
+		}
+		assert.Equal(t, []string{"user_test"}, createdBy)
+
+		var orgIDs []string
+		orgRows, err := pgxDb.Query(ctx, "SELECT DISTINCT org_id FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs1.UUID())
+		require.NoError(t, err)
+		defer orgRows.Close()
+		for orgRows.Next() {
+			var o string
+			require.NoError(t, orgRows.Scan(&o))
+			orgIDs = append(orgIDs, o)
+		}
+		assert.Equal(t, []string{testOrgID}, orgIDs)
 	})
 
 	t.Run("insufficient balance rolls back the whole batch", func(t *testing.T) {

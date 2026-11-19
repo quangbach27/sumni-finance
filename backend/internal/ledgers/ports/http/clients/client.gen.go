@@ -19,8 +19,66 @@ import (
 	"backend/internal/shared"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/shopspring/decimal"
 )
+
+// Defines values for LedgerEntryDirection.
+const (
+	Inflow  LedgerEntryDirection = "inflow"
+	Outflow LedgerEntryDirection = "outflow"
+)
+
+// Valid indicates whether the value is a known member of the LedgerEntryDirection enum.
+func (e LedgerEntryDirection) Valid() bool {
+	switch e {
+	case Inflow:
+		return true
+	case Outflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListLedgerEntriesParamsOrderBy.
+const (
+	CategoryUuid   ListLedgerEntriesParamsOrderBy = "category_uuid"
+	FundSourceUuid ListLedgerEntriesParamsOrderBy = "fund_source_uuid"
+	OccurredAt     ListLedgerEntriesParamsOrderBy = "occurred_at"
+)
+
+// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrderBy enum.
+func (e ListLedgerEntriesParamsOrderBy) Valid() bool {
+	switch e {
+	case CategoryUuid:
+		return true
+	case FundSourceUuid:
+		return true
+	case OccurredAt:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListLedgerEntriesParamsOrder.
+const (
+	Asc  ListLedgerEntriesParamsOrder = "asc"
+	Desc ListLedgerEntriesParamsOrder = "desc"
+)
+
+// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrder enum.
+func (e ListLedgerEntriesParamsOrder) Valid() bool {
+	switch e {
+	case Asc:
+		return true
+	case Desc:
+		return true
+	default:
+		return false
+	}
+}
 
 // Category defines model for Category.
 type Category struct {
@@ -142,10 +200,32 @@ type GenerateLedgerPeriodReportResponse struct {
 	ReportUuid ReportUUID `json:"report_uuid"`
 }
 
+// GetFundSourceResponse defines model for GetFundSourceResponse.
+type GetFundSourceResponse struct {
+	FundSource FundSource `json:"fund_source"`
+
+	// LatestEntryAt occurred_at of the latest entry; absent without entries.
+	LatestEntryAt *time.Time `json:"latest_entry_at,omitempty"`
+}
+
+// GetLedgerEntryResponse defines model for GetLedgerEntryResponse.
+type GetLedgerEntryResponse struct {
+	Entry LedgerEntryListItem `json:"entry"`
+}
+
 // GetLedgerPeriodResponse defines model for GetLedgerPeriodResponse.
 type GetLedgerPeriodResponse struct {
 	LedgerPeriod LedgerPeriodDetail `json:"ledger_period"`
 }
+
+// LedgerEntryCategoryRef defines model for LedgerEntryCategoryRef.
+type LedgerEntryCategoryRef struct {
+	Name string       `json:"name"`
+	Uuid CategoryUUID `json:"uuid"`
+}
+
+// LedgerEntryDirection defines model for LedgerEntryDirection.
+type LedgerEntryDirection string
 
 // LedgerEntryInput defines model for LedgerEntryInput.
 type LedgerEntryInput struct {
@@ -155,6 +235,56 @@ type LedgerEntryInput struct {
 	Direction    Direction     `json:"direction"`
 	OccurredAt   time.Time     `json:"occurred_at"`
 }
+
+// LedgerEntryKind defines model for LedgerEntryKind.
+type LedgerEntryKind = domain.EntryKind
+
+// LedgerEntryListItem defines model for LedgerEntryListItem.
+type LedgerEntryListItem struct {
+	Amount        Decimal                 `json:"amount"`
+	BalanceAfter  Decimal                 `json:"balance_after"`
+	BalanceBefore Decimal                 `json:"balance_before"`
+	Category      *LedgerEntryCategoryRef `json:"category,omitempty"`
+	CreatedAt     time.Time               `json:"created_at"`
+
+	// CreatedBy Id of the user who created the entry.
+	CreatedBy   string               `json:"created_by"`
+	Description string               `json:"description"`
+	Direction   LedgerEntryDirection `json:"direction"`
+	FundSource  struct {
+		// AccountNumber Bank only.
+		AccountNumber *string `json:"account_number,omitempty"`
+
+		// BankCode Bank only.
+		BankCode *string        `json:"bank_code,omitempty"`
+		Name     string         `json:"name"`
+		Uuid     FundSourceUUID `json:"uuid"`
+	} `json:"fund_source"`
+	Kind         LedgerEntryKind `json:"kind"`
+	LedgerPeriod struct {
+		Name   string           `json:"name"`
+		Status LedgerStatus     `json:"status"`
+		Uuid   LedgerPeriodUUID `json:"uuid"`
+	} `json:"ledger_period"`
+	OccurredAt time.Time `json:"occurred_at"`
+
+	// ReversedByEntryUuid Set on a voided entry; its reversal entry.
+	ReversedByEntryUuid *openapi_types.UUID `json:"reversed_by_entry_uuid,omitempty"`
+
+	// ReversesEntryUuid Set on a reversal entry; the voided entry it compensates.
+	ReversesEntryUuid *openapi_types.UUID `json:"reverses_entry_uuid,omitempty"`
+	Status            LedgerEntryStatus   `json:"status"`
+
+	// Tag The sub-category, when the entry has one.
+	Tag          *LedgerEntryCategoryRef `json:"tag,omitempty"`
+	Uuid         openapi_types.UUID      `json:"uuid"`
+	VoidedAt     *time.Time              `json:"voided_at,omitempty"`
+	VoidedBy     *string                 `json:"voided_by,omitempty"`
+	VoidedReason *string                 `json:"voided_reason,omitempty"`
+}
+
+// LedgerEntryStatus defines model for LedgerEntryStatus.
+type LedgerEntryStatus = domain.EntryStatus
 
 // LedgerEntryUUID defines model for LedgerEntryUUID.
 type LedgerEntryUUID = domain.LedgerEntryUUID
@@ -236,6 +366,12 @@ type ListFundSourceStatementsResponse struct {
 // ListFundSourcesResponse defines model for ListFundSourcesResponse.
 type ListFundSourcesResponse struct {
 	FundSources []FundSource `json:"fund_sources"`
+}
+
+// ListLedgerEntriesResponse defines model for ListLedgerEntriesResponse.
+type ListLedgerEntriesResponse struct {
+	Items    []LedgerEntryListItem `json:"items"`
+	PageInfo PageInfo              `json:"page_info"`
 }
 
 // ListLedgerPeriodsResponse defines model for ListLedgerPeriodsResponse.
@@ -334,6 +470,34 @@ type NotFound = ErrorResponse
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorResponse
+
+// ListLedgerEntriesParams defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParams struct {
+	FundSourceUuid *FundSourceUUID `form:"fund_source_uuid,omitempty" json:"fund_source_uuid,omitempty"`
+
+	// CategoryUuid A category; also matches entries of its sub-categories (tags).
+	CategoryUuid     *CategoryUUID     `form:"category_uuid,omitempty" json:"category_uuid,omitempty"`
+	LedgerPeriodUuid *LedgerPeriodUUID `form:"ledger_period_uuid,omitempty" json:"ledger_period_uuid,omitempty"`
+
+	// FromDate Inclusive lower bound of occurred_at.
+	FromDate *time.Time `form:"from_date,omitempty" json:"from_date,omitempty"`
+
+	// ToDate Inclusive upper bound of occurred_at.
+	ToDate *time.Time `form:"to_date,omitempty" json:"to_date,omitempty"`
+
+	// Kind Only entries of this kind; omit for both.
+	Kind     *LedgerEntryKind                `form:"kind,omitempty" json:"kind,omitempty"`
+	OrderBy  *ListLedgerEntriesParamsOrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+	Order    *ListLedgerEntriesParamsOrder   `form:"order,omitempty" json:"order,omitempty"`
+	Page     *int                            `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int                            `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListLedgerEntriesParamsOrderBy defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParamsOrderBy string
+
+// ListLedgerEntriesParamsOrder defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParamsOrder string
 
 // ListLedgerPeriodsParams defines parameters for ListLedgerPeriods.
 type ListLedgerPeriodsParams struct {
@@ -477,6 +641,25 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/fund-sources (the `CreateFundSource` operationId).
 	CreateFundSource(ctx context.Context, body CreateFundSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFundSource Get a fund source
+	//
+	// Corresponds with GET /api/v1/fund-sources/{fund_source_uuid} (the `GetFundSource` operationId).
+	GetFundSource(ctx context.Context, fundSourceUuid FundSourceUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListLedgerEntries List ledger entries
+	//
+	// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+	//
+	// Corresponds with GET /api/v1/ledger-entries (the `ListLedgerEntries` operationId).
+	ListLedgerEntries(ctx context.Context, params *ListLedgerEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerEntry Get a ledger entry
+	//
+	// Any entry, including a reversal entry.
+	//
+	// Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
+	GetLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListLedgerPeriods List ledger periods
 	//
@@ -692,6 +875,55 @@ func (c *Client) CreateFundSourceWithBody(ctx context.Context, contentType strin
 // Corresponds with POST /api/v1/fund-sources (the `CreateFundSource` operationId).
 func (c *Client) CreateFundSource(ctx context.Context, body CreateFundSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateFundSourceRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFundSource Get a fund source
+//
+// Corresponds with GET /api/v1/fund-sources/{fund_source_uuid} (the `GetFundSource` operationId).
+func (c *Client) GetFundSource(ctx context.Context, fundSourceUuid FundSourceUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFundSourceRequest(c.Server, fundSourceUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListLedgerEntries List ledger entries
+//
+// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+//
+// Corresponds with GET /api/v1/ledger-entries (the `ListLedgerEntries` operationId).
+func (c *Client) ListLedgerEntries(ctx context.Context, params *ListLedgerEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListLedgerEntriesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerEntry Get a ledger entry
+//
+// Any entry, including a reversal entry.
+//
+// Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
+func (c *Client) GetLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerEntryRequest(c.Server, ledgerEntryUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -1101,6 +1333,236 @@ func NewCreateFundSourceRequestWithBody(server string, contentType string, body 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetFundSourceRequest constructs an http.Request for the GetFundSource method
+func NewGetFundSourceRequest(server string, fundSourceUuid FundSourceUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "fund_source_uuid", fundSourceUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/fund-sources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListLedgerEntriesRequest constructs an http.Request for the ListLedgerEntries method
+func NewListLedgerEntriesRequest(server string, params *ListLedgerEntriesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-entries")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.FundSourceUuid != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "fund_source_uuid", *params.FundSourceUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CategoryUuid != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "category_uuid", *params.CategoryUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.LedgerPeriodUuid != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "ledger_period_uuid", *params.LedgerPeriodUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.FromDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from_date", *params.FromDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ToDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to_date", *params.ToDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "kind", *params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Order != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order", *params.Order, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_size", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLedgerEntryRequest constructs an http.Request for the GetLedgerEntry method
+func NewGetLedgerEntryRequest(server string, ledgerEntryUuid openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_entry_uuid", ledgerEntryUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-entries/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -1653,6 +2115,31 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/fund-sources (the `CreateFundSource` operationId).
 	CreateFundSourceWithResponse(ctx context.Context, body CreateFundSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateFundSourceClientResponse, error)
 
+	// GetFundSourceWithResponse Get a fund source
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/fund-sources/{fund_source_uuid} (the `GetFundSource` operationId).
+	GetFundSourceWithResponse(ctx context.Context, fundSourceUuid FundSourceUUID, reqEditors ...RequestEditorFn) (*GetFundSourceClientResponse, error)
+
+	// ListLedgerEntriesWithResponse List ledger entries
+	//
+	// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-entries (the `ListLedgerEntries` operationId).
+	ListLedgerEntriesWithResponse(ctx context.Context, params *ListLedgerEntriesParams, reqEditors ...RequestEditorFn) (*ListLedgerEntriesClientResponse, error)
+
+	// GetLedgerEntryWithResponse Get a ledger entry
+	//
+	// Any entry, including a reversal entry.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
+	GetLedgerEntryWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetLedgerEntryClientResponse, error)
+
 	// ListLedgerPeriodsWithResponse List ledger periods
 	//
 	// Newest period (by open date) first.
@@ -2022,6 +2509,192 @@ func (r CreateFundSourceClientResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateFundSourceClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetFundSourceClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GetFundSourceResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFundSourceClientResponse) GetJSON200() *GetFundSourceResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFundSourceClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFundSourceClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFundSourceClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFundSourceClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFundSourceClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFundSourceClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFundSourceClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListLedgerEntriesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListLedgerEntriesResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListLedgerEntriesClientResponse) GetJSON200() *ListLedgerEntriesResponse {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ListLedgerEntriesClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListLedgerEntriesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListLedgerEntriesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListLedgerEntriesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListLedgerEntriesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListLedgerEntriesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListLedgerEntriesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerEntryClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GetLedgerEntryResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerEntryClientResponse) GetJSON200() *GetLedgerEntryResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerEntryClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetLedgerEntryClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetLedgerEntryClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerEntryClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerEntryClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerEntryClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerEntryClientResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2857,6 +3530,49 @@ func (c *ClientWithResponses) CreateFundSourceWithResponse(ctx context.Context, 
 	return ParseCreateFundSourceClientResponse(rsp)
 }
 
+// GetFundSourceWithResponse Get a fund source
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/fund-sources/{fund_source_uuid} (the `GetFundSource` operationId).
+func (c *ClientWithResponses) GetFundSourceWithResponse(ctx context.Context, fundSourceUuid FundSourceUUID, reqEditors ...RequestEditorFn) (*GetFundSourceClientResponse, error) {
+	rsp, err := c.GetFundSource(ctx, fundSourceUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFundSourceClientResponse(rsp)
+}
+
+// ListLedgerEntriesWithResponse List ledger entries
+//
+// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-entries (the `ListLedgerEntries` operationId).
+func (c *ClientWithResponses) ListLedgerEntriesWithResponse(ctx context.Context, params *ListLedgerEntriesParams, reqEditors ...RequestEditorFn) (*ListLedgerEntriesClientResponse, error) {
+	rsp, err := c.ListLedgerEntries(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListLedgerEntriesClientResponse(rsp)
+}
+
+// GetLedgerEntryWithResponse Get a ledger entry
+//
+// Any entry, including a reversal entry.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
+func (c *ClientWithResponses) GetLedgerEntryWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetLedgerEntryClientResponse, error) {
+	rsp, err := c.GetLedgerEntry(ctx, ledgerEntryUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerEntryClientResponse(rsp)
+}
+
 // ListLedgerPeriodsWithResponse List ledger periods
 //
 // Newest period (by open date) first.
@@ -3248,6 +3964,147 @@ func ParseCreateFundSourceClientResponse(rsp *http.Response) (*CreateFundSourceC
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetFundSourceClientResponse parses an HTTP response from a GetFundSourceWithResponse call
+func ParseGetFundSourceClientResponse(rsp *http.Response) (*GetFundSourceClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFundSourceClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetFundSourceResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListLedgerEntriesClientResponse parses an HTTP response from a ListLedgerEntriesWithResponse call
+func ParseListLedgerEntriesClientResponse(rsp *http.Response) (*ListLedgerEntriesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListLedgerEntriesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListLedgerEntriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerEntryClientResponse parses an HTTP response from a GetLedgerEntryWithResponse call
+func ParseGetLedgerEntryClientResponse(rsp *http.Response) (*GetLedgerEntryClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerEntryClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetLedgerEntryResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError

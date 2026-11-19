@@ -10,7 +10,6 @@ import (
 	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
-
 	"github.com/shopspring/decimal"
 )
 
@@ -52,6 +51,7 @@ type LedgersFundSourceStatement struct {
 
 type LedgersLedgerEntry struct {
 	Uuid                domain.LedgerEntryUUID
+	OrgID               string
 	LedgerPeriodUuid    domain.LedgerPeriodUUID
 	FundSourceUuid      domain.FundSourceUUID
 	Amount              decimal.Decimal
@@ -68,6 +68,7 @@ type LedgersLedgerEntry struct {
 	VoidedReason        *string
 	VoidedBy            *string
 	VoidedAt            *time.Time
+	CreatedBy           string
 	CreatedAt           time.Time
 }
 

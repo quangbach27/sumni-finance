@@ -74,9 +74,10 @@ func ledgerPeriodToDomain(row dbmodels.LedgersLedgerPeriod) *domain.LedgerPeriod
 	)
 }
 
-func ledgerEntryToInsertParams(e *domain.LedgerEntry) dbmodels.InsertLedgerEntriesParams {
+func ledgerEntryToInsertParams(orgID string, e *domain.LedgerEntry) dbmodels.InsertLedgerEntriesParams {
 	return dbmodels.InsertLedgerEntriesParams{
 		Uuid:             e.UUID(),
+		OrgID:            orgID,
 		LedgerPeriodUuid: e.LedgerPeriodUUID(),
 		FundSourceUuid:   e.FundSourceUUID(),
 		Amount:           e.Amount(),
@@ -88,6 +89,7 @@ func ledgerEntryToInsertParams(e *domain.LedgerEntry) dbmodels.InsertLedgerEntri
 		FsBalanceAfter:   e.FundSourceBalanceAfter(),
 		Status:           e.Status(),
 		Kind:             e.Kind(),
+		CreatedBy:        e.CreatedBy(),
 	}
 }
 
