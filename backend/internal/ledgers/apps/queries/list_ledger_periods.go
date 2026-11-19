@@ -17,7 +17,7 @@ type ListLedgerPeriods struct {
 }
 
 func (h *Handlers) ListLedgerPeriods(ctx context.Context, query ListLedgerPeriods) (shared.PagedResult[LedgerPeriod], error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  query.Session,
 		Resource: shared.ResourceLedgerPeriod,
 		Action:   shared.ActionRead,
@@ -26,5 +26,5 @@ func (h *Handlers) ListLedgerPeriods(ctx context.Context, query ListLedgerPeriod
 		return shared.PagedResult[LedgerPeriod]{}, err
 	}
 
-	return h.periodReadModel.ListLedgerPeriods(ctx, res.OrgID, query)
+	return h.periodReadModel.ListLedgerPeriods(ctx, principal.OrgID, query)
 }

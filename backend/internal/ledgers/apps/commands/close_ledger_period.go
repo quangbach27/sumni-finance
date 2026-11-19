@@ -19,7 +19,7 @@ type CloseLedgerPeriod struct {
 // CloseLedgerPeriod closes the period. The repository sets the closing balance
 // of every fund source statement to the current fund source balance.
 func (h *Handlers) CloseLedgerPeriod(ctx context.Context, cmd CloseLedgerPeriod) error {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerPeriod,
 		Action:   shared.ActionUpdate,
@@ -28,7 +28,7 @@ func (h *Handlers) CloseLedgerPeriod(ctx context.Context, cmd CloseLedgerPeriod)
 		return err
 	}
 
-	if err := h.periodRepo.CloseLedgerPeriod(ctx, res.OrgID, cmd.LedgerPeriodUUID); err != nil {
+	if err := h.periodRepo.CloseLedgerPeriod(ctx, principal.OrgID, cmd.LedgerPeriodUUID); err != nil {
 		return err
 	}
 

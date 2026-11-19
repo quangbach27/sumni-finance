@@ -48,7 +48,7 @@ type UpsertCategory struct {
 // not sent are left as they are. It returns the saved category UUIDs in the
 // order of cmd.Categories.
 func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]models.CategoryUUID, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerCategory,
 		Action:   shared.ActionCreate,
@@ -66,7 +66,7 @@ func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]mo
 		return nil, err
 	}
 
-	if err := h.categoryRepo.UpsertCategories(ctx, res.OrgID, categories); err != nil {
+	if err := h.categoryRepo.UpsertCategories(ctx, principal.OrgID, categories); err != nil {
 		return nil, err
 	}
 

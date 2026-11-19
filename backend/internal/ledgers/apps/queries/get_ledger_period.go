@@ -16,7 +16,7 @@ type GetLedgerPeriod struct {
 }
 
 func (h *Handlers) GetLedgerPeriod(ctx context.Context, q GetLedgerPeriod) (LedgerPeriodDetail, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  q.Session,
 		Resource: shared.ResourceLedgerPeriod,
 		Action:   shared.ActionRead,
@@ -25,5 +25,5 @@ func (h *Handlers) GetLedgerPeriod(ctx context.Context, q GetLedgerPeriod) (Ledg
 		return LedgerPeriodDetail{}, err
 	}
 
-	return h.periodReadModel.GetLedgerPeriod(ctx, res.OrgID, q.LedgerPeriodUUID)
+	return h.periodReadModel.GetLedgerPeriod(ctx, principal.OrgID, q.LedgerPeriodUUID)
 }

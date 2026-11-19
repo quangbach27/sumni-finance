@@ -31,7 +31,7 @@ type CreateFundSource struct {
 }
 
 func (h *Handlers) CreateFundSource(ctx context.Context, cmd CreateFundSource) (domain.FundSourceUUID, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceFundSource,
 		Action:   shared.ActionCreate,
@@ -66,7 +66,7 @@ func (h *Handlers) CreateFundSource(ctx context.Context, cmd CreateFundSource) (
 		return domain.FundSourceUUID{}, err
 	}
 
-	if err := h.fsRepo.CreateFundSource(ctx, res.OrgID, fundSource); err != nil {
+	if err := h.fsRepo.CreateFundSource(ctx, principal.OrgID, fundSource); err != nil {
 		return domain.FundSourceUUID{}, err
 	}
 
