@@ -32,6 +32,11 @@ output "db_name" {
   value = module.database.db_name
 }
 
+output "bastion_instance_id" {
+  description = "Target for `aws ssm start-session` (null when var.bastion_enabled is false)."
+  value       = module.bastion.instance_id
+}
+
 output "db_secret_arn" {
   value = module.database.master_secret_arn
 }

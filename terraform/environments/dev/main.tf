@@ -36,6 +36,26 @@ module "database" {
   instance_class       = var.db_instance_class
 }
 
+module "bastion" {
+  source = "../../modules/bastion"
+
+  name                 = local.name
+  enabled              = var.bastion_enabled
+  vpc_id               = module.network.vpc_id
+  subnet_id            = module.network.subnet_ids[0]
+  db_security_group_id = module.database.security_group_id
+}
+
+# Lives here, not in a module, so the database and bastion modules don't depend on each other.
+resource "aws_vpc_security_group_ingress_rule" "db_from_bastion" {
+  security_group_id            = module.database.security_group_id
+  description                  = "Postgres from the SSM bastion"
+  referenced_security_group_id = module.bastion.security_group_id
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+}
+
 module "backend" {
   source = "../../modules/backend"
 
