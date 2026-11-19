@@ -78,7 +78,7 @@ func (q *Queries) GetLatestLedgerEntryOccurredAt(ctx context.Context, arg GetLat
 
 const getLedgerEntry = `-- name: GetLedgerEntry :one
 SELECT
-    e.uuid, e.org_id, e.ledger_period_uuid, e.fund_source_uuid, e.amount, e.direction, e.description, e.occurred_at, e.category_uuid, e.fs_balance_before, e.fs_balance_after, e.status, e.kind, e.reversed_by_entry_uuid, e.reverses_entry_uuid, e.voided_reason, e.voided_by, e.voided_at, e.created_by, e.created_at,
+    e.uuid, e.org_id, e.ledger_period_uuid, e.fund_source_uuid, e.amount, e.direction, e.description, e.occurred_at, e.category_uuid, e.fs_balance_before, e.fs_balance_after, e.status, e.kind, e.reversed_by_entry_uuid, e.voided_reason, e.voided_by, e.voided_at, e.created_by, e.created_at,
     fs.name AS fund_source_name,
     fs.bank_code AS fund_source_bank_code,
     fs.account_number AS fund_source_account_number,
@@ -116,7 +116,6 @@ type GetLedgerEntryRow struct {
 	Status                  domain.EntryStatus
 	Kind                    domain.EntryKind
 	ReversedByEntryUuid     *domain.LedgerEntryUUID
-	ReversesEntryUuid       *domain.LedgerEntryUUID
 	VoidedReason            *string
 	VoidedBy                *string
 	VoidedAt                *time.Time
@@ -150,7 +149,6 @@ func (q *Queries) GetLedgerEntry(ctx context.Context, arg GetLedgerEntryParams) 
 		&i.Status,
 		&i.Kind,
 		&i.ReversedByEntryUuid,
-		&i.ReversesEntryUuid,
 		&i.VoidedReason,
 		&i.VoidedBy,
 		&i.VoidedAt,
@@ -164,6 +162,45 @@ func (q *Queries) GetLedgerEntry(ctx context.Context, arg GetLedgerEntryParams) 
 		&i.EntryCategoryName,
 		&i.ParentCategoryUuid,
 		&i.ParentCategoryName,
+	)
+	return i, err
+}
+
+const getLedgerEntryByUUID = `-- name: GetLedgerEntryByUUID :one
+SELECT uuid, org_id, ledger_period_uuid, fund_source_uuid, amount, direction, description, occurred_at, category_uuid, fs_balance_before, fs_balance_after, status, kind, reversed_by_entry_uuid, voided_reason, voided_by, voided_at, created_by, created_at
+FROM ledgers.ledger_entries
+WHERE org_id = $1
+  AND uuid = $2
+`
+
+type GetLedgerEntryByUUIDParams struct {
+	OrgID string
+	Uuid  domain.LedgerEntryUUID
+}
+
+func (q *Queries) GetLedgerEntryByUUID(ctx context.Context, arg GetLedgerEntryByUUIDParams) (LedgersLedgerEntry, error) {
+	row := q.db.QueryRow(ctx, getLedgerEntryByUUID, arg.OrgID, arg.Uuid)
+	var i LedgersLedgerEntry
+	err := row.Scan(
+		&i.Uuid,
+		&i.OrgID,
+		&i.LedgerPeriodUuid,
+		&i.FundSourceUuid,
+		&i.Amount,
+		&i.Direction,
+		&i.Description,
+		&i.OccurredAt,
+		&i.CategoryUuid,
+		&i.FsBalanceBefore,
+		&i.FsBalanceAfter,
+		&i.Status,
+		&i.Kind,
+		&i.ReversedByEntryUuid,
+		&i.VoidedReason,
+		&i.VoidedBy,
+		&i.VoidedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -187,7 +224,7 @@ type InsertLedgerEntriesParams struct {
 
 const listLedgerEntries = `-- name: ListLedgerEntries :many
 SELECT
-    e.uuid, e.org_id, e.ledger_period_uuid, e.fund_source_uuid, e.amount, e.direction, e.description, e.occurred_at, e.category_uuid, e.fs_balance_before, e.fs_balance_after, e.status, e.kind, e.reversed_by_entry_uuid, e.reverses_entry_uuid, e.voided_reason, e.voided_by, e.voided_at, e.created_by, e.created_at,
+    e.uuid, e.org_id, e.ledger_period_uuid, e.fund_source_uuid, e.amount, e.direction, e.description, e.occurred_at, e.category_uuid, e.fs_balance_before, e.fs_balance_after, e.status, e.kind, e.reversed_by_entry_uuid, e.voided_reason, e.voided_by, e.voided_at, e.created_by, e.created_at,
     fs.name AS fund_source_name,
     fs.bank_code AS fund_source_bank_code,
     fs.account_number AS fund_source_account_number,
@@ -250,7 +287,6 @@ type ListLedgerEntriesRow struct {
 	Status                  domain.EntryStatus
 	Kind                    domain.EntryKind
 	ReversedByEntryUuid     *domain.LedgerEntryUUID
-	ReversesEntryUuid       *domain.LedgerEntryUUID
 	VoidedReason            *string
 	VoidedBy                *string
 	VoidedAt                *time.Time
@@ -306,7 +342,6 @@ func (q *Queries) ListLedgerEntries(ctx context.Context, arg ListLedgerEntriesPa
 			&i.Status,
 			&i.Kind,
 			&i.ReversedByEntryUuid,
-			&i.ReversesEntryUuid,
 			&i.VoidedReason,
 			&i.VoidedBy,
 			&i.VoidedAt,
@@ -329,4 +364,38 @@ func (q *Queries) ListLedgerEntries(ctx context.Context, arg ListLedgerEntriesPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const markLedgerEntryVoided = `-- name: MarkLedgerEntryVoided :exec
+UPDATE ledgers.ledger_entries
+SET status = $1,
+    reversed_by_entry_uuid = $2,
+    voided_reason = $3,
+    voided_by = $4,
+    voided_at = $5
+WHERE org_id = $6
+  AND uuid = $7
+`
+
+type MarkLedgerEntryVoidedParams struct {
+	Status              domain.EntryStatus
+	ReversedByEntryUuid *domain.LedgerEntryUUID
+	VoidedReason        *string
+	VoidedBy            *string
+	VoidedAt            *time.Time
+	OrgID               string
+	Uuid                domain.LedgerEntryUUID
+}
+
+func (q *Queries) MarkLedgerEntryVoided(ctx context.Context, arg MarkLedgerEntryVoidedParams) error {
+	_, err := q.db.Exec(ctx, markLedgerEntryVoided,
+		arg.Status,
+		arg.ReversedByEntryUuid,
+		arg.VoidedReason,
+		arg.VoidedBy,
+		arg.VoidedAt,
+		arg.OrgID,
+		arg.Uuid,
+	)
+	return err
 }

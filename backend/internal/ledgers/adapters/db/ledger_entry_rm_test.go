@@ -67,9 +67,9 @@ func TestLedgerEntryReadModel(t *testing.T) {
 	// reversal of the voided entry
 	exec(`INSERT INTO ledgers.ledger_entries
 		(uuid, org_id, ledger_period_uuid, fund_source_uuid, amount, direction, description, occurred_at, category_uuid,
-		 fs_balance_before, fs_balance_after, status, kind, reverses_entry_uuid, created_by)
-		VALUES ($1, $7, $2, $3, 300, 'inflow', 'reversal', $4, $5, 500, 800, 'posted', 'reversal', $6, 'user_2')`,
-		reversalID, periodID, fs.UUID().UUID, now, parentID, voidedID, orgID)
+		 fs_balance_before, fs_balance_after, status, kind, created_by)
+		VALUES ($1, $6, $2, $3, 300, 'inflow', 'reversal', $4, $5, 500, 800, 'posted', 'reversal', 'user_2')`,
+		reversalID, periodID, fs.UUID().UUID, now, parentID, orgID)
 	exec(`UPDATE ledgers.ledger_entries
 		SET status = 'voided', reversed_by_entry_uuid = $1, voided_reason = 'typo', voided_by = 'user_1', voided_at = $2
 		WHERE uuid = $3`, reversalID, now, voidedID)
@@ -164,8 +164,6 @@ func TestLedgerEntryReadModel(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, domain.EntryKindReversal, got.Kind)
 		assert.Equal(t, "user_2", got.CreatedBy)
-		require.NotNil(t, got.ReversesEntryUUID)
-		assert.Equal(t, voidedID.String(), *got.ReversesEntryUUID)
 	})
 
 	t.Run("other org sees nothing", func(t *testing.T) {

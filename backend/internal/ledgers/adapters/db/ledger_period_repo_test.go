@@ -581,3 +581,71 @@ func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
 		assert.Equal(t, "ledger-period-not-found", cerr.ErrorSlug)
 	})
 }
+
+func TestLedgerPeriodRepo_VoidJournalEntry(t *testing.T) {
+	ctx := context.Background()
+	repo, err := ledgerdb.NewLedgerPeriodRepository(pgxDb)
+	require.NoError(t, err)
+
+	postOutflow := func(t *testing.T) (*domain.FundSource, *domain.LedgerPeriod, domain.LedgerEntryUUID) {
+		t.Helper()
+
+		resetPeriods(t, ctx)
+		fs := createCashFundSource(t, ctx, 1_000)
+		period := openPeriodFor(t, ctx, fs)
+		require.NoError(t, repo.PostJournalEntries(ctx, testOrgID, period.UUID(),
+			[]domain.FundSourceUUID{fs.UUID()}, postFnFor(t, []entrySpec{{fs, shared.DirectionOutflow, 300}})))
+
+		var id domain.LedgerEntryUUID
+		require.NoError(t, pgxDb.QueryRow(ctx, "SELECT uuid FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs.UUID()).Scan(&id))
+
+		return fs, period, id
+	}
+
+	t.Run("stores the reversal, marks the entry voided and restores the balance", func(t *testing.T) {
+		fs, _, id := postOutflow(t)
+
+		require.NoError(t, repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test"))
+
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(1000)))
+
+		var status, reason string
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT status, voided_reason FROM ledgers.ledger_entries WHERE uuid = $1", id).Scan(&status, &reason))
+		assert.Equal(t, "voided", status)
+		assert.Equal(t, "wrong amount", reason)
+
+		var reversals int
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT count(*) FROM ledgers.ledger_entries r JOIN ledgers.ledger_entries o ON o.reversed_by_entry_uuid = r.uuid WHERE o.uuid = $1 AND r.kind = 'reversal'", id).Scan(&reversals))
+		assert.Equal(t, 1, reversals)
+	})
+
+	t.Run("voiding twice fails and changes nothing", func(t *testing.T) {
+		fs, _, id := postOutflow(t)
+		require.NoError(t, repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test"))
+
+		err := repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ledger-entry-already-voided")
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(1000)))
+	})
+
+	t.Run("unknown entry is not found", func(t *testing.T) {
+		postOutflow(t)
+
+		err := repo.VoidJournalEntry(ctx, testOrgID, domain.LedgerEntryUUID{UUID: common.NewUUIDv7()}, "wrong amount", "user_test")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ledger-entry-not-found")
+	})
+
+	t.Run("a closed period rejects the void and changes nothing", func(t *testing.T) {
+		fs, period, id := postOutflow(t)
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
+
+		err := repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "period-not-open")
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(700)))
+	})
+}

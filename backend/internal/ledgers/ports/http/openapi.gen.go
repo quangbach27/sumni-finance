@@ -268,10 +268,7 @@ type LedgerEntryListItem struct {
 
 	// ReversedByEntryUuid Set on a voided entry; its reversal entry.
 	ReversedByEntryUuid *openapi_types.UUID `json:"reversed_by_entry_uuid,omitempty"`
-
-	// ReversesEntryUuid Set on a reversal entry; the voided entry it compensates.
-	ReversesEntryUuid *openapi_types.UUID `json:"reverses_entry_uuid,omitempty"`
-	Status            LedgerEntryStatus   `json:"status"`
+	Status              LedgerEntryStatus   `json:"status"`
 
 	// Tag The sub-category, when the entry has one.
 	Tag          *LedgerEntryCategoryRef `json:"tag,omitempty"`
@@ -454,6 +451,11 @@ type UpsertCategoriesResponse struct {
 	CategoryUuids []CategoryUUID `json:"category_uuids"`
 }
 
+// VoidLedgerEntryRequest defines model for VoidLedgerEntryRequest.
+type VoidLedgerEntryRequest struct {
+	Reason string `json:"reason"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -510,6 +512,9 @@ type UpsertCategoriesJSONRequestBody = UpsertCategoriesRequest
 // CreateFundSourceJSONRequestBody defines body for CreateFundSource for application/json ContentType.
 type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
 
+// VoidLedgerEntryJSONRequestBody defines body for VoidLedgerEntry for application/json ContentType.
+type VoidLedgerEntryJSONRequestBody = VoidLedgerEntryRequest
+
 // OpenLedgerPeriodJSONRequestBody defines body for OpenLedgerPeriod for application/json ContentType.
 type OpenLedgerPeriodJSONRequestBody = OpenLedgerPeriodRequest
 
@@ -545,6 +550,9 @@ type ServerInterface interface {
 	// GetLedgerEntry Get a ledger entry
 	// (GET /api/v1/ledger-entries/{ledger_entry_uuid})
 	GetLedgerEntry(ctx *echo.Context, ledgerEntryUuid openapi_types.UUID) error
+	// VoidLedgerEntry Void a ledger entry
+	// (POST /api/v1/ledger-entries/{ledger_entry_uuid}/void)
+	VoidLedgerEntry(ctx *echo.Context, ledgerEntryUuid openapi_types.UUID) error
 	// ListLedgerPeriods List ledger periods
 	// (GET /api/v1/ledger-periods)
 	ListLedgerPeriods(ctx *echo.Context, params ListLedgerPeriodsParams) error
@@ -731,6 +739,22 @@ func (w *ServerInterfaceWrapper) GetLedgerEntry(ctx *echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetLedgerEntry(ctx, ledgerEntryUuid)
+	return err
+}
+
+// VoidLedgerEntry converts echo context to params.
+func (w *ServerInterfaceWrapper) VoidLedgerEntry(ctx *echo.Context) error {
+	var err error
+	// ------------- Path parameter "ledger_entry_uuid" -------------
+	var ledgerEntryUuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ledger_entry_uuid", ctx.Param("ledger_entry_uuid"), &ledgerEntryUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter ledger_entry_uuid: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.VoidLedgerEntry(ctx, ledgerEntryUuid)
 	return err
 }
 
@@ -964,6 +988,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/api/v1/fund-sources/:fund_source_uuid", wrapper.GetFundSource, options.OperationMiddlewares["getFundSource"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-entries", wrapper.ListLedgerEntries, options.OperationMiddlewares["listLedgerEntries"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-entries/:ledger_entry_uuid", wrapper.GetLedgerEntry, options.OperationMiddlewares["getLedgerEntry"]...)
+	router.POST(options.BaseURL+"/api/v1/ledger-entries/:ledger_entry_uuid/void", wrapper.VoidLedgerEntry, options.OperationMiddlewares["voidLedgerEntry"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods/unlocked", wrapper.GetUnlockedLedgerPeriod, options.OperationMiddlewares["getUnlockedLedgerPeriod"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods/:ledger_period_uuid", wrapper.GetLedgerPeriod, options.OperationMiddlewares["getLedgerPeriod"]...)
 	router.GET(options.BaseURL+"/api/v1/ledger-periods", wrapper.ListLedgerPeriods, options.OperationMiddlewares["listLedgerPeriods"]...)
@@ -1425,6 +1450,95 @@ type GetLedgerEntry500JSONResponse struct {
 }
 
 func (response GetLedgerEntry500JSONResponse) VisitGetLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VoidLedgerEntryRequestObject struct {
+	LedgerEntryUuid openapi_types.UUID `json:"ledger_entry_uuid"`
+	Body            *VoidLedgerEntryJSONRequestBody
+}
+
+type VoidLedgerEntryResponseObject interface {
+	VisitVoidLedgerEntryResponse(w http.ResponseWriter) error
+}
+
+type VoidLedgerEntry204Response struct {
+}
+
+func (response VoidLedgerEntry204Response) VisitVoidLedgerEntryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type VoidLedgerEntry400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response VoidLedgerEntry400JSONResponse) VisitVoidLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VoidLedgerEntry401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response VoidLedgerEntry401JSONResponse) VisitVoidLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VoidLedgerEntry404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response VoidLedgerEntry404JSONResponse) VisitVoidLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VoidLedgerEntry409JSONResponse struct{ ConflictJSONResponse }
+
+func (response VoidLedgerEntry409JSONResponse) VisitVoidLedgerEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VoidLedgerEntry500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response VoidLedgerEntry500JSONResponse) VisitVoidLedgerEntryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2345,6 +2459,9 @@ type StrictServerInterface interface {
 	// GetLedgerEntry Get a ledger entry
 	// (GET /api/v1/ledger-entries/{ledger_entry_uuid})
 	GetLedgerEntry(ctx context.Context, request GetLedgerEntryRequestObject) (GetLedgerEntryResponseObject, error)
+	// VoidLedgerEntry Void a ledger entry
+	// (POST /api/v1/ledger-entries/{ledger_entry_uuid}/void)
+	VoidLedgerEntry(ctx context.Context, request VoidLedgerEntryRequestObject) (VoidLedgerEntryResponseObject, error)
 	// ListLedgerPeriods List ledger periods
 	// (GET /api/v1/ledger-periods)
 	ListLedgerPeriods(ctx context.Context, request ListLedgerPeriodsRequestObject) (ListLedgerPeriodsResponseObject, error)
@@ -2599,6 +2716,54 @@ func (sh *strictHandler) GetLedgerEntry(ctx *echo.Context, ledgerEntryUuid opena
 		return err
 	} else if validResponse, ok := response.(GetLedgerEntryResponseObject); ok {
 		return validResponse.VisitGetLedgerEntryResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// VoidLedgerEntry operation middleware
+func (sh *strictHandler) VoidLedgerEntry(ctx *echo.Context, ledgerEntryUuid openapi_types.UUID) error {
+	var request VoidLedgerEntryRequestObject
+
+	request.LedgerEntryUuid = ledgerEntryUuid
+
+	var body VoidLedgerEntryJSONRequestBody
+	var err error
+	if _, ok := ctx.Echo().Binder.(*echo.DefaultBinder); ok {
+		// A request validator built on kin-openapi's openapi3filter with
+		// KeepValidatedValue leaves the value it validated on the body. Bind
+		// that value, matching member names exactly, so the handler receives
+		// what was validated instead of a second, case-insensitive decode.
+		// Otherwise bind only the request body, so that path and query
+		// parameters are not also bound into the body struct.
+		if vb, ok := ctx.Request().Body.(interface{ ValidatedValue() any }); !ok || runtime.BindJSONValue(vb.ValidatedValue(), &body) != nil {
+			err = echo.BindBody(ctx, &body)
+		}
+	} else {
+		// A custom binder is installed on the Echo instance; defer to it
+		// entirely, since echo.Binder does not expose body-only binding and
+		// the binder may do more than decode (for example call ctx.Validate).
+		err = ctx.Bind(&body)
+	}
+	if err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.VoidLedgerEntry(ctx.Request().Context(), request.(VoidLedgerEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VoidLedgerEntry")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(VoidLedgerEntryResponseObject); ok {
+		return validResponse.VisitVoidLedgerEntryResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

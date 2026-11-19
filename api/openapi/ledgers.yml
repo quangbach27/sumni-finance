@@ -194,6 +194,44 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/ledger-entries/{ledger_entry_uuid}/void:
+    post:
+      tags: [ledger-entries]
+      operationId: voidLedgerEntry
+      summary: Void a ledger entry
+      description: >
+        Voids a posted entry by posting a reversal entry that restores the fund
+        source balance. The entry is kept. Only allowed while the entry's period
+        is opened (409 `period-not-open`). Fails with 400
+        `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or
+        `void-reason-required`.
+      parameters:
+        - name: ledger_entry_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidLedgerEntryRequest"
+      responses:
+        "204":
+          description: Ledger entry voided
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/ledger-periods/unlocked:
     get:
       tags: [ledger-periods]
@@ -812,10 +850,6 @@ components:
           type: string
           format: uuid
           description: Set on a voided entry; its reversal entry.
-        reverses_entry_uuid:
-          type: string
-          format: uuid
-          description: Set on a reversal entry; the voided entry it compensates.
         voided_reason:
           type: string
         voided_by:
@@ -931,6 +965,14 @@ components:
       properties:
         reason:
           type: string
+
+    VoidLedgerEntryRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 200
 
     OpenLedgerPeriodRequest:
       type: object

@@ -106,3 +106,26 @@ func fundSourceStatementToDomain(row dbmodels.LedgersFundSourceStatement) *domai
 		row.ReconciledAt,
 	)
 }
+
+// ledgerEntryToDomain rebuilds an entry from a row (trusted, no validation).
+func ledgerEntryToDomain(row dbmodels.LedgersLedgerEntry) *domain.LedgerEntry {
+	return domain.UnmarshalLedgerEntry(
+		row.Uuid,
+		row.LedgerPeriodUuid,
+		row.FundSourceUuid,
+		row.Amount,
+		row.Direction,
+		row.Description,
+		row.OccurredAt,
+		row.CategoryUuid,
+		row.FsBalanceBefore,
+		row.FsBalanceAfter,
+		row.Status,
+		row.Kind,
+		row.ReversedByEntryUuid,
+		row.VoidedReason,
+		row.VoidedBy,
+		row.VoidedAt,
+		row.CreatedBy,
+	)
+}

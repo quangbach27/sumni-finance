@@ -113,7 +113,6 @@ type LedgerEntryListItem struct {
 	CreatedAt           time.Time
 	CreatedBy           string
 	ReversedByEntryUUID *string
-	ReversesEntryUUID   *string
 	VoidedReason        *string
 	VoidedBy            *string
 	VoidedAt            *time.Time

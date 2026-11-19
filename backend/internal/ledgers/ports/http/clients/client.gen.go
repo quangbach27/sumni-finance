@@ -270,10 +270,7 @@ type LedgerEntryListItem struct {
 
 	// ReversedByEntryUuid Set on a voided entry; its reversal entry.
 	ReversedByEntryUuid *openapi_types.UUID `json:"reversed_by_entry_uuid,omitempty"`
-
-	// ReversesEntryUuid Set on a reversal entry; the voided entry it compensates.
-	ReversesEntryUuid *openapi_types.UUID `json:"reverses_entry_uuid,omitempty"`
-	Status            LedgerEntryStatus   `json:"status"`
+	Status              LedgerEntryStatus   `json:"status"`
 
 	// Tag The sub-category, when the entry has one.
 	Tag          *LedgerEntryCategoryRef `json:"tag,omitempty"`
@@ -456,6 +453,11 @@ type UpsertCategoriesResponse struct {
 	CategoryUuids []CategoryUUID `json:"category_uuids"`
 }
 
+// VoidLedgerEntryRequest defines model for VoidLedgerEntryRequest.
+type VoidLedgerEntryRequest struct {
+	Reason string `json:"reason"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -511,6 +513,9 @@ type UpsertCategoriesJSONRequestBody = UpsertCategoriesRequest
 
 // CreateFundSourceJSONRequestBody defines body for CreateFundSource for application/json ContentType.
 type CreateFundSourceJSONRequestBody = CreateFundSourceRequest
+
+// VoidLedgerEntryJSONRequestBody defines body for VoidLedgerEntry for application/json ContentType.
+type VoidLedgerEntryJSONRequestBody = VoidLedgerEntryRequest
 
 // OpenLedgerPeriodJSONRequestBody defines body for OpenLedgerPeriod for application/json ContentType.
 type OpenLedgerPeriodJSONRequestBody = OpenLedgerPeriodRequest
@@ -660,6 +665,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
 	GetLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// VoidLedgerEntryWithBody Void a ledger entry
+	//
+	// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+	VoidLedgerEntryWithBody(ctx context.Context, ledgerEntryUuid openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// VoidLedgerEntry Void a ledger entry
+	//
+	// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+	VoidLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListLedgerPeriods List ledger periods
 	//
@@ -924,6 +947,44 @@ func (c *Client) ListLedgerEntries(ctx context.Context, params *ListLedgerEntrie
 // Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
 func (c *Client) GetLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetLedgerEntryRequest(c.Server, ledgerEntryUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// VoidLedgerEntryWithBody Void a ledger entry
+//
+// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+func (c *Client) VoidLedgerEntryWithBody(ctx context.Context, ledgerEntryUuid openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVoidLedgerEntryRequestWithBody(c.Server, ledgerEntryUuid, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// VoidLedgerEntry Void a ledger entry
+//
+// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+func (c *Client) VoidLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVoidLedgerEntryRequest(c.Server, ledgerEntryUuid, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1567,6 +1628,53 @@ func NewGetLedgerEntryRequest(server string, ledgerEntryUuid openapi_types.UUID)
 	return req, nil
 }
 
+// NewVoidLedgerEntryRequest calls the generic VoidLedgerEntry builder with application/json body
+func NewVoidLedgerEntryRequest(server string, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewVoidLedgerEntryRequestWithBody(server, ledgerEntryUuid, "application/json", bodyReader)
+}
+
+// NewVoidLedgerEntryRequestWithBody constructs an http.Request for the VoidLedgerEntry method, with any body, and a specified content type
+func NewVoidLedgerEntryRequestWithBody(server string, ledgerEntryUuid openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ledger_entry_uuid", ledgerEntryUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-entries/%s/void", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListLedgerPeriodsRequest constructs an http.Request for the ListLedgerPeriods method
 func NewListLedgerPeriodsRequest(server string, params *ListLedgerPeriodsParams) (*http.Request, error) {
 	var err error
@@ -2140,6 +2248,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/ledger-entries/{ledger_entry_uuid} (the `GetLedgerEntry` operationId).
 	GetLedgerEntryWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetLedgerEntryClientResponse, error)
 
+	// VoidLedgerEntryWithBodyWithResponse Void a ledger entry
+	//
+	// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+	VoidLedgerEntryWithBodyWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*VoidLedgerEntryClientResponse, error)
+
+	// VoidLedgerEntryWithResponse Void a ledger entry
+	//
+	// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+	VoidLedgerEntryWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*VoidLedgerEntryClientResponse, error)
+
 	// ListLedgerPeriodsWithResponse List ledger periods
 	//
 	// Newest period (by open date) first.
@@ -2695,6 +2821,75 @@ func (r GetLedgerEntryClientResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetLedgerEntryClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type VoidLedgerEntryClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r VoidLedgerEntryClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r VoidLedgerEntryClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r VoidLedgerEntryClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r VoidLedgerEntryClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r VoidLedgerEntryClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r VoidLedgerEntryClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r VoidLedgerEntryClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r VoidLedgerEntryClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r VoidLedgerEntryClientResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -3573,6 +3768,36 @@ func (c *ClientWithResponses) GetLedgerEntryWithResponse(ctx context.Context, le
 	return ParseGetLedgerEntryClientResponse(rsp)
 }
 
+// VoidLedgerEntryWithBodyWithResponse Void a ledger entry
+//
+// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+func (c *ClientWithResponses) VoidLedgerEntryWithBodyWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*VoidLedgerEntryClientResponse, error) {
+	rsp, err := c.VoidLedgerEntryWithBody(ctx, ledgerEntryUuid, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVoidLedgerEntryClientResponse(rsp)
+}
+
+// VoidLedgerEntryWithResponse Void a ledger entry
+//
+// Voids a posted entry by posting a reversal entry that restores the fund source balance. The entry is kept. Only allowed while the entry's period is opened (409 `period-not-open`). Fails with 400 `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or `void-reason-required`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
+func (c *ClientWithResponses) VoidLedgerEntryWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*VoidLedgerEntryClientResponse, error) {
+	rsp, err := c.VoidLedgerEntry(ctx, ledgerEntryUuid, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVoidLedgerEntryClientResponse(rsp)
+}
+
 // ListLedgerPeriodsWithResponse List ledger periods
 //
 // Newest period (by open date) first.
@@ -4105,6 +4330,63 @@ func ParseGetLedgerEntryClientResponse(rsp *http.Response) (*GetLedgerEntryClien
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseVoidLedgerEntryClientResponse parses an HTTP response from a VoidLedgerEntryWithResponse call
+func ParseVoidLedgerEntryClientResponse(rsp *http.Response) (*VoidLedgerEntryClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &VoidLedgerEntryClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError

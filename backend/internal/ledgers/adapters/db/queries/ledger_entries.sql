@@ -110,3 +110,19 @@ LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
 LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
 WHERE e.org_id = @org_id
   AND e.uuid = @uuid;
+
+-- name: GetLedgerEntryByUUID :one
+SELECT *
+FROM ledgers.ledger_entries
+WHERE org_id = @org_id
+  AND uuid = @uuid;
+
+-- name: MarkLedgerEntryVoided :exec
+UPDATE ledgers.ledger_entries
+SET status = @status,
+    reversed_by_entry_uuid = @reversed_by_entry_uuid,
+    voided_reason = @voided_reason,
+    voided_by = @voided_by,
+    voided_at = @voided_at
+WHERE org_id = @org_id
+  AND uuid = @uuid;

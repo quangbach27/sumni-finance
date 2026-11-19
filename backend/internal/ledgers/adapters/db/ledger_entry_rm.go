@@ -112,7 +112,6 @@ func (r *LedgerEntryReadModel) ListLedgerEntries(
 			Status:                  row.Status,
 			Kind:                    row.Kind,
 			ReversedByEntryUuid:     row.ReversedByEntryUuid,
-			ReversesEntryUuid:       row.ReversesEntryUuid,
 			VoidedReason:            row.VoidedReason,
 			VoidedBy:                row.VoidedBy,
 			VoidedAt:                row.VoidedAt,
@@ -165,7 +164,6 @@ type ledgerEntryRow struct {
 	Status                  domain.EntryStatus
 	Kind                    domain.EntryKind
 	ReversedByEntryUuid     *domain.LedgerEntryUUID
-	ReversesEntryUuid       *domain.LedgerEntryUUID
 	VoidedReason            *string
 	VoidedBy                *string
 	VoidedAt                *time.Time
@@ -206,7 +204,6 @@ func toLedgerEntryListItem(row ledgerEntryRow) queries.LedgerEntryListItem {
 		CreatedAt:           row.CreatedAt,
 		CreatedBy:           row.CreatedBy,
 		ReversedByEntryUUID: uuidPtrToString(row.ReversedByEntryUuid),
-		ReversesEntryUUID:   uuidPtrToString(row.ReversesEntryUuid),
 		VoidedReason:        row.VoidedReason,
 		VoidedBy:            row.VoidedBy,
 		VoidedAt:            row.VoidedAt,

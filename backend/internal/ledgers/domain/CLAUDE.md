@@ -25,7 +25,7 @@ A ledger entry is one immutable money movement against a fund source. Fields are
   |---|---|---|---|
   | Normal post (just created) | posted | normal | none |
   | Voided original | voided | normal | `reversedByEntryID` → reversal, plus `voidedReason`, `voidedBy`, `voidedAt` |
-  | Reversal (created by the void) | posted | reversal | `reversesEntryID` → original |
+  | Reversal (created by the void) | posted | reversal | none (the original's `reversedByEntryID` points to it) |
 
 - **Immutability**: entries are never edited. To fix a mistake, the user voids the entry via `Void(reason, voidedBy)`, which marks the original `voided` and returns a new reversal entry (same fund source, amount and category; opposite direction; `occurredAt` = void time; description "Reversal of <uuid>"). Applying the entries to the fund source balance and persisting both is the command handler's job, not the aggregate's.
 - **`NewLedgerEntry` validation** (aggregated into `invalid-ledger-entry` details): `fund-source-required`, `amount-must-be-positive`, `direction-required`, `description-required` (trimmed), `occurred-at-required`.
@@ -33,7 +33,7 @@ A ledger entry is one immutable money movement against a fund source. Fields are
 - **Status checks**: `IsVoided()` (status is voided), `IsReversed()` (a reversal has been linked), `IsReversal()` (kind is reversal).
 - **Category**: the entry stores one optional `categoryUUID`. A sub-category is a category in the same tree (the relationship is two-way), so the entry needs no separate sub-category reference. `PostJournalEntries` rejects an entry whose category (or sub-category) does not exist (400 `category-not-found`, `EntityID` = entry index). See the `Category` model below.
 - **Fund source snapshot**: each entry stores `fsBalanceBefore` / `fsBalanceAfter`, the fund source balance around it. `RecordFundSourceSnapshot(FundSourceSnapshot)` sets them once (errors `fund-source-snapshot-already-recorded`, `snapshot-fund-source-mismatch`); the command handler passes the snapshot returned by `TopUp`/`Withdraw`. This per-entry trail is why `FundSourceStatement` is not reused for it: a statement is one row per period and fund source.
-- `voidedBy` is a plain string user ID for now (no user type in the domain). Posting is implemented (see below); void is not (`LedgerPeriodRepo.VoidJournalEntry` is a stub).
+- `voidedBy` is a plain string user ID for now (no user type in the domain). Posting is implemented (see below); void is implemented too: `LedgerPeriodRepo.VoidJournalEntry` loads the entry, its period and fund source in one serializable tx, requires an open period (409 `period-not-open`), and stores the reversal, the voided entry and the new balance.
 
 ### LedgerPeriod aggregate (`domain/ledger_period.go`)
 A ledger period is a book with an open date and a close date for the whole ledger. Fields: uuid, name, `openingBalance` (total, summed by the service from the period's fund sources), `closingBalance` (nil until reconciled), `openDate`, `closeDate` (both set at creation), status, `reopenReason`, `reopenedAt`, `reconciledAt`. Entries and `FundSourceStatement` reference it by `LedgerPeriodUUID`.

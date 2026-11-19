@@ -72,9 +72,6 @@ type LedgerEntry struct {
 	voidedBy          *string
 	voidedAt          *time.Time
 
-	// set on the reversal entry
-	reversesEntryID *LedgerEntryUUID
-
 	// id of the user who created the entry (for a reversal: who voided)
 	createdBy string
 }
@@ -152,7 +149,6 @@ func (e *LedgerEntry) CategoryUUID() *models.CategoryUUID  { return e.categoryUU
 func (e *LedgerEntry) Status() EntryStatus                 { return e.status }
 func (e *LedgerEntry) Kind() EntryKind                     { return e.kind }
 func (e *LedgerEntry) ReversedByEntryID() *LedgerEntryUUID { return e.reversedByEntryID }
-func (e *LedgerEntry) ReversesEntryID() *LedgerEntryUUID   { return e.reversesEntryID }
 func (e *LedgerEntry) VoidedReason() *string               { return e.voidedReason }
 func (e *LedgerEntry) VoidedBy() *string                   { return e.voidedBy }
 func (e *LedgerEntry) VoidedAt() *time.Time                { return e.voidedAt }
@@ -239,7 +235,6 @@ func (e *LedgerEntry) Void(reason, voidedBy string) (*LedgerEntry, error) {
 		categoryUUID:     e.categoryUUID,
 		status:           EntryStatusPosted,
 		kind:             EntryKindReversal,
-		reversesEntryID:  &originalUUID,
 		createdBy:        voidedBy,
 	}
 

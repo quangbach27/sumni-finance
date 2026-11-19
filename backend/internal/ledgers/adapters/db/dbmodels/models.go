@@ -64,7 +64,6 @@ type LedgersLedgerEntry struct {
 	Status              domain.EntryStatus
 	Kind                domain.EntryKind
 	ReversedByEntryUuid *domain.LedgerEntryUUID
-	ReversesEntryUuid   *domain.LedgerEntryUUID
 	VoidedReason        *string
 	VoidedBy            *string
 	VoidedAt            *time.Time

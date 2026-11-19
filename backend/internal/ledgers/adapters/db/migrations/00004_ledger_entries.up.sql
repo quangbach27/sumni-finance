@@ -17,7 +17,6 @@ CREATE TABLE ledgers.ledger_entries (
     status                text NOT NULL CHECK (status IN ('posted', 'voided')),
     kind                  text NOT NULL CHECK (kind IN ('normal', 'reversal')),
     reversed_by_entry_uuid uuid REFERENCES ledgers.ledger_entries (uuid),
-    reverses_entry_uuid   uuid REFERENCES ledgers.ledger_entries (uuid),
     voided_reason         text,
     voided_by             text,
     voided_at             timestamptz,
@@ -33,9 +32,6 @@ CREATE TABLE ledgers.ledger_entries (
     ),
     CONSTRAINT ledger_entries_void_fields CHECK (
         (status = 'voided') = (voided_reason IS NOT NULL AND voided_by IS NOT NULL AND voided_at IS NOT NULL AND reversed_by_entry_uuid IS NOT NULL)
-    ),
-    CONSTRAINT ledger_entries_reversal_fields CHECK (
-        (kind = 'reversal') = (reverses_entry_uuid IS NOT NULL)
     )
 );
 

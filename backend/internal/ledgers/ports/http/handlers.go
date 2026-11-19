@@ -620,6 +620,23 @@ func (h *Handlers) GetLedgerEntry(ctx context.Context, request GetLedgerEntryReq
 	return GetLedgerEntry200JSONResponse{Entry: toAPILedgerEntry(entry)}, nil
 }
 
+func (h *Handlers) VoidLedgerEntry(ctx context.Context, request VoidLedgerEntryRequestObject) (VoidLedgerEntryResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.commandHandlers.VoidLedgerEntry(ctx, commands.VoidLedgerEntry{
+		Session:         session,
+		LedgerEntryUUID: domain.LedgerEntryUUID{UUID: common.UUID(request.LedgerEntryUuid)},
+		Reason:          request.Body.Reason,
+	}); err != nil {
+		return nil, err
+	}
+
+	return VoidLedgerEntry204Response{}, nil
+}
+
 func toAPILedgerEntry(e queries.LedgerEntryListItem) LedgerEntryListItem {
 	item := LedgerEntryListItem{
 		Uuid:          openapi_types.UUID(common.MustUUIDFromString(e.UUID)),
@@ -650,7 +667,6 @@ func toAPILedgerEntry(e queries.LedgerEntryListItem) LedgerEntryListItem {
 	item.FundSource.AccountNumber = e.FundSource.AccountNumber
 
 	item.ReversedByEntryUuid = toOpenAPIUUID(e.ReversedByEntryUUID)
-	item.ReversesEntryUuid = toOpenAPIUUID(e.ReversesEntryUUID)
 
 	return item
 }

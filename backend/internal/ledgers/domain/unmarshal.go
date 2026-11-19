@@ -5,6 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/shared"
 )
 
@@ -88,5 +89,44 @@ func UnmarshalFundSourceStatement(
 		actualBalance:    actualBalance,
 		reconciledBy:     reconciledBy,
 		reconciledAt:     reconciledAt,
+	}
+}
+
+func UnmarshalLedgerEntry(
+	uuid LedgerEntryUUID,
+	ledgerPeriodUUID LedgerPeriodUUID,
+	fundSourceUUID FundSourceUUID,
+	amount decimal.Decimal,
+	direction shared.Direction,
+	description string,
+	occurredAt time.Time,
+	categoryUUID *models.CategoryUUID,
+	fsBalanceBefore, fsBalanceAfter decimal.Decimal,
+	status EntryStatus,
+	kind EntryKind,
+	reversedByEntryID *LedgerEntryUUID,
+	voidedReason, voidedBy *string,
+	voidedAt *time.Time,
+	createdBy string,
+) *LedgerEntry {
+	return &LedgerEntry{
+		uuid:                      uuid,
+		ledgerPeriodUUID:          ledgerPeriodUUID,
+		fundSourceUUID:            fundSourceUUID,
+		amount:                    amount,
+		direction:                 direction,
+		description:               description,
+		occurredAt:                occurredAt,
+		categoryUUID:              categoryUUID,
+		fsBalanceBefore:           fsBalanceBefore,
+		fsBalanceAfter:            fsBalanceAfter,
+		fsBalanceSnapshotRecorded: true,
+		status:                    status,
+		kind:                      kind,
+		reversedByEntryID:         reversedByEntryID,
+		voidedReason:              voidedReason,
+		voidedBy:                  voidedBy,
+		voidedAt:                  voidedAt,
+		createdBy:                 createdBy,
 	}
 }
