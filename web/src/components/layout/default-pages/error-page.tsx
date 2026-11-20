@@ -1,6 +1,5 @@
 import { useQueryErrorResetBoundary } from '@tanstack/react-query';
 
-
 import { Button } from '@/components/ui/button';
 
 import { formatApiError } from '@/features/fund-sources/api/format-api-error';

@@ -63,13 +63,3 @@ export const parseTypedDate = (
   const date = parseDateString(`${year}-${pad(month)}-${pad(day)}`);
   return date ? toDateString(date) : undefined;
 };
-
-/** `dd/mm` within the current year, `dd/mm/yyyy` otherwise; the raw text when not a date. */
-export const formatDateShort = (value: string): string => {
-  const date = parseDateString(value);
-  if (!date) return value;
-  const full = formatDate(date);
-  return date.getFullYear() === new Date().getFullYear()
-    ? full.slice(0, 5)
-    : full;
-};

@@ -56,7 +56,7 @@ export default function AppSidebar({ navItems }: Props) {
                   >
                     <item.icon />
                     <span>{item.label}</span>
-                    <ChevronDownIcon className="ml-auto transition-transform in-data-[panel-open]:rotate-180" />
+                    <ChevronDownIcon className="ml-auto transition-transform in-data-panel-open:rotate-180" />
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>

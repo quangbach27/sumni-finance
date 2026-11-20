@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { Lock } from 'lucide-react';
+
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -30,12 +32,8 @@ type ClosePeriodButtonProps = {
 const closeDescription =
   'Sau khi đóng, bạn không thể ghi thêm bút toán. Số dư từng nguồn quỹ sẽ được chốt để đối soát với thực tế.';
 
-const CloseLabel = () => (
-  <>
-    <span className="hidden md:inline">Đóng kỳ để đối soát</span>
-    <span className="md:hidden">Đóng kỳ</span>
-  </>
-);
+const getCloseLabel = (periodName: string) =>
+  `Đóng kỳ ${periodName} để đối soát`;
 
 /**
  * "Đóng kỳ" button. Inside a `<StepFlow>` it confirms through the flow's dialog and moves
@@ -67,12 +65,13 @@ function FlowClosePeriodButton({
         openConfirm({
           title: `Đóng ${periodName}?`,
           description: closeDescription,
-          confirmLabel: 'Đóng kỳ',
+          confirmLabel: getCloseLabel(periodName),
           action: () => mutateAsync(periodUuid),
         })
       }
     >
-      <CloseLabel />
+      <Lock data-icon="inline-start" />
+      {getCloseLabel(periodName)}
     </Button>
   );
 }
@@ -104,7 +103,8 @@ function StandaloneClosePeriodButton({
         className={className}
         onClick={() => setOpen(true)}
       >
-        <CloseLabel />
+        <Lock data-icon="inline-start" />
+        {getCloseLabel(periodName)}
       </Button>
       <AlertDialog open={open} onOpenChange={(o) => !isPending && setOpen(o)}>
         <AlertDialogContent>

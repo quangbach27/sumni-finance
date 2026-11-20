@@ -15,7 +15,7 @@ import type { LedgerEntryRow } from '../post-journal-entries-schema';
 import type { Column } from 'react-datasheet-grid';
 
 // Fixed widths so the totals row below the grid lines up with its columns.
-export const WIDTH = { date: 120, text: 180, amount: 150 } as const;
+export const WIDTH = { date: 120, text: 160, amount: 150 } as const;
 
 /** Column index the cursor jumps back to after the last column. */
 export const CATEGORY_COL = 1;

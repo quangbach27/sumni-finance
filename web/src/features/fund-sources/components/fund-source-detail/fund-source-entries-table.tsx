@@ -64,6 +64,7 @@ export default function FundSourceEntriesTable({
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Ngày</TableHead>
+              <TableHead>Nội dung</TableHead>
               <TableHead>Danh mục</TableHead>
               <TableHead>Thẻ</TableHead>
               <TableHead className="text-right">Nợ</TableHead>
@@ -76,7 +77,7 @@ export default function FundSourceEntriesTable({
             {isPending &&
               Array.from({ length: 5 }, (_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
@@ -93,6 +94,14 @@ export default function FundSourceEntriesTable({
                 >
                   <TableCell className="text-muted-foreground">
                     {formatDate(new Date(entry.occurred_at))}
+                  </TableCell>
+                  <TableCell className="max-w-56">
+                    <span
+                      className={`block truncate ${strike ?? ''}`}
+                      title={entry.description}
+                    >
+                      {entry.description}
+                    </span>
                   </TableCell>
                   <TableCell className={strike}>
                     {entry.category?.name ?? dash}

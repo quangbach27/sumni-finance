@@ -57,6 +57,11 @@ export default function EntryDetailNormal({ entry }: { entry: LedgerEntry }) {
       </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+        <EntryDetailField label="Nội dung" className="col-span-full">
+          <span className="break-words whitespace-pre-wrap">
+            {entry.description}
+          </span>
+        </EntryDetailField>
         <EntryDetailField label="Ngày phát sinh">
           {formatDate(new Date(entry.occurred_at))}
         </EntryDetailField>

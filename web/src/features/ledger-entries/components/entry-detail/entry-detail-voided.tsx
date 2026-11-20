@@ -114,6 +114,11 @@ export default function EntryDetailVoided({
           Thông tin bút toán gốc
         </p>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+          <EntryDetailField label="Nội dung" className="col-span-full">
+            <span className="break-words whitespace-pre-wrap">
+              {entry.description}
+            </span>
+          </EntryDetailField>
           <EntryDetailField label="Nguồn quỹ">
             {formatEntryFundSource(entry)}
           </EntryDetailField>

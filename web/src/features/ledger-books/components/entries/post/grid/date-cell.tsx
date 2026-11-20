@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react';
 
 import DateInput from '@/components/shared/date-picker/date-input';
 
-import { formatDateShort, parseTypedDate } from '@/lib/date';
+import { formatDate, parseTypedDate } from '@/lib/date';
 
 import type { LedgerEntryRow } from '../post-journal-entries-schema';
 import type { CellProps, Column } from 'react-datasheet-grid';
 
-/** Date cell: type `31/10` or pick from the calendar. */
+/** Date cell: type `31/10/2026` or pick from the calendar. */
 const DateCell = ({
   rowData,
   setRowData,
@@ -27,7 +27,7 @@ const DateCell = ({
         ref={ref}
         value={rowData.date}
         onChange={(date) => setRowData({ ...rowData, date })}
-        className="h-full rounded-none border-0 bg-transparent px-9 text-center text-base shadow-none focus-visible:ring-0 md:text-base dark:bg-transparent"
+        className="h-full rounded-none border-0 bg-transparent pr-8 pl-1 text-center text-sm shadow-none focus-visible:ring-0 md:text-sm dark:bg-transparent"
         style={{ pointerEvents: focus ? 'auto' : 'none' }}
         tabIndex={-1}
         onKeyDown={(e) => {
@@ -42,7 +42,7 @@ export const dateColumn: Partial<Column<LedgerEntryRow, unknown, string>> = {
   component: DateCell,
   keepFocus: true,
   disableKeys: true,
-  copyValue: ({ rowData }) => formatDateShort(rowData.date),
+  copyValue: ({ rowData }) => formatDate(rowData.date),
   pasteValue: ({ rowData, value }) => ({
     ...rowData,
     date:

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { AlertTriangle, Check, ChevronRight, Lock } from 'lucide-react';
+import { AlertTriangle, Check, Lock } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,6 @@ import { formatAmount } from '@/lib/currency';
 import { daysUntil, formatDate } from '@/lib/date';
 
 import { getSystemBalance } from '../../api/get-unlocked-ledger-period';
-import ClosePeriodButton from '../ledger-period-details/close-period-dialog';
 import FundSourceStatementList from './fund-source-statement-list';
 import PeriodStatTiles from './period-stat-tiles';
 
@@ -103,29 +102,6 @@ const ReconciliationButton = ({
   </Button>
 );
 
-const EntriesButton = ({
-  periodUuid,
-  className,
-}: {
-  periodUuid: string;
-  className?: string;
-}) => (
-  <Button
-    variant="outline"
-    className={className}
-    nativeButton={false}
-    render={
-      <Link
-        to="/ledger-books/$uuid/entries"
-        params={{ uuid: periodUuid }}
-        search={{ page: 1 }}
-      />
-    }
-  >
-    Xem bút toán
-  </Button>
-);
-
 const LedgerDetailsButton = ({
   periodUuid,
   className,
@@ -162,19 +138,11 @@ const DesktopLayout = ({ period, view }: LayoutProps) => {
           </div>
           <p className="text-muted-foreground mt-1 text-base">{range}</p>
         </div>
-        {/* TODO: wire entries / post-entry / reconciliation once those flows exist. */}
         <div className="flex flex-wrap gap-3">
-          <EntriesButton periodUuid={period.uuid} />
           {isClosed ? (
             <ReconciliationButton periodUuid={period.uuid} />
           ) : (
-            <>
-              <ClosePeriodButton
-                periodUuid={period.uuid}
-                periodName={period.name}
-              />
-              <LedgerDetailsButton periodUuid={period.uuid} />
-            </>
+            <LedgerDetailsButton periodUuid={period.uuid} />
           )}
         </div>
       </div>
@@ -214,20 +182,9 @@ const MobileLayout = ({ period, view }: LayoutProps) => {
         <p className="text-muted-foreground mt-1 text-sm">{range}</p>
       </div>
 
-      {/* TODO: wire post-entry once that flow exists. */}
-      <div className="flex flex-wrap gap-3">
-        <EntriesButton periodUuid={period.uuid} className="flex-1" />
-        {!isClosed && (
-          <>
-            <LedgerDetailsButton periodUuid={period.uuid} className="flex-1" />
-            <ClosePeriodButton
-              periodUuid={period.uuid}
-              periodName={period.name}
-              className="flex-1"
-            />
-          </>
-        )}
-      </div>
+      {!isClosed && (
+        <LedgerDetailsButton periodUuid={period.uuid} className="w-full" />
+      )}
 
       <PeriodAlert view={view} />
 
@@ -250,19 +207,10 @@ const MobileLayout = ({ period, view }: LayoutProps) => {
         <>
           <FundSourceStatementList statements={period.statements} />
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between border-t pt-4 text-sm">
+            <div className="border-t pt-4 text-sm">
               <span className="text-muted-foreground">
                 {entryCount} bút toán
               </span>
-              {/* TODO: wire to the entries page once it exists. */}
-              <button
-                type="button"
-                disabled
-                className="text-primary flex items-center gap-1 font-medium disabled:opacity-100"
-              >
-                Xem tất cả bút toán
-                <ChevronRight className="size-4" />
-              </button>
             </div>
             <ReconciliationButton
               periodUuid={period.uuid}

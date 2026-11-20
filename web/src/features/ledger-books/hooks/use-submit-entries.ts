@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
 
+import { toast } from '@/components/ui/toast';
+
 import { formatApiError } from '@/features/fund-sources/api/format-api-error';
 
 import { usePostLedgerEntries } from '../api/post-ledger-entries';
@@ -45,7 +47,15 @@ export function useSubmitEntries(
       });
       clearDraft();
       setConfirmOpen(false);
-      await goBack();
+      toast.add({
+        type: 'success',
+        title: `Đã ghi ${drafts.length} bút toán.`,
+      });
+      await navigate({
+        to: '/ledger-books/$uuid/entries',
+        params: { uuid: periodUuid },
+        search: { page: 1 },
+      });
     } catch (e) {
       setApiError(formatApiError(e, 'Không thể ghi bút toán.'));
       mapServerErrorsToRows(e, rowIndexes, setError);
