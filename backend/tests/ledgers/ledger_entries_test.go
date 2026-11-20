@@ -268,3 +268,32 @@ func TestVoidLedgerEntry(t *testing.T) {
 		require.Equal(t, 404, resp.StatusCode(), "body: %s", string(resp.Body))
 	})
 }
+
+func TestListLedgerEntriesOrder(t *testing.T) {
+	t.Run("same occurred_at lists the last posted entry first", func(t *testing.T) {
+		utils.ResetLedgerPeriods(t)
+		clients, token := utils.NewTestClients(t), newUserToken()
+		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+		period := openPeriod(t, clients, token, fs)
+
+		// every entry has the same occurred_at, so only created_at can tell them apart
+		resp := postLedgerEntries(t, clients, token, period, fs,
+			entryInput(shared.DirectionInflow, 1_000),
+			entryInput(shared.DirectionInflow, 2_000),
+			entryInput(shared.DirectionInflow, 3_000),
+		)
+		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
+		posted := resp.JSON201.LedgerEntryUuids
+		require.Len(t, posted, 3)
+
+		list, err := clients.Ledgers.ListLedgerEntriesWithResponse(context.Background(),
+			&ledgersClients.ListLedgerEntriesParams{}, utils.AuthEditorFn(token))
+		require.NoError(t, err)
+		require.Equal(t, 200, list.StatusCode(), "body: %s", string(list.Body))
+		require.Len(t, list.JSON200.Items, 3)
+
+		for i, item := range list.JSON200.Items {
+			assert.Equal(t, posted[len(posted)-1-i].UUID.String(), item.Uuid.String())
+		}
+	})
+}

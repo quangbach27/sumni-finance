@@ -58,16 +58,11 @@ WHERE e.org_id = @org_id
   AND (sqlc.narg('ledger_period_uuid')::uuid IS NULL OR e.ledger_period_uuid = sqlc.narg('ledger_period_uuid')::uuid)
   AND (sqlc.narg('fund_source_uuid')::uuid IS NULL OR e.fund_source_uuid = sqlc.narg('fund_source_uuid')::uuid)
   AND (sqlc.narg('kind')::text IS NULL OR e.kind = sqlc.narg('kind')::text)
+  AND (sqlc.narg('status')::text IS NULL OR e.status = sqlc.narg('status')::text)
   AND (sqlc.narg('category_uuid')::uuid IS NULL OR c.uuid = sqlc.narg('category_uuid')::uuid OR c.parent_uuid = sqlc.narg('category_uuid')::uuid)
-ORDER BY
-    (CASE WHEN @order_by::text = 'fund_source_uuid' AND @order_dir::text = 'asc' THEN fs.name END) ASC,
-    (CASE WHEN @order_by::text = 'fund_source_uuid' AND @order_dir::text = 'desc' THEN fs.name END) DESC,
-    (CASE WHEN @order_by::text = 'category_uuid' AND @order_dir::text = 'asc' THEN COALESCE(p.name, c.name) END) ASC,
-    (CASE WHEN @order_by::text = 'category_uuid' AND @order_dir::text = 'desc' THEN COALESCE(p.name, c.name) END) DESC,
-    (CASE WHEN @order_by::text = 'occurred_at' AND @order_dir::text = 'asc' THEN e.occurred_at END) ASC,
-    e.occurred_at DESC,
-    e.created_at DESC,
-    e.uuid
+-- Fixed order. The uuid is v7 (time-ordered, monotonic within a process), so within a
+-- date it gives the order the entries were created in.
+ORDER BY e.occurred_at DESC, e.uuid DESC
 LIMIT @page_limit
 OFFSET @page_offset;
 
@@ -82,6 +77,7 @@ WHERE e.org_id = @org_id
   AND (sqlc.narg('ledger_period_uuid')::uuid IS NULL OR e.ledger_period_uuid = sqlc.narg('ledger_period_uuid')::uuid)
   AND (sqlc.narg('fund_source_uuid')::uuid IS NULL OR e.fund_source_uuid = sqlc.narg('fund_source_uuid')::uuid)
   AND (sqlc.narg('kind')::text IS NULL OR e.kind = sqlc.narg('kind')::text)
+  AND (sqlc.narg('status')::text IS NULL OR e.status = sqlc.narg('status')::text)
   AND (sqlc.narg('category_uuid')::uuid IS NULL OR c.uuid = sqlc.narg('category_uuid')::uuid OR c.parent_uuid = sqlc.narg('category_uuid')::uuid);
 
 -- name: GetLatestLedgerEntryOccurredAt :one

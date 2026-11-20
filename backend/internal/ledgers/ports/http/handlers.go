@@ -554,24 +554,27 @@ func (h *Handlers) ListLedgerEntries(ctx context.Context, request ListLedgerEntr
 		return nil, err
 	}
 
-	var orderBy queries.LedgerEntryOrderBy
-	if params.OrderBy != nil {
-		orderBy = queries.LedgerEntryOrderBy(*params.OrderBy)
+	var status *domain.EntryStatus
+
+	if params.Status != nil {
+		switch *params.Status {
+		case Posted:
+			status = &domain.EntryStatusPosted
+		case Voided:
+			status = &domain.EntryStatusVoided
+		}
 	}
 
 	result, err := h.queryHandlers.ListLedgerEntries(ctx, queries.ListLedgerEntries{
 		Session:          session,
 		Kind:             params.Kind,
+		Status:           status,
 		LedgerPeriodUUID: params.LedgerPeriodUuid,
 		FundSourceUUID:   params.FundSourceUuid,
 		CategoryUUID:     params.CategoryUuid,
 		FromDate:         params.FromDate,
 		ToDate:           params.ToDate,
-		Sort: queries.LedgerEntrySort{
-			Field: orderBy,
-			Desc:  params.Order == nil || *params.Order == Desc,
-		},
-		Page: page,
+		Page:             page,
 	})
 	if err != nil {
 		return nil, err

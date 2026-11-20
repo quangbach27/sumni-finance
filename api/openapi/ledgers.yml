@@ -82,7 +82,8 @@ paths:
       summary: List ledger entries
       description: >-
         Entries across all ledger periods, optionally of one fund source and
-        within a date range. Sorted by occurred_at descending by default.
+        within a date range. Always sorted by occurred_at, then by creation order,
+        newest first.
       parameters:
         - name: fund_source_uuid
           in: query
@@ -124,20 +125,14 @@ paths:
           description: Only entries of this kind; omit for both.
           schema:
             $ref: "#/components/schemas/LedgerEntryKind"
-        - name: order_by
+        - name: status
           in: query
           required: false
+          description: Only entries of this status; omit or `all` for both.
           schema:
             type: string
-            enum: [occurred_at, fund_source_uuid, category_uuid]
-            default: occurred_at
-        - name: order
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
+            enum: [posted, voided, all]
+            default: all
         - name: page
           in: query
           required: false

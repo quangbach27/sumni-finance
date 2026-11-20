@@ -26,7 +26,8 @@ WHERE e.org_id = $1
   AND ($4::uuid IS NULL OR e.ledger_period_uuid = $4::uuid)
   AND ($5::uuid IS NULL OR e.fund_source_uuid = $5::uuid)
   AND ($6::text IS NULL OR e.kind = $6::text)
-  AND ($7::uuid IS NULL OR c.uuid = $7::uuid OR c.parent_uuid = $7::uuid)
+  AND ($7::text IS NULL OR e.status = $7::text)
+  AND ($8::uuid IS NULL OR c.uuid = $8::uuid OR c.parent_uuid = $8::uuid)
 `
 
 type CountLedgerEntriesParams struct {
@@ -36,6 +37,7 @@ type CountLedgerEntriesParams struct {
 	LedgerPeriodUuid *golang_common.UUID
 	FundSourceUuid   *golang_common.UUID
 	Kind             *string
+	Status           *string
 	CategoryUuid     *golang_common.UUID
 }
 
@@ -48,6 +50,7 @@ func (q *Queries) CountLedgerEntries(ctx context.Context, arg CountLedgerEntries
 		arg.LedgerPeriodUuid,
 		arg.FundSourceUuid,
 		arg.Kind,
+		arg.Status,
 		arg.CategoryUuid,
 	)
 	var count int64
@@ -244,18 +247,11 @@ WHERE e.org_id = $1
   AND ($4::uuid IS NULL OR e.ledger_period_uuid = $4::uuid)
   AND ($5::uuid IS NULL OR e.fund_source_uuid = $5::uuid)
   AND ($6::text IS NULL OR e.kind = $6::text)
-  AND ($7::uuid IS NULL OR c.uuid = $7::uuid OR c.parent_uuid = $7::uuid)
-ORDER BY
-    (CASE WHEN $8::text = 'fund_source_uuid' AND $9::text = 'asc' THEN fs.name END) ASC,
-    (CASE WHEN $8::text = 'fund_source_uuid' AND $9::text = 'desc' THEN fs.name END) DESC,
-    (CASE WHEN $8::text = 'category_uuid' AND $9::text = 'asc' THEN COALESCE(p.name, c.name) END) ASC,
-    (CASE WHEN $8::text = 'category_uuid' AND $9::text = 'desc' THEN COALESCE(p.name, c.name) END) DESC,
-    (CASE WHEN $8::text = 'occurred_at' AND $9::text = 'asc' THEN e.occurred_at END) ASC,
-    e.occurred_at DESC,
-    e.created_at DESC,
-    e.uuid
-LIMIT $11
-OFFSET $10
+  AND ($7::text IS NULL OR e.status = $7::text)
+  AND ($8::uuid IS NULL OR c.uuid = $8::uuid OR c.parent_uuid = $8::uuid)
+ORDER BY e.occurred_at DESC, e.uuid DESC
+LIMIT $10
+OFFSET $9
 `
 
 type ListLedgerEntriesParams struct {
@@ -265,9 +261,8 @@ type ListLedgerEntriesParams struct {
 	LedgerPeriodUuid *golang_common.UUID
 	FundSourceUuid   *golang_common.UUID
 	Kind             *string
+	Status           *string
 	CategoryUuid     *golang_common.UUID
-	OrderBy          string
-	OrderDir         string
 	PageOffset       int32
 	PageLimit        int32
 }
@@ -306,6 +301,8 @@ type ListLedgerEntriesRow struct {
 // the category and the entry's own category is the tag.
 // Predicate order: tenant (e.org_id, first column of every index) first, then the date range (the filter users pick
 // most), then the scope filters. Keep identical in CountLedgerEntries.
+// Fixed order. The uuid is v7 (time-ordered, monotonic within a process), so within a
+// date it gives the order the entries were created in.
 func (q *Queries) ListLedgerEntries(ctx context.Context, arg ListLedgerEntriesParams) ([]ListLedgerEntriesRow, error) {
 	rows, err := q.db.Query(ctx, listLedgerEntries,
 		arg.OrgID,
@@ -314,9 +311,8 @@ func (q *Queries) ListLedgerEntries(ctx context.Context, arg ListLedgerEntriesPa
 		arg.LedgerPeriodUuid,
 		arg.FundSourceUuid,
 		arg.Kind,
+		arg.Status,
 		arg.CategoryUuid,
-		arg.OrderBy,
-		arg.OrderDir,
 		arg.PageOffset,
 		arg.PageLimit,
 	)

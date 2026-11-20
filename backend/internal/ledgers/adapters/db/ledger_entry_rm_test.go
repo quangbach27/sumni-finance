@@ -75,7 +75,6 @@ func TestLedgerEntryReadModel(t *testing.T) {
 		WHERE uuid = $3`, reversalID, now, voidedID)
 
 	kindNormal := domain.EntryKindNormal
-	sortNewest := queries.LedgerEntrySort{Field: queries.LedgerEntryOrderByOccurredAt, Desc: true}
 	page, err := shared.NewPageRequest(1, 10)
 	require.NoError(t, err)
 
@@ -85,7 +84,6 @@ func TestLedgerEntryReadModel(t *testing.T) {
 		got, err := readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{
 			FundSourceUUID: &domain.FundSourceUUID{UUID: fs.UUID().UUID},
 			Kind:           &kindNormal,
-			Sort:           sortNewest,
 			Page:           page,
 		})
 		require.NoError(t, err)
@@ -107,7 +105,7 @@ func TestLedgerEntryReadModel(t *testing.T) {
 	t.Run("without kind both are listed", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{Sort: sortNewest, Page: page})
+		got, err := readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{Page: page})
 		require.NoError(t, err)
 		assert.Equal(t, 3, got.Page.TotalCount)
 	})
@@ -117,14 +115,14 @@ func TestLedgerEntryReadModel(t *testing.T) {
 
 		period := domain.LedgerPeriodUUID{UUID: common.UUID(periodID)}
 		got, err := readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{
-			LedgerPeriodUUID: &period, Sort: sortNewest, Page: page,
+			LedgerPeriodUUID: &period, Page: page,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 3, got.Page.TotalCount)
 
 		other := domain.LedgerPeriodUUID{UUID: common.UUID(uuid.New())}
 		got, err = readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{
-			LedgerPeriodUUID: &other, Sort: sortNewest, Page: page,
+			LedgerPeriodUUID: &other, Page: page,
 		})
 		require.NoError(t, err)
 		assert.Zero(t, got.Page.TotalCount)
@@ -133,17 +131,33 @@ func TestLedgerEntryReadModel(t *testing.T) {
 		// only the entries at or after 90 minutes ago: the voided one and the reversal
 		from := now.Add(-90 * time.Minute)
 		got, err = readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{
-			FromDate: &from, Sort: sortNewest, Page: page,
+			FromDate: &from, Page: page,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 2, got.Page.TotalCount)
 
 		to := now.Add(-90 * time.Minute)
 		got, err = readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{
-			ToDate: &to, Sort: sortNewest, Page: page,
+			ToDate: &to, Page: page,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 1, got.Page.TotalCount)
+	})
+
+	t.Run("status filter", func(t *testing.T) {
+		t.Parallel()
+
+		voided, posted := domain.EntryStatusVoided, domain.EntryStatusPosted
+
+		got, err := readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{Status: &voided, Page: page})
+		require.NoError(t, err)
+		assert.Equal(t, 1, got.Page.TotalCount)
+		require.Len(t, got.Items, 1)
+		assert.Equal(t, voidedID.String(), got.Items[0].UUID)
+
+		got, err = readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{Status: &posted, Page: page})
+		require.NoError(t, err)
+		assert.Equal(t, 2, got.Page.TotalCount)
 	})
 
 	t.Run("tag resolves to parent category", func(t *testing.T) {
@@ -172,7 +186,7 @@ func TestLedgerEntryReadModel(t *testing.T) {
 		other := "org_other_" + uuid.NewString()
 		fsUUID := domain.FundSourceUUID{UUID: fs.UUID().UUID}
 		got, err := readModel.ListLedgerEntries(ctx, other, queries.ListLedgerEntries{
-			FundSourceUUID: &fsUUID, Sort: sortNewest, Page: page,
+			FundSourceUUID: &fsUUID, Page: page,
 		})
 		require.NoError(t, err)
 		assert.Zero(t, got.Page.TotalCount)
@@ -185,4 +199,65 @@ func TestLedgerEntryReadModel(t *testing.T) {
 		_, err := readModel.GetLedgerEntry(ctx, "org_other", domain.LedgerEntryUUID{UUID: common.UUID(normalID)})
 		require.Error(t, err)
 	})
+}
+
+func TestLedgerEntryReadModel_FixedOrder(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	orgID := "org_entry_order_" + uuid.NewString()
+
+	fsRepo, err := ledgerdb.NewFundSourceRepository(pgxDb)
+	require.NoError(t, err)
+	readModel, err := ledgerdb.NewLedgerEntryReadModel(pgxDb)
+	require.NoError(t, err)
+	factory, err := domain.NewFundSourceFactory(bankverifier.NewBankAccountVerifierStub())
+	require.NoError(t, err)
+
+	details, err := factory.CreateCashDetails("An")
+	require.NoError(t, err)
+	fs, err := factory.CreateFundSource("Cash (entry order)", decimal.Zero, shared.CurrencyVND, details)
+	require.NoError(t, err)
+	require.NoError(t, fsRepo.CreateFundSource(ctx, orgID, fs))
+
+	periodID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	exec := func(sql string, args ...any) {
+		_, err := pgxDb.Exec(ctx, sql, args...)
+		require.NoError(t, err)
+	}
+	exec(`INSERT INTO ledgers.ledger_periods (uuid, org_id, name, opening_balance, open_date, close_date, status)
+		VALUES ($1, $2, 'Tháng 11/2026', 0, $3, $3, 'opened')`, periodID, orgID, now)
+
+	insert := func(id uuid.UUID, occurredAt time.Time) {
+		exec(`INSERT INTO ledgers.ledger_entries
+			(uuid, org_id, ledger_period_uuid, fund_source_uuid, amount, direction, description, occurred_at, category_uuid,
+			 fs_balance_before, fs_balance_after, status, kind, created_by)
+			VALUES ($1, $2, $3, $4, 1, 'inflow', 'entry', $5, NULL, 0, 1, 'posted', 'normal', 'user_1')`,
+			id, orgID, periodID, fs.UUID().UUID, occurredAt)
+	}
+
+	day := now.Add(-48 * time.Hour)
+	// uuid v7 grows with creation order
+	firstID, secondID, thirdID, olderID := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	// the same day, created one after another
+	insert(firstID, day)
+	insert(secondID, day)
+	insert(thirdID, day)
+	// an earlier day created last: occurred_at wins over the uuid
+	insert(olderID, day.Add(-24*time.Hour))
+
+	page, err := shared.NewPageRequest(1, 10)
+	require.NoError(t, err)
+
+	got, err := readModel.ListLedgerEntries(ctx, orgID, queries.ListLedgerEntries{Page: page})
+	require.NoError(t, err)
+
+	ids := make([]string, 0, len(got.Items))
+	for _, it := range got.Items {
+		ids = append(ids, it.UUID)
+	}
+
+	assert.Equal(t, []string{thirdID.String(), secondID.String(), firstID.String(), olderID.String()}, ids)
 }

@@ -39,39 +39,21 @@ func (e LedgerEntryDirection) Valid() bool {
 	}
 }
 
-// Defines values for ListLedgerEntriesParamsOrderBy.
+// Defines values for ListLedgerEntriesParamsStatus.
 const (
-	CategoryUuid   ListLedgerEntriesParamsOrderBy = "category_uuid"
-	FundSourceUuid ListLedgerEntriesParamsOrderBy = "fund_source_uuid"
-	OccurredAt     ListLedgerEntriesParamsOrderBy = "occurred_at"
+	All    ListLedgerEntriesParamsStatus = "all"
+	Posted ListLedgerEntriesParamsStatus = "posted"
+	Voided ListLedgerEntriesParamsStatus = "voided"
 )
 
-// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrderBy enum.
-func (e ListLedgerEntriesParamsOrderBy) Valid() bool {
+// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsStatus enum.
+func (e ListLedgerEntriesParamsStatus) Valid() bool {
 	switch e {
-	case CategoryUuid:
+	case All:
 		return true
-	case FundSourceUuid:
+	case Posted:
 		return true
-	case OccurredAt:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListLedgerEntriesParamsOrder.
-const (
-	Asc  ListLedgerEntriesParamsOrder = "asc"
-	Desc ListLedgerEntriesParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrder enum.
-func (e ListLedgerEntriesParamsOrder) Valid() bool {
-	switch e {
-	case Asc:
-		return true
-	case Desc:
+	case Voided:
 		return true
 	default:
 		return false
@@ -486,18 +468,16 @@ type ListLedgerEntriesParams struct {
 	ToDate *time.Time `form:"to_date,omitempty" json:"to_date,omitempty"`
 
 	// Kind Only entries of this kind; omit for both.
-	Kind     *LedgerEntryKind                `form:"kind,omitempty" json:"kind,omitempty"`
-	OrderBy  *ListLedgerEntriesParamsOrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
-	Order    *ListLedgerEntriesParamsOrder   `form:"order,omitempty" json:"order,omitempty"`
-	Page     *int                            `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *int                            `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Kind *LedgerEntryKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Status Only entries of this status; omit or `all` for both.
+	Status   *ListLedgerEntriesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Page     *int                           `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int                           `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
-// ListLedgerEntriesParamsOrderBy defines parameters for ListLedgerEntries.
-type ListLedgerEntriesParamsOrderBy string
-
-// ListLedgerEntriesParamsOrder defines parameters for ListLedgerEntries.
-type ListLedgerEntriesParamsOrder string
+// ListLedgerEntriesParamsStatus defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParamsStatus string
 
 // ListLedgerPeriodsParams defines parameters for ListLedgerPeriods.
 type ListLedgerPeriodsParams struct {
@@ -693,18 +673,11 @@ func (w *ServerInterfaceWrapper) ListLedgerEntries(ctx *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter kind: %s", err))
 	}
 
-	// ------------- Optional query parameter "order_by" -------------
+	// ------------- Optional query parameter "status" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order_by", ctx.QueryParams(), &params.OrderBy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", ctx.QueryParams(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter order_by: %s", err))
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", ctx.QueryParams(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter order: %s", err))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter status: %s", err))
 	}
 
 	// ------------- Optional query parameter "page" -------------

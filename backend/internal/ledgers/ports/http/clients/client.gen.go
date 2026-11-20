@@ -41,39 +41,21 @@ func (e LedgerEntryDirection) Valid() bool {
 	}
 }
 
-// Defines values for ListLedgerEntriesParamsOrderBy.
+// Defines values for ListLedgerEntriesParamsStatus.
 const (
-	CategoryUuid   ListLedgerEntriesParamsOrderBy = "category_uuid"
-	FundSourceUuid ListLedgerEntriesParamsOrderBy = "fund_source_uuid"
-	OccurredAt     ListLedgerEntriesParamsOrderBy = "occurred_at"
+	All    ListLedgerEntriesParamsStatus = "all"
+	Posted ListLedgerEntriesParamsStatus = "posted"
+	Voided ListLedgerEntriesParamsStatus = "voided"
 )
 
-// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrderBy enum.
-func (e ListLedgerEntriesParamsOrderBy) Valid() bool {
+// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsStatus enum.
+func (e ListLedgerEntriesParamsStatus) Valid() bool {
 	switch e {
-	case CategoryUuid:
+	case All:
 		return true
-	case FundSourceUuid:
+	case Posted:
 		return true
-	case OccurredAt:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListLedgerEntriesParamsOrder.
-const (
-	Asc  ListLedgerEntriesParamsOrder = "asc"
-	Desc ListLedgerEntriesParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListLedgerEntriesParamsOrder enum.
-func (e ListLedgerEntriesParamsOrder) Valid() bool {
-	switch e {
-	case Asc:
-		return true
-	case Desc:
+	case Voided:
 		return true
 	default:
 		return false
@@ -488,18 +470,16 @@ type ListLedgerEntriesParams struct {
 	ToDate *time.Time `form:"to_date,omitempty" json:"to_date,omitempty"`
 
 	// Kind Only entries of this kind; omit for both.
-	Kind     *LedgerEntryKind                `form:"kind,omitempty" json:"kind,omitempty"`
-	OrderBy  *ListLedgerEntriesParamsOrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
-	Order    *ListLedgerEntriesParamsOrder   `form:"order,omitempty" json:"order,omitempty"`
-	Page     *int                            `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *int                            `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Kind *LedgerEntryKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Status Only entries of this status; omit or `all` for both.
+	Status   *ListLedgerEntriesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Page     *int                           `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int                           `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
-// ListLedgerEntriesParamsOrderBy defines parameters for ListLedgerEntries.
-type ListLedgerEntriesParamsOrderBy string
-
-// ListLedgerEntriesParamsOrder defines parameters for ListLedgerEntries.
-type ListLedgerEntriesParamsOrder string
+// ListLedgerEntriesParamsStatus defines parameters for ListLedgerEntries.
+type ListLedgerEntriesParamsStatus string
 
 // ListLedgerPeriodsParams defines parameters for ListLedgerPeriods.
 type ListLedgerPeriodsParams struct {
@@ -654,7 +634,7 @@ type ClientInterface interface {
 
 	// ListLedgerEntries List ledger entries
 	//
-	// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+	// Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then by creation order, newest first.
 	//
 	// Corresponds with GET /api/v1/ledger-entries (the `ListLedgerEntries` operationId).
 	ListLedgerEntries(ctx context.Context, params *ListLedgerEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -925,7 +905,7 @@ func (c *Client) GetFundSource(ctx context.Context, fundSourceUuid FundSourceUUI
 
 // ListLedgerEntries List ledger entries
 //
-// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+// Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then by creation order, newest first.
 //
 // Corresponds with GET /api/v1/ledger-entries (the `ListLedgerEntries` operationId).
 func (c *Client) ListLedgerEntries(ctx context.Context, params *ListLedgerEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1532,21 +1512,9 @@ func NewListLedgerEntriesRequest(server string, params *ListLedgerEntriesParams)
 
 		}
 
-		if params.OrderBy != nil {
+		if params.Status != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Order != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order", *params.Order, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -2232,7 +2200,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListLedgerEntriesWithResponse List ledger entries
 	//
-	// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+	// Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then by creation order, newest first.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -3740,7 +3708,7 @@ func (c *ClientWithResponses) GetFundSourceWithResponse(ctx context.Context, fun
 
 // ListLedgerEntriesWithResponse List ledger entries
 //
-// Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+// Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then by creation order, newest first.
 //
 // Returns a wrapper object for the known response body format(s).
 //

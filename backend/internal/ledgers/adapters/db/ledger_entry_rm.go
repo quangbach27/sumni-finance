@@ -56,11 +56,10 @@ func (r *LedgerEntryReadModel) ListLedgerEntries(
 		kind = &k
 	}
 
-	orderBy := string(query.Sort.Field)
-
-	orderDir := "asc"
-	if query.Sort.Desc {
-		orderDir = "desc"
+	var status *string
+	if query.Status != nil {
+		s := query.Status.String()
+		status = &s
 	}
 
 	q := dbmodels.New(r.db)
@@ -68,6 +67,7 @@ func (r *LedgerEntryReadModel) ListLedgerEntries(
 	total, err := q.CountLedgerEntries(ctx, dbmodels.CountLedgerEntriesParams{
 		OrgID:            orgID,
 		Kind:             kind,
+		Status:           status,
 		LedgerPeriodUuid: periodUUID,
 		FundSourceUuid:   fundSourceUUID,
 		CategoryUuid:     categoryUUID,
@@ -81,13 +81,12 @@ func (r *LedgerEntryReadModel) ListLedgerEntries(
 	rows, err := q.ListLedgerEntries(ctx, dbmodels.ListLedgerEntriesParams{
 		OrgID:            orgID,
 		Kind:             kind,
+		Status:           status,
 		LedgerPeriodUuid: periodUUID,
 		FundSourceUuid:   fundSourceUUID,
 		CategoryUuid:     categoryUUID,
 		FromDate:         query.FromDate,
 		ToDate:           query.ToDate,
-		OrderBy:          orderBy,
-		OrderDir:         orderDir,
 		PageLimit:        int32(query.Page.Limit()),
 		PageOffset:       int32(query.Page.Offset()),
 	})
