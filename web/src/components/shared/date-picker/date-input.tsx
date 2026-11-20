@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/popover';
 
 import {
-  formatDateShort,
+  formatDate,
   parseDateString,
   parseTypedDate,
   toDateString,
@@ -62,10 +62,10 @@ export default function DateInput({
         {...props}
         inputMode="numeric"
         autoComplete="off"
-        placeholder="dd/mm"
+        placeholder="dd/mm/yyyy"
         aria-invalid={invalid}
         className={cn('pr-10', className)}
-        value={draft ?? formatDateShort(value)}
+        value={draft ?? formatDate(value)}
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => {

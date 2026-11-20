@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 
 import { Link } from '@tanstack/react-router';
-import { AlertTriangle, BookOpen, Plus } from 'lucide-react';
+import { AlertTriangle, BookOpen, PenLine } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -54,7 +54,7 @@ const DeadlineBar = ({ periodUuid }: { periodUuid: string }) => {
       )}
       <ClosePeriodButton
         className="ml-auto"
-        variant="outline"
+        variant="destructive"
         periodUuid={period.uuid}
         periodName={period.name}
       />
@@ -102,7 +102,7 @@ export default function PostEntryStep({ periodUuid }: { periodUuid: string }) {
                     />
                   }
                 >
-                  <Plus data-icon="inline-start" />
+                  <PenLine data-icon="inline-start" />
                   Ghi bút toán
                 </Button>
               </div>

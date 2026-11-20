@@ -20,7 +20,7 @@ export default function ContentLayout({
   additionalContent,
 }: ContentLayoutProps) {
   return (
-    <section className={cn('mx-auto w-full max-w-7xl p-4 md:p-6', className)}>
+    <section className={cn('mx-auto w-full max-w-350 p-4 md:p-6', className)}>
       <div className="flex items-center justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
