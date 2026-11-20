@@ -10,7 +10,7 @@ The identity provider gives us user id, org id and a single role (`auth.Session`
 
 ### Policies: `policy.go`
 - The domain only has the generic building blocks: `Rule{resource, actions}` and `Policy{name, rules}` with `Policy.Allows(resource, action)`, validated in `NewRule` / `NewPolicy`.
-- The default role baseline is configuration, not domain logic, so it lives in the app layer (`apps/default_policies.go`, used by `apps.NewDefaultPolicyCatalog`): `office-admin` = `AdministratorAccess` (all resources, all actions); `office-accountant` and `office-viewer` = `ReadOnlyAccess` (read on `fund_source`, `ledger_period`, `ledger_entry`, `ledger_category`).
+- The default role baseline is configuration, not domain logic, so it lives in the app layer (`apps/default_policies.go`, used by `apps.NewDefaultPolicyCatalog`): `office-admin` = `AdministratorAccess` (all resources, all actions); `office-accountant` and `office-viewer` = `ReadOnlyAccess` (read on `fund_source`, `ledger_period`, `ledger_entry`, `ledger_category`, `access_grant`).
 
 ### Access grants: `access_grant.go`
 Extra permissions an admin gives to ONE user on top of the role.
@@ -31,7 +31,7 @@ Grants are per user: user_1's grant on fund source 123 never applies to user_2 o
 - Grant lookups and listing have no query handlers: `adapters/db/grant_rm.go` (`GrantReadModel`) queries Postgres directly. It implements `apps.GrantReadModel` for the catalog and serves the list endpoint through `models.GrantView`.
 
 ### HTTP (`api/openapi/authorization.yml`)
-`POST/GET /api/v1/access-grants`, `PUT/DELETE /api/v1/access-grants/{access_grant_uuid}`. Listing needs `access_grant`/read (admin only). Identity comes from the session only (`module.PrincipalFromContext` in `ports/module/module.go`): missing user or org is 401, empty or unknown role is 403. The module contract (`ports/module/client`) has a single method, `Authorize`: it takes the caller's `*auth.Session` and parses it into a `models.Principal` itself (`module.PrincipalFromSession`), so other modules never build principals. Grant, update and revoke are not in the contract; they are only available through the HTTP API.
+`POST/GET /api/v1/access-grants`, `PUT/DELETE /api/v1/access-grants/{access_grant_uuid}`. Listing needs `access_grant`/read, which every role has; create, update and revoke are admin-only. `GET /api/v1/role-policies` returns each role's baseline policies to any member. Identity comes from the session only (`module.PrincipalFromContext` in `ports/module/module.go`): missing user or org is 401, empty or unknown role is 403. The module contract (`ports/module/client`) has a single method, `Authorize`: it takes the caller's `*auth.Session` and parses it into a `models.Principal` itself (`module.PrincipalFromSession`), so other modules never build principals. Grant, update and revoke are not in the contract; they are only available through the HTTP API.
 
 ### Persistence (`adapters/db`)
 `authz.access_grants`, one row per grant, `actions text[]`, `scope` text NULL (`resource/id`), unique index on (org, user, resource, scope); sqlc maps `resource`, `actions` and `scope` straight to `shared.Resource`, `[]shared.Action` and `*shared.ResourceScope`.

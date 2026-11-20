@@ -104,3 +104,25 @@ func (c *PolicyCatalog) Authorize(
 func (c *PolicyCatalog) roleAllows(role shared.Role, resource shared.Resource, action shared.Action) bool {
 	return slices.ContainsFunc(c.byRole[role], func(p domain.Policy) bool { return p.Allows(resource, action) })
 }
+
+// RolePolicies returns the baseline policies of every role, in a stable role order.
+func (c *PolicyCatalog) RolePolicies() []models.RolePolicyView {
+	roles := []shared.Role{shared.RoleOfficeAdmin, shared.RoleOfficeAccountant, shared.RoleOfficeViewer}
+
+	views := make([]models.RolePolicyView, 0, len(roles))
+	for _, role := range roles {
+		policies := make([]models.PolicyView, 0, len(c.byRole[role]))
+		for _, policy := range c.byRole[role] {
+			rules := make([]models.RuleView, 0, len(policy.Rules()))
+			for _, rule := range policy.Rules() {
+				rules = append(rules, models.RuleView{Resource: rule.Resource(), Actions: rule.Actions()})
+			}
+
+			policies = append(policies, models.PolicyView{Name: policy.Name(), Rules: rules})
+		}
+
+		views = append(views, models.RolePolicyView{Role: role, Policies: policies})
+	}
+
+	return views
+}

@@ -5,6 +5,7 @@ info:
 
 tags:
   - name: access-grants
+  - name: role-policies
 
 paths:
   /api/v1/access-grants:
@@ -22,7 +23,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
+            $ref: "#/components/schemas/Resource"
       responses:
         "200":
           description: List of access grants
@@ -116,6 +117,26 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/role-policies:
+    get:
+      tags: [role-policies]
+      operationId: listRolePolicies
+      summary: List the baseline policies of every role
+      description: >
+        The default permissions each role has before any access grant. Readable by every
+        member of an organization.
+      responses:
+        "200":
+          description: Policies per role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRolePoliciesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   schemas:
     AccessGrantUUID:
@@ -127,7 +148,7 @@ components:
 
     Resource:
       type: string
-      enum: [ledger_period, ledger_entry, fund_source, access_grant]
+      enum: [ledger_period, ledger_entry, fund_source, access_grant, ledger_category]
       x-go-type: shared.Resource
       x-go-type-import:
         path: backend/internal/shared
@@ -136,6 +157,13 @@ components:
       type: string
       enum: [read, create, update, delete]
       x-go-type: shared.Action
+      x-go-type-import:
+        path: backend/internal/shared
+
+    Role:
+      type: string
+      enum: [office_admin, office_accountant, office_viewer]
+      x-go-type: shared.Role
       x-go-type-import:
         path: backend/internal/shared
 
@@ -214,6 +242,48 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AccessGrant"
+
+    PolicyRule:
+      type: object
+      required: [resource, actions]
+      properties:
+        resource:
+          $ref: "#/components/schemas/Resource"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Action"
+
+    Policy:
+      type: object
+      required: [name, rules]
+      properties:
+        name:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyRule"
+
+    RolePolicies:
+      type: object
+      required: [role, policies]
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Policy"
+
+    ListRolePoliciesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RolePolicies"
 
     ErrorDetail:
       type: object

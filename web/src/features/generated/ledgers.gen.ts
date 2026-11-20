@@ -48,7 +48,7 @@ export interface paths {
         };
         /**
          * List ledger entries
-         * @description Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then created_at, newest first.
+         * @description Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then by creation order, newest first.
          */
         get: operations["listLedgerEntries"];
         put?: never;

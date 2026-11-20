@@ -45,6 +45,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/role-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the baseline policies of every role
+         * @description The default permissions each role has before any access grant. Readable by every member of an organization.
+         */
+        get: operations["listRolePolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -52,9 +72,11 @@ export interface components {
         /** Format: uuid */
         AccessGrantUUID: string;
         /** @enum {string} */
-        Resource: "ledger_period" | "ledger_entry" | "fund_source" | "access_grant";
+        Resource: "ledger_period" | "ledger_entry" | "fund_source" | "access_grant" | "ledger_category";
         /** @enum {string} */
         Action: "read" | "create" | "update" | "delete";
+        /** @enum {string} */
+        Role: "office_admin" | "office_accountant" | "office_viewer";
         /**
          * @description One instance of a resource, written resource/id.
          * @example fund_source/123
@@ -87,6 +109,21 @@ export interface components {
         };
         ListAccessGrantsResponse: {
             items: components["schemas"]["AccessGrant"][];
+        };
+        PolicyRule: {
+            resource: components["schemas"]["Resource"];
+            actions: components["schemas"]["Action"][];
+        };
+        Policy: {
+            name: string;
+            rules: components["schemas"]["PolicyRule"][];
+        };
+        RolePolicies: {
+            role: components["schemas"]["Role"];
+            policies: components["schemas"]["Policy"][];
+        };
+        ListRolePoliciesResponse: {
+            items: components["schemas"]["RolePolicies"][];
         };
         ErrorDetail: {
             entity_id?: string;
@@ -167,7 +204,7 @@ export interface operations {
         parameters: {
             query?: {
                 user_id?: string;
-                resource?: string;
+                resource?: components["schemas"]["Resource"];
             };
             header?: never;
             path?: never;
@@ -269,6 +306,28 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listRolePolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Policies per role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRolePoliciesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];
         };
     };

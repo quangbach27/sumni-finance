@@ -1,7 +1,7 @@
 import {
   BookOpenIcon,
   // ChartColumnIcon,
-  // SettingsIcon,
+  SettingsIcon,
   WalletIcon,
 } from 'lucide-react';
 
@@ -20,6 +20,8 @@ export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  /** Renders a collapsible group; `href` is then only used as the key. */
+  children?: { label: string; href: string }[];
 };
 
 const navItems = [
@@ -38,11 +40,12 @@ const navItems = [
   //   href: '/reports',
   //   icon: ChartColumnIcon,
   // },
-  // {
-  //   label: 'Cài đặt',
-  //   href: '/settings',
-  //   icon: SettingsIcon,
-  // },
+  {
+    label: 'Cài đặt',
+    href: '/settings',
+    icon: SettingsIcon,
+    children: [{ label: 'Vai trò và quyền', href: '/settings/roles' }],
+  },
 ] satisfies NavItem[];
 
 export default function AppLayout({ children }: Props) {
