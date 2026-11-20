@@ -22,6 +22,7 @@ paths:
         - name: resource
           in: query
           required: false
+          explode: false
           schema:
             $ref: "#/components/schemas/Resource"
       responses:
