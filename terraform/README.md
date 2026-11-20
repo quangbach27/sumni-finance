@@ -73,7 +73,27 @@ Lints and scans, then builds (it needs `VITE_API_BASE_URL`, so it loads the Terr
 
 ## Connecting to the dev DB
 
-The database has no public endpoint: only the Lightsail container service can reach it (security group allows `172.26.0.0/16`, the Lightsail VPC, over the VPC peering enabled by the `backend` module). `psql` from a laptop does not work. Migrations run when the container starts. For ad-hoc queries add a bastion with SSM port forwarding in the default VPC (no module exists yet).
+The database has no public endpoint: the security group allows only the Lightsail VPC (`172.26.0.0/16`, over the VPC peering enabled by the `backend` module) and the SSM bastion. `psql` straight from a laptop does not work. Migrations run when the container starts.
+
+For ad-hoc queries use the `bastion` module (a `t4g.nano`, no inbound access, no SSH key) with SSM port forwarding. It needs the AWS CLI, the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) and the admin profile.
+
+```sh
+T="terraform -chdir=terraform/environments/dev"
+export AWS_PROFILE=sumni-finance-dev
+
+# 1. Master credentials (RDS-managed secret, JSON {username,password})
+aws secretsmanager get-secret-value --secret-id "$($T output -raw db_secret_arn)" --query SecretString --output text
+
+# 2. Tunnel (leave it running)
+aws ssm start-session --target "$($T output -raw bastion_instance_id)" \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters "{\"host\":[\"$($T output -raw db_host)\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"5433\"]}"
+
+# 3. In another terminal (TLS is forced)
+psql "postgresql://sumni:<password>@localhost:5433/$($T output -raw db_name)?sslmode=require"
+```
+
+The `t4g.micro` is free-tier within the 12-month allowance (about $6/month after). To stop paying for it when you don't need it, set `bastion_enabled = false` and apply.
 
 ## Secret rotation
 

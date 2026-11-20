@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	common "github.com/quangbach27/golang-common"
 	"github.com/quangbach27/golang-common/http/auth"
 
@@ -521,4 +522,164 @@ func (h *Handlers) UpsertCategories(ctx context.Context, request UpsertCategorie
 	}
 
 	return UpsertCategories200JSONResponse{CategoryUuids: uuids}, nil
+}
+
+func (h *Handlers) GetFundSource(ctx context.Context, request GetFundSourceRequestObject) (GetFundSourceResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	detail, err := h.queryHandlers.GetFundSource(ctx, queries.GetFundSource{Session: session, FundSourceUUID: request.FundSourceUuid})
+	if err != nil {
+		return nil, err
+	}
+
+	return GetFundSource200JSONResponse{
+		FundSource:    toAPIFundSource(detail.FundSource),
+		LatestEntryAt: detail.LatestEntryAt,
+	}, nil
+}
+
+func (h *Handlers) ListLedgerEntries(ctx context.Context, request ListLedgerEntriesRequestObject) (ListLedgerEntriesResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	params := request.Params
+
+	page, err := shared.NewPageRequest(utils.SafeDeref(params.Page, 0), utils.SafeDeref(params.PageSize, 20))
+	if err != nil {
+		return nil, err
+	}
+
+	var status *domain.EntryStatus
+
+	if params.Status != nil {
+		switch *params.Status {
+		case Posted:
+			status = &domain.EntryStatusPosted
+		case Voided:
+			status = &domain.EntryStatusVoided
+		}
+	}
+
+	result, err := h.queryHandlers.ListLedgerEntries(ctx, queries.ListLedgerEntries{
+		Session:          session,
+		Kind:             params.Kind,
+		Status:           status,
+		LedgerPeriodUUID: params.LedgerPeriodUuid,
+		FundSourceUUID:   params.FundSourceUuid,
+		CategoryUUID:     params.CategoryUuid,
+		FromDate:         params.FromDate,
+		ToDate:           params.ToDate,
+		Page:             page,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]LedgerEntryListItem, 0, len(result.Items))
+	for _, e := range result.Items {
+		items = append(items, toAPILedgerEntry(e))
+	}
+
+	return ListLedgerEntries200JSONResponse{
+		Items: items,
+		PageInfo: PageInfo{
+			Page:       result.Page.Page,
+			PageSize:   result.Page.PageSize,
+			TotalCount: result.Page.TotalCount,
+		},
+	}, nil
+}
+
+func toAPICategoryRef(ref *queries.CategoryRef) *LedgerEntryCategoryRef {
+	if ref == nil {
+		return nil
+	}
+
+	return &LedgerEntryCategoryRef{
+		Uuid: models.CategoryUUID{UUID: common.MustUUIDFromString(ref.UUID)},
+		Name: ref.Name,
+	}
+}
+
+func (h *Handlers) GetLedgerEntry(ctx context.Context, request GetLedgerEntryRequestObject) (GetLedgerEntryResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := h.queryHandlers.GetLedgerEntry(ctx, queries.GetLedgerEntry{
+		Session:         session,
+		LedgerEntryUUID: domain.LedgerEntryUUID{UUID: common.UUID(request.LedgerEntryUuid)},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return GetLedgerEntry200JSONResponse{Entry: toAPILedgerEntry(entry)}, nil
+}
+
+func (h *Handlers) VoidLedgerEntry(ctx context.Context, request VoidLedgerEntryRequestObject) (VoidLedgerEntryResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.commandHandlers.VoidLedgerEntry(ctx, commands.VoidLedgerEntry{
+		Session:         session,
+		LedgerEntryUUID: domain.LedgerEntryUUID{UUID: common.UUID(request.LedgerEntryUuid)},
+		Reason:          request.Body.Reason,
+	}); err != nil {
+		return nil, err
+	}
+
+	return VoidLedgerEntry204Response{}, nil
+}
+
+func toAPILedgerEntry(e queries.LedgerEntryListItem) LedgerEntryListItem {
+	item := LedgerEntryListItem{
+		Uuid:          openapi_types.UUID(common.MustUUIDFromString(e.UUID)),
+		OccurredAt:    e.OccurredAt,
+		Description:   e.Description,
+		Direction:     LedgerEntryDirection(e.Direction),
+		Amount:        e.Amount,
+		BalanceBefore: e.BalanceBefore,
+		BalanceAfter:  e.BalanceAfter,
+		Category:      toAPICategoryRef(e.Category),
+		Tag:           toAPICategoryRef(e.Tag),
+		Status:        e.Status,
+		Kind:          e.Kind,
+		CreatedAt:     e.CreatedAt,
+		CreatedBy:     e.CreatedBy,
+		VoidedReason:  e.VoidedReason,
+		VoidedBy:      e.VoidedBy,
+		VoidedAt:      e.VoidedAt,
+	}
+
+	item.LedgerPeriod.Uuid = domain.LedgerPeriodUUID{UUID: common.MustUUIDFromString(e.LedgerPeriod.UUID)}
+	item.LedgerPeriod.Name = e.LedgerPeriod.Name
+	item.LedgerPeriod.Status = common.MustEnum[domain.LedgerStatus](e.LedgerPeriod.Status)
+
+	item.FundSource.Uuid = domain.FundSourceUUID{UUID: common.MustUUIDFromString(e.FundSource.UUID)}
+	item.FundSource.Name = e.FundSource.Name
+	item.FundSource.BankCode = e.FundSource.BankCode
+	item.FundSource.AccountNumber = e.FundSource.AccountNumber
+
+	item.ReversedByEntryUuid = toOpenAPIUUID(e.ReversedByEntryUUID)
+
+	return item
+}
+
+func toOpenAPIUUID(id *string) *openapi_types.UUID {
+	if id == nil {
+		return nil
+	}
+
+	u := openapi_types.UUID(common.MustUUIDFromString(*id))
+
+	return &u
 }

@@ -103,6 +103,29 @@ const ReconciliationButton = ({
   </Button>
 );
 
+const EntriesButton = ({
+  periodUuid,
+  className,
+}: {
+  periodUuid: string;
+  className?: string;
+}) => (
+  <Button
+    variant="outline"
+    className={className}
+    nativeButton={false}
+    render={
+      <Link
+        to="/ledger-books/$uuid/entries"
+        params={{ uuid: periodUuid }}
+        search={{ page: 1 }}
+      />
+    }
+  >
+    Xem bút toán
+  </Button>
+);
+
 const LedgerDetailsButton = ({
   periodUuid,
   className,
@@ -141,6 +164,7 @@ const DesktopLayout = ({ period, view }: LayoutProps) => {
         </div>
         {/* TODO: wire entries / post-entry / reconciliation once those flows exist. */}
         <div className="flex flex-wrap gap-3">
+          <EntriesButton periodUuid={period.uuid} />
           {isClosed ? (
             <ReconciliationButton periodUuid={period.uuid} />
           ) : (
@@ -148,7 +172,6 @@ const DesktopLayout = ({ period, view }: LayoutProps) => {
               <ClosePeriodButton
                 periodUuid={period.uuid}
                 periodName={period.name}
-                variant="outline"
               />
               <LedgerDetailsButton periodUuid={period.uuid} />
             </>
@@ -192,16 +215,19 @@ const MobileLayout = ({ period, view }: LayoutProps) => {
       </div>
 
       {/* TODO: wire post-entry once that flow exists. */}
-      {!isClosed && (
-        <div className="flex flex-wrap gap-3">
-          <LedgerDetailsButton periodUuid={period.uuid} className="flex-1" />
-          <ClosePeriodButton
-            periodUuid={period.uuid}
-            periodName={period.name}
-            className="flex-1"
-          />
-        </div>
-      )}
+      <div className="flex flex-wrap gap-3">
+        <EntriesButton periodUuid={period.uuid} className="flex-1" />
+        {!isClosed && (
+          <>
+            <LedgerDetailsButton periodUuid={period.uuid} className="flex-1" />
+            <ClosePeriodButton
+              periodUuid={period.uuid}
+              periodName={period.name}
+              className="flex-1"
+            />
+          </>
+        )}
+      </div>
 
       <PeriodAlert view={view} />
 

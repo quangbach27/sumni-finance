@@ -14,7 +14,7 @@ type ListCategories struct {
 }
 
 func (h *Handlers) ListCategories(ctx context.Context, q ListCategories) ([]Category, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  q.Session,
 		Resource: shared.ResourceLedgerCategory,
 		Action:   shared.ActionRead,
@@ -23,5 +23,5 @@ func (h *Handlers) ListCategories(ctx context.Context, q ListCategories) ([]Cate
 		return nil, err
 	}
 
-	return h.categoryReadModel.ListCategories(ctx, res.OrgID)
+	return h.categoryReadModel.ListCategories(ctx, principal.OrgID)
 }

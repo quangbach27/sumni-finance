@@ -11,13 +11,14 @@ import OpenLedgerPeriodTrigger from '../open-period/open-ledger-period-trigger';
 import PastPeriods from './past-periods';
 import UnlockedPeriodCard from './unlocked-period-card';
 
-/** Header button: disabled while a period is unlocked (open or closed). */
+/** Header button: hidden while a period is unlocked (open or closed). */
 export function OpenPeriodHeaderTrigger() {
   const { data: unlocked } = useSuspenseQuery(
     getUnlockedLedgerPeriodQueryOptions(),
   );
+  if (unlocked) return null;
   return (
-    <OpenLedgerPeriodTrigger disabled={!!unlocked}>
+    <OpenLedgerPeriodTrigger>
       <Plus data-icon="inline-start" />
       <span>Mở kỳ mới</span>
     </OpenLedgerPeriodTrigger>

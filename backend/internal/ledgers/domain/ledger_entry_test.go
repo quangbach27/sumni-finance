@@ -23,7 +23,7 @@ func newEntry(t *testing.T) *domain.LedgerEntry {
 	cat.UUID = fs.UUID().UUID // any non-zero uuid
 	e, err := domain.NewLedgerEntry(
 		period, fs.UUID(), decimal.NewFromInt(50), shared.DirectionOutflow,
-		"  lunch  ", time.Now().Add(-time.Hour), &cat,
+		"  lunch  ", time.Now().Add(-time.Hour), &cat, "  user-1  ",
 	)
 	require.NoError(t, err)
 
@@ -52,9 +52,23 @@ func TestNewLedgerEntry(t *testing.T) {
 		t.Parallel()
 		_, err := domain.NewLedgerEntry(
 			domain.LedgerPeriodUUID{}, domain.FundSourceUUID{}, decimal.Zero, shared.Direction{},
-			"  ", time.Time{}, nil,
+			"  ", time.Time{}, nil, "  ",
 		)
 		require.Error(t, err)
+	})
+
+	t.Run("created by is required", func(t *testing.T) {
+		t.Parallel()
+		fs := newFundSource(t, 100)
+		_, err := domain.NewLedgerEntry(
+			newPeriodUUID(), fs.UUID(), decimal.NewFromInt(1), shared.DirectionInflow,
+			"lunch", time.Now().Add(-time.Hour), nil, " ",
+		)
+		require.Error(t, err)
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		require.Len(t, cerr.Details, 1)
+		assert.Equal(t, "created-by-required", cerr.Details[0].ErrorSlug)
 	})
 }
 
@@ -89,8 +103,10 @@ func TestLedgerEntry_Void(t *testing.T) {
 		assert.Equal(t, rev.UUID(), *e.ReversedByEntryID())
 
 		assert.True(t, rev.IsReversal())
+		assert.Equal(t, "user-1", rev.CreatedBy())
 		assert.False(t, rev.IsVoided())
-		assert.Equal(t, e.UUID(), *rev.ReversesEntryID())
+		require.NotNil(t, e.ReversedByEntryID())
+		assert.Equal(t, rev.UUID(), *e.ReversedByEntryID())
 		assert.Equal(t, e.LedgerPeriodUUID(), rev.LedgerPeriodUUID())
 		assert.Equal(t, e.FundSourceUUID(), rev.FundSourceUUID())
 		assert.True(t, e.Amount().Equal(rev.Amount()))
@@ -181,7 +197,7 @@ func TestLedgerEntry_RecordFundSourceSnapshot(t *testing.T) {
 
 		e, err := domain.NewLedgerEntry(
 			period, fs.UUID(), decimal.NewFromInt(30), shared.DirectionOutflow,
-			"lunch", time.Now().Add(-time.Hour), nil,
+			"lunch", time.Now().Add(-time.Hour), nil, "user-1",
 		)
 		require.NoError(t, err)
 

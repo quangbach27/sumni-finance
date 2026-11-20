@@ -16,7 +16,7 @@ type ListFundSourceStatements struct {
 }
 
 func (h *Handlers) ListFundSourceStatements(ctx context.Context, query ListFundSourceStatements) ([]FundSourceStatement, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  query.Session,
 		Resource: shared.ResourceFundSource,
 		Action:   shared.ActionRead,
@@ -25,5 +25,5 @@ func (h *Handlers) ListFundSourceStatements(ctx context.Context, query ListFundS
 		return nil, err
 	}
 
-	return h.statementReadModel.ListFundSourceStatements(ctx, res.OrgID, query.LedgerPeriodUUID)
+	return h.statementReadModel.ListFundSourceStatements(ctx, principal.OrgID, query.LedgerPeriodUUID)
 }

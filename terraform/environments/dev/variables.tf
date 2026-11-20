@@ -32,3 +32,9 @@ variable "lightsail_scale" {
   type    = number
   default = 1
 }
+
+variable "bastion_enabled" {
+  description = "Run the SSM bastion used for ad-hoc psql access to the private database."
+  type        = bool
+  default     = true
+}

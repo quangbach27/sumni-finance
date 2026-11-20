@@ -63,16 +63,16 @@ type LedgerPeriodRepository interface {
 		fundSourceUUIDs []FundSourceUUID,
 		postFn func(period *LedgerPeriod, fundSources map[FundSourceUUID]*FundSource) ([]*LedgerEntry, error),
 	) error
-	// VoidJournalEntry voids one entry of a period. voidFn receives the period,
-	// the entry to void and its fund source; it voids the entry, applies the
-	// reversal to the fund source (recording the snapshot) and returns the
-	// reversal entry. The repository then stores the voided entry, the reversal
-	// and the updated fund source balance, all or nothing.
+	// VoidJournalEntry voids one entry in a serializable transaction (no row
+	// locks; a concurrent change fails the transaction and it is retried). It
+	// loads the entry, its period and its fund source, fails with 409
+	// `period-not-open` unless the period is open, voids the entry, applies the
+	// reversal to the fund source (recording the snapshot), then stores the
+	// reversal, the voided entry and the fund source balance, all or nothing.
 	VoidJournalEntry(
 		ctx context.Context,
 		orgID string,
-		ledgerPeriodUUID LedgerPeriodUUID,
 		ledgerEntryUUID LedgerEntryUUID,
-		voidFn func(period *LedgerPeriod, entry *LedgerEntry, fundSource *FundSource) (*LedgerEntry, error),
+		reason, voidedBy string,
 	) error
 }

@@ -13,6 +13,8 @@ CREATE TABLE ledgers.ledger_periods (
     reopened_at     timestamptz,
     reconciled_at   timestamptz,
     created_at      timestamptz NOT NULL DEFAULT now(),
+    -- target of the composite (org_id, ledger_period_uuid) foreign keys
+    CONSTRAINT ledger_periods_org_uuid_unique UNIQUE (org_id, uuid),
     CONSTRAINT ledger_periods_dates_valid CHECK (close_date >= open_date),
     CONSTRAINT ledger_periods_reconciled_fields CHECK (
         status <> 'reconciled'

@@ -21,7 +21,7 @@ type ReconcileFundSourceStatements struct {
 // with its closing balance. The repository validates and reconciles them all
 // or none.
 func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, cmd ReconcileFundSourceStatements) error {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceFundSource,
 		Action:   shared.ActionUpdate,
@@ -30,7 +30,7 @@ func (h *Handlers) ReconcileFundSourceStatements(ctx context.Context, cmd Reconc
 		return err
 	}
 
-	if err := h.periodRepo.ReconcileFundSourceStatements(ctx, res.OrgID, cmd.LedgerPeriodUUID, res.UserID, cmd.Statements); err != nil {
+	if err := h.periodRepo.ReconcileFundSourceStatements(ctx, principal.OrgID, cmd.LedgerPeriodUUID, principal.UserID, cmd.Statements); err != nil {
 		return err
 	}
 

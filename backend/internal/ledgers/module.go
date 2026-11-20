@@ -122,7 +122,12 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 
-	queryHandlers, err := queries.NewHandlers(m.contracts, fsReadModel, periodReadModel, statementReadModel, categoryReadModel)
+	entryReadModel, err := db.NewLedgerEntryReadModel(m.pgxDb)
+	if err != nil {
+		return err
+	}
+
+	queryHandlers, err := queries.NewHandlers(m.contracts, fsReadModel, periodReadModel, statementReadModel, categoryReadModel, entryReadModel)
 	if err != nil {
 		return err
 	}

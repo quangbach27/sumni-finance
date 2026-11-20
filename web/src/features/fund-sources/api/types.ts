@@ -7,6 +7,7 @@ export type FundSource = Omit<Schemas['FundSource'], 'balance'> & {
   balance: number;
 };
 export type ListFundSourcesResponse = Schemas['ListFundSourcesResponse'];
+export type GetFundSourceResponse = Schemas['GetFundSourceResponse'];
 export type CreateFundSourceRequest = Schemas['CreateFundSourceRequest'];
 export type CreateFundSourceResponse = Schemas['CreateFundSourceResponse'];
 export type FundSourceDetailsRequest = Schemas['FundSourceDetails'];

@@ -52,7 +52,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 		return nil, err
 	}
 
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerEntry,
 		Action:   shared.ActionCreate,
@@ -63,7 +63,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 	}
 
 	// Validate the whole batch before touching the database.
-	if _, err := buildLedgerEntries(cmd); err != nil {
+	if _, err := buildLedgerEntries(cmd, principal.UserID); err != nil {
 		return nil, err
 	}
 
@@ -71,7 +71,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 
 	err = h.periodRepo.PostJournalEntries(
 		ctx,
-		res.OrgID,
+		principal.OrgID,
 		cmd.LedgerPeriodUUID,
 		[]domain.FundSourceUUID{cmd.FundSourceUUID},
 		func(period *domain.LedgerPeriod, fundSources map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {
@@ -81,7 +81,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 
 			// postFn can run again when the transaction is retried, so build the
 			// entries here on every call instead of reusing them.
-			entries, err := buildLedgerEntries(cmd)
+			entries, err := buildLedgerEntries(cmd, principal.UserID)
 			if err != nil {
 				return nil, err
 			}
@@ -126,7 +126,7 @@ func (h *Handlers) PostLedgerEntries(ctx context.Context, cmd PostLedgerEntries)
 
 // buildLedgerEntries creates the entries of the command. Validation failures of
 // all entries are returned together, each detail tagged with the entry index.
-func buildLedgerEntries(cmd PostLedgerEntries) ([]*domain.LedgerEntry, error) {
+func buildLedgerEntries(cmd PostLedgerEntries, createdBy string) ([]*domain.LedgerEntry, error) {
 	entries := make([]*domain.LedgerEntry, 0, len(cmd.Entries))
 
 	var details []common.ErrorDetails
@@ -140,6 +140,7 @@ func buildLedgerEntries(cmd PostLedgerEntries) ([]*domain.LedgerEntry, error) {
 			in.Description,
 			in.OccurredAt,
 			in.CategoryUUID,
+			createdBy,
 		)
 		if err != nil {
 			var cerr common.Error

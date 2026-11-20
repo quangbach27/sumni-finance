@@ -15,6 +15,8 @@ CREATE TABLE ledgers.fund_sources (
     bank_short_name text,
     account_number  text,
     created_at      timestamptz NOT NULL DEFAULT now(),
+    -- target of the composite (org_id, fund_source_uuid) foreign keys
+    CONSTRAINT fund_sources_org_uuid_unique UNIQUE (org_id, uuid),
     CONSTRAINT fund_sources_bank_details_required CHECK (
         type <> 'bank'
         OR (

@@ -72,8 +72,8 @@ type LedgerEntry struct {
 	voidedBy          *string
 	voidedAt          *time.Time
 
-	// set on the reversal entry
-	reversesEntryID *LedgerEntryUUID
+	// id of the user who created the entry (for a reversal: who voided)
+	createdBy string
 }
 
 func NewLedgerEntry(
@@ -84,8 +84,10 @@ func NewLedgerEntry(
 	description string,
 	occurredAt time.Time,
 	categoryUUID *models.CategoryUUID,
+	createdBy string,
 ) (*LedgerEntry, error) {
 	description = strings.TrimSpace(description)
+	createdBy = strings.TrimSpace(createdBy)
 
 	var errDetails []common.ErrorDetails
 	add := func(slug, msg string) {
@@ -114,6 +116,9 @@ func NewLedgerEntry(
 	if occurredAt.IsZero() {
 		add("occurred-at-required", "occurred at is required")
 	}
+	if createdBy == "" {
+		add("created-by-required", "created by is required")
+	}
 	if len(errDetails) > 0 {
 		return nil, common.NewInvalidInputError("invalid-ledger-entry", "invalid ledger entry").WithDetails(errDetails)
 	}
@@ -129,6 +134,7 @@ func NewLedgerEntry(
 		categoryUUID:     categoryUUID,
 		status:           EntryStatusPosted,
 		kind:             EntryKindNormal,
+		createdBy:        createdBy,
 	}, nil
 }
 
@@ -143,10 +149,10 @@ func (e *LedgerEntry) CategoryUUID() *models.CategoryUUID  { return e.categoryUU
 func (e *LedgerEntry) Status() EntryStatus                 { return e.status }
 func (e *LedgerEntry) Kind() EntryKind                     { return e.kind }
 func (e *LedgerEntry) ReversedByEntryID() *LedgerEntryUUID { return e.reversedByEntryID }
-func (e *LedgerEntry) ReversesEntryID() *LedgerEntryUUID   { return e.reversesEntryID }
 func (e *LedgerEntry) VoidedReason() *string               { return e.voidedReason }
 func (e *LedgerEntry) VoidedBy() *string                   { return e.voidedBy }
 func (e *LedgerEntry) VoidedAt() *time.Time                { return e.voidedAt }
+func (e *LedgerEntry) CreatedBy() string                   { return e.createdBy }
 
 func (e *LedgerEntry) FundSourceBalanceBefore() decimal.Decimal { return e.fsBalanceBefore }
 func (e *LedgerEntry) FundSourceBalanceAfter() decimal.Decimal  { return e.fsBalanceAfter }
@@ -229,7 +235,7 @@ func (e *LedgerEntry) Void(reason, voidedBy string) (*LedgerEntry, error) {
 		categoryUUID:     e.categoryUUID,
 		status:           EntryStatusPosted,
 		kind:             EntryKindReversal,
-		reversesEntryID:  &originalUUID,
+		createdBy:        voidedBy,
 	}
 
 	reversalUUID := reversal.uuid

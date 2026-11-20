@@ -7,6 +7,7 @@ tags:
   - name: fund-sources
   - name: ledger-periods
   - name: categories
+  - name: ledger-entries
 
 paths:
   /api/v1/fund-sources:
@@ -46,6 +47,183 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/fund-sources/{fund_source_uuid}:
+    get:
+      tags: [fund-sources]
+      operationId: getFundSource
+      summary: Get a fund source
+      parameters:
+        - name: fund_source_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/FundSourceUUID"
+      responses:
+        "200":
+          description: The fund source.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetFundSourceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-entries:
+    get:
+      tags: [ledger-entries]
+      operationId: listLedgerEntries
+      summary: List ledger entries
+      description: >-
+        Entries across all ledger periods, optionally of one fund source and
+        within a date range. Always sorted by occurred_at, then by creation order,
+        newest first.
+      parameters:
+        - name: fund_source_uuid
+          in: query
+          required: false
+          explode: false
+          schema:
+            $ref: "#/components/schemas/FundSourceUUID"
+        - name: category_uuid
+          in: query
+          required: false
+          explode: false
+          description: A category; also matches entries of its sub-categories (tags).
+          schema:
+            $ref: "#/components/schemas/CategoryUUID"
+        - name: ledger_period_uuid
+          in: query
+          required: false
+          explode: false
+          schema:
+            $ref: "#/components/schemas/LedgerPeriodUUID"
+        - name: from_date
+          in: query
+          required: false
+          description: Inclusive lower bound of occurred_at.
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          required: false
+          description: Inclusive upper bound of occurred_at.
+          schema:
+            type: string
+            format: date-time
+        - name: kind
+          in: query
+          required: false
+          explode: false
+          description: Only entries of this kind; omit for both.
+          schema:
+            $ref: "#/components/schemas/LedgerEntryKind"
+        - name: status
+          in: query
+          required: false
+          description: Only entries of this status; omit or `all` for both.
+          schema:
+            type: string
+            enum: [posted, voided, all]
+            default: all
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: A page of ledger entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLedgerEntriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-entries/{ledger_entry_uuid}:
+    get:
+      tags: [ledger-entries]
+      operationId: getLedgerEntry
+      summary: Get a ledger entry
+      description: Any entry, including a reversal entry.
+      parameters:
+        - name: ledger_entry_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The ledger entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetLedgerEntryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-entries/{ledger_entry_uuid}/void:
+    post:
+      tags: [ledger-entries]
+      operationId: voidLedgerEntry
+      summary: Void a ledger entry
+      description: >
+        Voids a posted entry by posting a reversal entry that restores the fund
+        source balance. The entry is kept. Only allowed while the entry's period
+        is opened (409 `period-not-open`). Fails with 400
+        `ledger-entry-already-voided`, `reversal-entry-cannot-be-voided` or
+        `void-reason-required`.
+      parameters:
+        - name: ledger_entry_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidLedgerEntryRequest"
+      responses:
+        "204":
+          description: Ledger entry voided
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -552,6 +730,147 @@ components:
         fund_source_uuid:
           $ref: "#/components/schemas/FundSourceUUID"
 
+    GetFundSourceResponse:
+      type: object
+      required: [fund_source]
+      properties:
+        fund_source:
+          $ref: "#/components/schemas/FundSource"
+        latest_entry_at:
+          type: string
+          format: date-time
+          description: occurred_at of the latest entry; absent without entries.
+
+    LedgerEntryCategoryRef:
+      type: object
+      required: [uuid, name]
+      properties:
+        uuid:
+          $ref: "#/components/schemas/CategoryUUID"
+        name:
+          type: string
+
+    LedgerEntryDirection:
+      type: string
+      enum: [inflow, outflow]
+
+    LedgerEntryKind:
+      type: string
+      enum: [normal, reversal]
+      x-go-type: domain.EntryKind
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    LedgerEntryStatus:
+      type: string
+      enum: [posted, voided]
+      x-go-type: domain.EntryStatus
+      x-go-type-import:
+        path: backend/internal/ledgers/domain
+
+    LedgerEntryListItem:
+      type: object
+      required:
+        - uuid
+        - ledger_period
+        - fund_source
+        - occurred_at
+        - description
+        - direction
+        - amount
+        - balance_before
+        - balance_after
+        - status
+        - kind
+        - created_at
+        - created_by
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        ledger_period:
+          type: object
+          required: [uuid, name, status]
+          properties:
+            uuid:
+              $ref: "#/components/schemas/LedgerPeriodUUID"
+            name:
+              type: string
+            status:
+              $ref: "#/components/schemas/LedgerStatus"
+        fund_source:
+          type: object
+          required: [uuid, name]
+          properties:
+            uuid:
+              $ref: "#/components/schemas/FundSourceUUID"
+            name:
+              type: string
+            bank_code:
+              type: string
+              description: Bank only.
+            account_number:
+              type: string
+              description: Bank only.
+        occurred_at:
+          type: string
+          format: date-time
+        description:
+          type: string
+        direction:
+          $ref: "#/components/schemas/LedgerEntryDirection"
+        amount:
+          $ref: "#/components/schemas/Decimal"
+        balance_before:
+          $ref: "#/components/schemas/Decimal"
+        balance_after:
+          $ref: "#/components/schemas/Decimal"
+        category:
+          $ref: "#/components/schemas/LedgerEntryCategoryRef"
+        tag:
+          allOf:
+            - $ref: "#/components/schemas/LedgerEntryCategoryRef"
+          description: The sub-category, when the entry has one.
+        status:
+          $ref: "#/components/schemas/LedgerEntryStatus"
+        kind:
+          $ref: "#/components/schemas/LedgerEntryKind"
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          description: Id of the user who created the entry.
+        reversed_by_entry_uuid:
+          type: string
+          format: uuid
+          description: Set on a voided entry; its reversal entry.
+        voided_reason:
+          type: string
+        voided_by:
+          type: string
+        voided_at:
+          type: string
+          format: date-time
+
+    GetLedgerEntryResponse:
+      type: object
+      required: [entry]
+      properties:
+        entry:
+          $ref: "#/components/schemas/LedgerEntryListItem"
+
+    ListLedgerEntriesResponse:
+      type: object
+      required: [items, page_info]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntryListItem"
+        page_info:
+          $ref: "#/components/schemas/PageInfo"
+
     LedgerPeriodUUID:
       type: string
       format: uuid
@@ -641,6 +960,14 @@ components:
       properties:
         reason:
           type: string
+
+    VoidLedgerEntryRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 200
 
     OpenLedgerPeriodRequest:
       type: object
@@ -868,7 +1195,14 @@ components:
       allOf:
         - $ref: "#/components/schemas/LedgerPeriod"
         - type: object
-          required: [total_inflow, total_outflow, entry_count, statements, category_summaries]
+          required:
+            [
+              total_inflow,
+              total_outflow,
+              entry_count,
+              statements,
+              category_summaries,
+            ]
           properties:
             total_inflow:
               $ref: "#/components/schemas/Decimal"

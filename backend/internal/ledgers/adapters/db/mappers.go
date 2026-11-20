@@ -74,9 +74,10 @@ func ledgerPeriodToDomain(row dbmodels.LedgersLedgerPeriod) *domain.LedgerPeriod
 	)
 }
 
-func ledgerEntryToInsertParams(e *domain.LedgerEntry) dbmodels.InsertLedgerEntriesParams {
+func ledgerEntryToInsertParams(orgID string, e *domain.LedgerEntry) dbmodels.InsertLedgerEntriesParams {
 	return dbmodels.InsertLedgerEntriesParams{
 		Uuid:             e.UUID(),
+		OrgID:            orgID,
 		LedgerPeriodUuid: e.LedgerPeriodUUID(),
 		FundSourceUuid:   e.FundSourceUUID(),
 		Amount:           e.Amount(),
@@ -88,6 +89,7 @@ func ledgerEntryToInsertParams(e *domain.LedgerEntry) dbmodels.InsertLedgerEntri
 		FsBalanceAfter:   e.FundSourceBalanceAfter(),
 		Status:           e.Status(),
 		Kind:             e.Kind(),
+		CreatedBy:        e.CreatedBy(),
 	}
 }
 
@@ -102,5 +104,28 @@ func fundSourceStatementToDomain(row dbmodels.LedgersFundSourceStatement) *domai
 		row.ActualBalance,
 		row.ReconciledBy,
 		row.ReconciledAt,
+	)
+}
+
+// ledgerEntryToDomain rebuilds an entry from a row (trusted, no validation).
+func ledgerEntryToDomain(row dbmodels.LedgersLedgerEntry) *domain.LedgerEntry {
+	return domain.UnmarshalLedgerEntry(
+		row.Uuid,
+		row.LedgerPeriodUuid,
+		row.FundSourceUuid,
+		row.Amount,
+		row.Direction,
+		row.Description,
+		row.OccurredAt,
+		row.CategoryUuid,
+		row.FsBalanceBefore,
+		row.FsBalanceAfter,
+		row.Status,
+		row.Kind,
+		row.ReversedByEntryUuid,
+		row.VoidedReason,
+		row.VoidedBy,
+		row.VoidedAt,
+		row.CreatedBy,
 	)
 }

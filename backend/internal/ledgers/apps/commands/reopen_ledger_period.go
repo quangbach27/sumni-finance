@@ -20,7 +20,7 @@ type ReopenLedgerPeriod struct {
 // ReopenLedgerPeriod reopens a closed period. The repository clears the closing
 // balance of its fund source statements.
 func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, cmd ReopenLedgerPeriod) error {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerPeriod,
 		Action:   shared.ActionUpdate,
@@ -29,7 +29,7 @@ func (h *Handlers) ReopenLedgerPeriod(ctx context.Context, cmd ReopenLedgerPerio
 		return err
 	}
 
-	if err := h.periodRepo.ReopenLedgerPeriod(ctx, res.OrgID, cmd.LedgerPeriodUUID, cmd.Reason); err != nil {
+	if err := h.periodRepo.ReopenLedgerPeriod(ctx, principal.OrgID, cmd.LedgerPeriodUUID, cmd.Reason); err != nil {
 		return err
 	}
 

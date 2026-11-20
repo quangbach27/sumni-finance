@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/input-group';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { useOrgMembers } from '@/hooks/use-org-members';
 import { isApiError } from '@/lib/clients';
 
 import {
@@ -37,11 +38,11 @@ import {
   useGrantAccountants,
   useRevokeAccountant,
 } from '../../../api/access-grants';
-import { useOrgMembers } from '../../../api/use-org-members';
 
 import type { AccessGrant } from '../../../api/access-grants';
-import type { OrgMember } from '../../../api/use-org-members';
+import type { FundSource } from '../../../api/types';
 import type { FundSourceActionDialogProps } from '../types';
+import type { OrgMember } from '@/hooks/use-org-members';
 import type { ReactNode } from 'react';
 
 const getInitials = (name: string) =>
@@ -81,7 +82,12 @@ const AccountantRow = ({
   </div>
 );
 
-type ContentProps = FundSourceActionDialogProps & {
+type DialogBodyProps = {
+  fundSource: FundSource;
+  onClose: () => void;
+};
+
+type ContentProps = DialogBodyProps & {
   grants: AccessGrant[];
 };
 
@@ -113,6 +119,7 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
       owner && normalize(member.name).includes(owner) ? 0 : 1;
 
     return members
+      .filter((member) => member.role === 'office_accountant')
       .filter((member) => !userIds.includes(member.userId))
       .filter(
         (member) =>
@@ -129,6 +136,7 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
       name: userId,
       email: '',
       imageUrl: '',
+      role: '',
     };
 
   const submit = () =>
@@ -227,7 +235,9 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
           {membersLoading && <Skeleton className="h-14 w-full" />}
           {!membersLoading && suggestions.length === 0 && (
             <span className="text-muted-foreground py-3 text-sm">
-              Không có thành viên phù hợp.
+              {search.trim()
+                ? 'Không có thành viên phù hợp.'
+                : 'Chưa có thành viên nào có vai trò Kế toán.'}
             </span>
           )}
           {suggestions.map((member) => (
@@ -324,7 +334,7 @@ const AccountantsContent = ({ fundSource, grants, onClose }: ContentProps) => {
   );
 };
 
-const AccountantsLoader = (props: FundSourceActionDialogProps) => {
+const AccountantsLoader = (props: DialogBodyProps) => {
   const query = useQuery(accountantGrantsQueryOptions(props.fundSource.uuid));
 
   if (query.isPending) return <Skeleton className="h-48 w-full" />;
@@ -353,13 +363,18 @@ const AccountantsLoader = (props: FundSourceActionDialogProps) => {
   return <AccountantsContent {...props} grants={query.data} />;
 };
 
-export default function AccountantsActionDialog(
-  props: FundSourceActionDialogProps,
-) {
+export default function AccountantsActionDialog({
+  fundSource,
+  open,
+  onOpenChange,
+}: FundSourceActionDialogProps) {
   return (
-    <Dialog open onOpenChange={(open) => !open && props.onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <AccountantsLoader {...props} />
+        <AccountantsLoader
+          fundSource={fundSource}
+          onClose={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );

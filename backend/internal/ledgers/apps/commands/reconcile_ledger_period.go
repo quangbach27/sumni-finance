@@ -20,7 +20,7 @@ type ReconcileLedgerPeriod struct {
 // is reconciled. The repository checks the statements and sets the closing
 // balance.
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, cmd ReconcileLedgerPeriod) error {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerPeriod,
 		Action:   shared.ActionUpdate,
@@ -29,7 +29,7 @@ func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, cmd ReconcileLedge
 		return err
 	}
 
-	if err := h.periodRepo.ReconcileLedgerPeriod(ctx, res.OrgID, cmd.LedgerPeriodUUID); err != nil {
+	if err := h.periodRepo.ReconcileLedgerPeriod(ctx, principal.OrgID, cmd.LedgerPeriodUUID); err != nil {
 		return err
 	}
 

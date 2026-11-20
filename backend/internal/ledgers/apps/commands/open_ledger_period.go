@@ -25,7 +25,7 @@ type OpenLedgerPeriod struct {
 // selected fund sources' balances. The repository refuses to open one while an
 // unlocked (not reconciled) period exists.
 func (h *Handlers) OpenLedgerPeriod(ctx context.Context, cmd OpenLedgerPeriod) (domain.LedgerPeriodUUID, error) {
-	res, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
+	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerPeriod,
 		Action:   shared.ActionCreate,
@@ -36,7 +36,7 @@ func (h *Handlers) OpenLedgerPeriod(ctx context.Context, cmd OpenLedgerPeriod) (
 
 	var periodUUID domain.LedgerPeriodUUID
 
-	err = h.periodRepo.OpenLedgerPeriod(ctx, res.OrgID, cmd.FundSourceUUIDs, func(fundSources []*domain.FundSource) (*domain.LedgerPeriod, error) {
+	err = h.periodRepo.OpenLedgerPeriod(ctx, principal.OrgID, cmd.FundSourceUUIDs, func(fundSources []*domain.FundSource) (*domain.LedgerPeriod, error) {
 		openingBalance := decimal.Zero
 		for _, fs := range fundSources {
 			openingBalance = openingBalance.Add(fs.Balance())

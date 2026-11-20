@@ -11,6 +11,12 @@ import (
 
 type FundSourceReadModel interface {
 	ListFundSources(ctx context.Context, orgID string) ([]FundSource, error)
+	GetFundSource(ctx context.Context, orgID string, fundSourceUUID domain.FundSourceUUID) (FundSourceDetail, error)
+}
+
+type LedgerEntryReadModel interface {
+	ListLedgerEntries(ctx context.Context, orgID string, query ListLedgerEntries) (shared.PagedResult[LedgerEntryListItem], error)
+	GetLedgerEntry(ctx context.Context, orgID string, ledgerEntryUUID domain.LedgerEntryUUID) (LedgerEntryListItem, error)
 }
 
 type LedgerPeriodReadModel interface {
@@ -38,6 +44,7 @@ type Handlers struct {
 	periodReadModel    LedgerPeriodReadModel
 	statementReadModel FundSourceStatementReadModel
 	categoryReadModel  CategoryReadModel
+	entryReadModel     LedgerEntryReadModel
 }
 
 func NewHandlers(
@@ -46,6 +53,7 @@ func NewHandlers(
 	periodReadModel LedgerPeriodReadModel,
 	statementReadModel FundSourceStatementReadModel,
 	categoryReadModel CategoryReadModel,
+	entryReadModel LedgerEntryReadModel,
 ) (*Handlers, error) {
 	var errs []error
 
@@ -69,6 +77,10 @@ func NewHandlers(
 		errs = append(errs, errors.New("category read model can't be nil"))
 	}
 
+	if entryReadModel == nil {
+		errs = append(errs, errors.New("ledger entry read model can't be nil"))
+	}
+
 	if len(errs) != 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -79,5 +91,6 @@ func NewHandlers(
 		periodReadModel:    periodReadModel,
 		statementReadModel: statementReadModel,
 		categoryReadModel:  categoryReadModel,
+		entryReadModel:     entryReadModel,
 	}, nil
 }

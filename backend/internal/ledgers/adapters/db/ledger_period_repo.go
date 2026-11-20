@@ -17,8 +17,6 @@ import (
 	"backend/internal/ledgers/domain"
 )
 
-var errNotImplemented = errors.New("not implemented")
-
 type LedgerPeriodRepo struct {
 	db *pgxpool.Pool
 }
@@ -113,7 +111,7 @@ func (r *LedgerPeriodRepo) PostJournalEntries(
 			return err
 		}
 
-		if err := saveJournalEntries(ctx, q, entries); err != nil {
+		if err := saveEntries(ctx, q, orgID, entries); err != nil {
 			return err
 		}
 
@@ -147,6 +145,24 @@ func getLedgerPeriodByUUID(
 	}
 
 	return ledgerPeriodToDomain(row), nil
+}
+
+func getLedgerEntryByUUID(
+	ctx context.Context,
+	q *dbmodels.Queries,
+	orgID string,
+	ledgerEntryUUID domain.LedgerEntryUUID,
+) (*domain.LedgerEntry, error) {
+	row, err := q.GetLedgerEntryByUUID(ctx, dbmodels.GetLedgerEntryByUUIDParams{OrgID: orgID, Uuid: ledgerEntryUUID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, common.NewNotFoundError("ledger-entry-not-found", "ledger entry %s was not found", ledgerEntryUUID.String())
+		}
+
+		return nil, err
+	}
+
+	return ledgerEntryToDomain(row), nil
 }
 
 // listFundSourcesByUUIDs validates the UUIDs (not empty, not zero, no
@@ -313,9 +329,9 @@ func validateEntryCategories(
 	return nil
 }
 
-// saveJournalEntries inserts the entries. Each entry must have its fund source
+// saveEntries inserts the entries. Each entry must have its fund source
 // snapshot recorded.
-func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, entries []*domain.LedgerEntry) error {
+func saveEntries(ctx context.Context, q *dbmodels.Queries, orgID string, entries []*domain.LedgerEntry) error {
 	if len(entries) == 0 {
 		return errors.New("postFn returned no ledger entries")
 	}
@@ -329,7 +345,7 @@ func saveJournalEntries(ctx context.Context, q *dbmodels.Queries, entries []*dom
 			return fmt.Errorf("ledger entry %s has no fund source snapshot", e.UUID().String())
 		}
 
-		params = append(params, ledgerEntryToInsertParams(e))
+		params = append(params, ledgerEntryToInsertParams(orgID, e))
 	}
 
 	_, err := q.InsertLedgerEntries(ctx, params)
@@ -436,17 +452,90 @@ func validateFundSourceUUIDs(uuids []domain.FundSourceUUID) error {
 	return nil
 }
 
-// TODO: in a serializable tx, lock the entry row (FOR UPDATE), call voidFn,
-// insert the reversal entry, mark the original voided and update the fund
-// source balance.
+// VoidJournalEntry runs in a serializable transaction without row locks: a
+// concurrent change makes the transaction fail and it is retried.
 func (r *LedgerPeriodRepo) VoidJournalEntry(
 	ctx context.Context,
 	orgID string,
-	ledgerPeriodUUID domain.LedgerPeriodUUID,
 	ledgerEntryUUID domain.LedgerEntryUUID,
-	voidFn func(period *domain.LedgerPeriod, entry *domain.LedgerEntry, fundSource *domain.FundSource) (*domain.LedgerEntry, error),
+	reason, voidedBy string,
 ) error {
-	return errNotImplemented
+	if ledgerEntryUUID.IsZero() {
+		return common.NewInvalidInputError("ledger-entry-required", "ledger entry is required")
+	}
+
+	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := dbmodels.New(tx)
+
+		entry, err := getLedgerEntryByUUID(ctx, q, orgID, ledgerEntryUUID)
+		if err != nil {
+			return err
+		}
+
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, entry.LedgerPeriodUUID())
+		if err != nil {
+			return err
+		}
+		if !period.CanPostEntries() {
+			return common.NewConflictError("period-not-open", "ledger period %s does not accept changes", period.UUID().String())
+		}
+
+		fundSources, err := listFundSourcesInPeriod(ctx, q, orgID, entry.LedgerPeriodUUID(), []domain.FundSourceUUID{entry.FundSourceUUID()})
+		if err != nil {
+			return err
+		}
+		fundSource, ok := fundSources[entry.FundSourceUUID()]
+		if !ok {
+			return common.NewNotFoundError("fund-source-not-found", "fund source %s was not found", entry.FundSourceUUID().String())
+		}
+
+		reversal, err := entry.Void(reason, voidedBy)
+		if err != nil {
+			return err
+		}
+
+		var snapshot domain.FundSourceSnapshot
+		if reversal.IsInflow() {
+			snapshot, err = fundSource.TopUp(reversal.Amount())
+		} else {
+			snapshot, err = fundSource.Withdraw(reversal.Amount())
+		}
+		if err != nil {
+			return err
+		}
+		if err := reversal.RecordFundSourceSnapshot(snapshot); err != nil {
+			return err
+		}
+
+		// The reversal goes first: the voided entry references it.
+		if err := saveEntries(ctx, q, orgID, []*domain.LedgerEntry{reversal}); err != nil {
+			return err
+		}
+
+		if err := q.MarkLedgerEntryVoided(ctx, dbmodels.MarkLedgerEntryVoidedParams{
+			OrgID:               orgID,
+			Uuid:                entry.UUID(),
+			Status:              entry.Status(),
+			ReversedByEntryUuid: entry.ReversedByEntryID(),
+			VoidedReason:        entry.VoidedReason(),
+			VoidedBy:            entry.VoidedBy(),
+			VoidedAt:            entry.VoidedAt(),
+		}); err != nil {
+			return err
+		}
+
+		return updateFundSourceBalances(ctx, q, orgID, fundSources)
+	})
+	if err != nil {
+		var cerr common.Error
+		if errors.As(err, &cerr) {
+			return err
+		}
+
+		return fmt.Errorf("void journal entry: %w", err)
+	}
+
+	return nil
 }
 
 func (r *LedgerPeriodRepo) CloseLedgerPeriod(

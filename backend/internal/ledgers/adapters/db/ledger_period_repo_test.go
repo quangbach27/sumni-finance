@@ -183,7 +183,7 @@ func postFnFor(t *testing.T, specs []entrySpec) func(*domain.LedgerPeriod, map[d
 		entries := make([]*domain.LedgerEntry, 0, len(specs))
 		for _, s := range specs {
 			e, err := domain.NewLedgerEntry(period.UUID(), s.fs.UUID(), decimal.NewFromInt(s.amount), s.direction,
-				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), nil)
+				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), nil, "user_test")
 			if err != nil {
 				return nil, err
 			}
@@ -257,6 +257,28 @@ func TestLedgerPeriodRepo_PostJournalEntries(t *testing.T) {
 		// 1000 -> 700 (outflow 300), 700 -> 800 (inflow 100)
 		assert.True(t, got[0].before.Equal(decimal.NewFromInt(1000)) && got[0].after.Equal(decimal.NewFromInt(700)))
 		assert.True(t, got[1].before.Equal(decimal.NewFromInt(700)) && got[1].after.Equal(decimal.NewFromInt(800)))
+
+		var createdBy []string
+		creators, err := pgxDb.Query(ctx, "SELECT DISTINCT created_by FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs1.UUID())
+		require.NoError(t, err)
+		defer creators.Close()
+		for creators.Next() {
+			var c string
+			require.NoError(t, creators.Scan(&c))
+			createdBy = append(createdBy, c)
+		}
+		assert.Equal(t, []string{"user_test"}, createdBy)
+
+		var orgIDs []string
+		orgRows, err := pgxDb.Query(ctx, "SELECT DISTINCT org_id FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs1.UUID())
+		require.NoError(t, err)
+		defer orgRows.Close()
+		for orgRows.Next() {
+			var o string
+			require.NoError(t, orgRows.Scan(&o))
+			orgIDs = append(orgIDs, o)
+		}
+		assert.Equal(t, []string{testOrgID}, orgIDs)
 	})
 
 	t.Run("insufficient balance rolls back the whole batch", func(t *testing.T) {
@@ -557,5 +579,73 @@ func TestLedgerPeriodRepo_ReconcileLedgerPeriod(t *testing.T) {
 		var cerr common.Error
 		require.ErrorAs(t, err, &cerr)
 		assert.Equal(t, "ledger-period-not-found", cerr.ErrorSlug)
+	})
+}
+
+func TestLedgerPeriodRepo_VoidJournalEntry(t *testing.T) {
+	ctx := context.Background()
+	repo, err := ledgerdb.NewLedgerPeriodRepository(pgxDb)
+	require.NoError(t, err)
+
+	postOutflow := func(t *testing.T) (*domain.FundSource, *domain.LedgerPeriod, domain.LedgerEntryUUID) {
+		t.Helper()
+
+		resetPeriods(t, ctx)
+		fs := createCashFundSource(t, ctx, 1_000)
+		period := openPeriodFor(t, ctx, fs)
+		require.NoError(t, repo.PostJournalEntries(ctx, testOrgID, period.UUID(),
+			[]domain.FundSourceUUID{fs.UUID()}, postFnFor(t, []entrySpec{{fs, shared.DirectionOutflow, 300}})))
+
+		var id domain.LedgerEntryUUID
+		require.NoError(t, pgxDb.QueryRow(ctx, "SELECT uuid FROM ledgers.ledger_entries WHERE fund_source_uuid = $1", fs.UUID()).Scan(&id))
+
+		return fs, period, id
+	}
+
+	t.Run("stores the reversal, marks the entry voided and restores the balance", func(t *testing.T) {
+		fs, _, id := postOutflow(t)
+
+		require.NoError(t, repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test"))
+
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(1000)))
+
+		var status, reason string
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT status, voided_reason FROM ledgers.ledger_entries WHERE uuid = $1", id).Scan(&status, &reason))
+		assert.Equal(t, "voided", status)
+		assert.Equal(t, "wrong amount", reason)
+
+		var reversals int
+		require.NoError(t, pgxDb.QueryRow(ctx,
+			"SELECT count(*) FROM ledgers.ledger_entries r JOIN ledgers.ledger_entries o ON o.reversed_by_entry_uuid = r.uuid WHERE o.uuid = $1 AND r.kind = 'reversal'", id).Scan(&reversals))
+		assert.Equal(t, 1, reversals)
+	})
+
+	t.Run("voiding twice fails and changes nothing", func(t *testing.T) {
+		fs, _, id := postOutflow(t)
+		require.NoError(t, repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test"))
+
+		err := repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ledger-entry-already-voided")
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(1000)))
+	})
+
+	t.Run("unknown entry is not found", func(t *testing.T) {
+		postOutflow(t)
+
+		err := repo.VoidJournalEntry(ctx, testOrgID, domain.LedgerEntryUUID{UUID: common.NewUUIDv7()}, "wrong amount", "user_test")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ledger-entry-not-found")
+	})
+
+	t.Run("a closed period rejects the void and changes nothing", func(t *testing.T) {
+		fs, period, id := postOutflow(t)
+		require.NoError(t, repo.CloseLedgerPeriod(ctx, testOrgID, period.UUID()))
+
+		err := repo.VoidJournalEntry(ctx, testOrgID, id, "wrong amount", "user_test")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "period-not-open")
+		assert.True(t, fsBalance(t, ctx, fs).Equal(decimal.NewFromInt(700)))
 	})
 }

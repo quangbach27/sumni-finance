@@ -17,7 +17,9 @@ import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 import { Route as AppLedgerBooksCategoriesRouteImport } from './routes/_app/ledger-books_.categories'
+import { Route as AppFundSourcesUuidIndexRouteImport } from './routes/_app/fund-sources_.$uuid.index'
 import { Route as AppLedgerBooksUuidIndexRouteImport } from './routes/_app/ledger-books_.$uuid.index'
+import { Route as AppLedgerBooksUuidEntriesIndexRouteImport } from './routes/_app/ledger-books_.$uuid.entries.index'
 import { Route as AppLedgerBooksUuidEntriesPostRouteImport } from './routes/_app/ledger-books_.$uuid.entries.post'
 
 const IndexRoute = IndexRouteImport.update({
@@ -60,11 +62,22 @@ const AppLedgerBooksCategoriesRoute =
     path: '/ledger-books/categories',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppFundSourcesUuidIndexRoute = AppFundSourcesUuidIndexRouteImport.update({
+  id: '/fund-sources_/$uuid/',
+  path: '/fund-sources/$uuid/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppLedgerBooksUuidIndexRoute = AppLedgerBooksUuidIndexRouteImport.update({
   id: '/ledger-books_/$uuid/',
   path: '/ledger-books/$uuid/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppLedgerBooksUuidEntriesIndexRoute =
+  AppLedgerBooksUuidEntriesIndexRouteImport.update({
+    id: '/ledger-books_/$uuid/entries/',
+    path: '/ledger-books/$uuid/entries/',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppLedgerBooksUuidEntriesPostRoute =
   AppLedgerBooksUuidEntriesPostRouteImport.update({
     id: '/ledger-books_/$uuid/entries/post',
@@ -80,8 +93,10 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
+  '/fund-sources/$uuid/': typeof AppFundSourcesUuidIndexRoute
   '/ledger-books/$uuid/': typeof AppLedgerBooksUuidIndexRoute
   '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
+  '/ledger-books/$uuid/entries/': typeof AppLedgerBooksUuidEntriesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,8 +106,10 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
+  '/fund-sources/$uuid': typeof AppFundSourcesUuidIndexRoute
   '/ledger-books/$uuid': typeof AppLedgerBooksUuidIndexRoute
   '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
+  '/ledger-books/$uuid/entries': typeof AppLedgerBooksUuidEntriesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,8 +121,10 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/_app/ledger-books_/categories': typeof AppLedgerBooksCategoriesRoute
+  '/_app/fund-sources_/$uuid/': typeof AppFundSourcesUuidIndexRoute
   '/_app/ledger-books_/$uuid/': typeof AppLedgerBooksUuidIndexRoute
   '/_app/ledger-books_/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
+  '/_app/ledger-books_/$uuid/entries/': typeof AppLedgerBooksUuidEntriesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,8 +136,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sign-in/$'
     | '/ledger-books/categories'
+    | '/fund-sources/$uuid/'
     | '/ledger-books/$uuid/'
     | '/ledger-books/$uuid/entries/post'
+    | '/ledger-books/$uuid/entries/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -128,8 +149,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sign-in/$'
     | '/ledger-books/categories'
+    | '/fund-sources/$uuid'
     | '/ledger-books/$uuid'
     | '/ledger-books/$uuid/entries/post'
+    | '/ledger-books/$uuid/entries'
   id:
     | '__root__'
     | '/'
@@ -140,8 +163,10 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/sign-in/$'
     | '/_app/ledger-books_/categories'
+    | '/_app/fund-sources_/$uuid/'
     | '/_app/ledger-books_/$uuid/'
     | '/_app/ledger-books_/$uuid/entries/post'
+    | '/_app/ledger-books_/$uuid/entries/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -208,11 +233,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLedgerBooksCategoriesRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/fund-sources_/$uuid/': {
+      id: '/_app/fund-sources_/$uuid/'
+      path: '/fund-sources/$uuid'
+      fullPath: '/fund-sources/$uuid/'
+      preLoaderRoute: typeof AppFundSourcesUuidIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/ledger-books_/$uuid/': {
       id: '/_app/ledger-books_/$uuid/'
       path: '/ledger-books/$uuid'
       fullPath: '/ledger-books/$uuid/'
       preLoaderRoute: typeof AppLedgerBooksUuidIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/ledger-books_/$uuid/entries/': {
+      id: '/_app/ledger-books_/$uuid/entries/'
+      path: '/ledger-books/$uuid/entries'
+      fullPath: '/ledger-books/$uuid/entries/'
+      preLoaderRoute: typeof AppLedgerBooksUuidEntriesIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/ledger-books_/$uuid/entries/post': {
@@ -231,8 +270,10 @@ interface AppRouteRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppLedgerBooksCategoriesRoute: typeof AppLedgerBooksCategoriesRoute
+  AppFundSourcesUuidIndexRoute: typeof AppFundSourcesUuidIndexRoute
   AppLedgerBooksUuidIndexRoute: typeof AppLedgerBooksUuidIndexRoute
   AppLedgerBooksUuidEntriesPostRoute: typeof AppLedgerBooksUuidEntriesPostRoute
+  AppLedgerBooksUuidEntriesIndexRoute: typeof AppLedgerBooksUuidEntriesIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
@@ -241,8 +282,10 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppLedgerBooksCategoriesRoute: AppLedgerBooksCategoriesRoute,
+  AppFundSourcesUuidIndexRoute: AppFundSourcesUuidIndexRoute,
   AppLedgerBooksUuidIndexRoute: AppLedgerBooksUuidIndexRoute,
   AppLedgerBooksUuidEntriesPostRoute: AppLedgerBooksUuidEntriesPostRoute,
+  AppLedgerBooksUuidEntriesIndexRoute: AppLedgerBooksUuidEntriesIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

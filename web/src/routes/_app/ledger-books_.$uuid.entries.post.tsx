@@ -24,10 +24,7 @@ export const Route = createFileRoute('/_app/ledger-books_/$uuid/entries/post')({
 
 function PostJournalEntriesLayout({ periodUuid }: { periodUuid: string }) {
   return (
-    <ContentLayout
-      title="Ghi bút toán"
-      description="Nợ = thu vào nguồn quỹ (+), Có = chi ra khỏi nguồn quỹ (−)."
-    >
+    <ContentLayout title="Ghi bút toán">
       <PostJournalEntriesPage periodUuid={periodUuid} />
     </ContentLayout>
   );

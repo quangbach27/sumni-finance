@@ -65,6 +65,7 @@ func (r *iteratorForInsertLedgerEntries) Next() bool {
 func (r iteratorForInsertLedgerEntries) Values() ([]interface{}, error) {
 	return []interface{}{
 		r.rows[0].Uuid,
+		r.rows[0].OrgID,
 		r.rows[0].LedgerPeriodUuid,
 		r.rows[0].FundSourceUuid,
 		r.rows[0].Amount,
@@ -76,6 +77,7 @@ func (r iteratorForInsertLedgerEntries) Values() ([]interface{}, error) {
 		r.rows[0].FsBalanceAfter,
 		r.rows[0].Status,
 		r.rows[0].Kind,
+		r.rows[0].CreatedBy,
 	}, nil
 }
 
@@ -84,5 +86,5 @@ func (r iteratorForInsertLedgerEntries) Err() error {
 }
 
 func (q *Queries) InsertLedgerEntries(ctx context.Context, arg []InsertLedgerEntriesParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"ledgers", "ledger_entries"}, []string{"uuid", "ledger_period_uuid", "fund_source_uuid", "amount", "direction", "description", "occurred_at", "category_uuid", "fs_balance_before", "fs_balance_after", "status", "kind"}, &iteratorForInsertLedgerEntries{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"ledgers", "ledger_entries"}, []string{"uuid", "org_id", "ledger_period_uuid", "fund_source_uuid", "amount", "direction", "description", "occurred_at", "category_uuid", "fs_balance_before", "fs_balance_after", "status", "kind", "created_by"}, &iteratorForInsertLedgerEntries{rows: arg})
 }

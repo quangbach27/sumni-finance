@@ -12,7 +12,7 @@ import type { UseFormSetError } from 'react-hook-form';
 
 export { isFilled };
 
-export const INITIAL_ROWS = 8;
+export const INITIAL_ROWS = 20;
 export const ADD_ROWS = 10;
 
 export const createRow = (): LedgerEntryRow => ({
