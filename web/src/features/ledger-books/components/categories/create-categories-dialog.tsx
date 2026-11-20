@@ -47,6 +47,7 @@ import {
   emptyCategoryRow,
   isBlankRow,
   useUpsertCategories,
+  withSuggestedRows,
 } from '../../api/upsert-categories';
 import CreateCategoriesForm from './create-categories-form';
 
@@ -66,6 +67,8 @@ const defaultValues = (): CreateCategoriesFormValues => ({
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Open with the suggested categories already filled in. */
+  prefillSuggestions?: boolean;
 };
 
 export default function CreateCategoriesDialog(props: Props) {
@@ -76,7 +79,11 @@ export default function CreateCategoriesDialog(props: Props) {
   );
 }
 
-function CreateCategoriesDialogContent({ open, onOpenChange }: Props) {
+function CreateCategoriesDialogContent({
+  open,
+  onOpenChange,
+  prefillSuggestions,
+}: Props) {
   const isMobile = useIsMobile();
   const { showAlert, dismissAlert } = useStatusAlertActions();
   const { mutate, isPending } = useUpsertCategories();
@@ -100,10 +107,12 @@ function CreateCategoriesDialogContent({ open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (open) {
-      form.reset(defaultValues());
+      form.reset(
+        prefillSuggestions ? { rows: withSuggestedRows([]) } : defaultValues(),
+      );
       dismissRef.current();
     }
-  }, [open, form]);
+  }, [open, form, prefillSuggestions]);
 
   // Editing dismisses a stale alert.
   useEffect(() => {

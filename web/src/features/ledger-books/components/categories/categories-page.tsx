@@ -5,6 +5,7 @@ import { Tags } from 'lucide-react';
 
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -16,6 +17,7 @@ import { getCategoriesQueryOptions } from '../../api/get-categories';
 import CategoryAccordion from './category-accordion';
 import CategoryDetail from './category-detail';
 import CategoryList from './category-list';
+import CreateCategoriesTrigger from './create-categories-trigger';
 
 export default function CategoriesPage() {
   const { data, isPending, isError } = useQuery(getCategoriesQueryOptions());
@@ -38,6 +40,9 @@ export default function CategoriesPage() {
             Nhấn &quot;Thêm danh mục&quot; để tạo danh mục và thẻ đầu tiên.
           </EmptyDescription>
         </EmptyHeader>
+        <EmptyContent>
+          <CreateCategoriesTrigger suggest />
+        </EmptyContent>
       </Empty>
     );
   }

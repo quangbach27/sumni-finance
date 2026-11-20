@@ -66,6 +66,41 @@ export const emptyCategoryRow = (): CategoryRow => ({
   tags: [],
 });
 
+export const suggestedCategoryRows: CategoryRow[] = [
+  {
+    name: 'Hiệp Thông',
+    description:
+      'Các khoản thu chi liên quan đến Hiệp Thông: lễ 1/10, cảm tạ, đặc biệt và chủ nhật.',
+    tags: ['1/10', 'Cảm tạ', 'Đặc biệt', 'Chủ nhật'],
+  },
+  {
+    name: 'Vận Hành',
+    description: 'Chi phí vận hành thường xuyên như tiền thuê nhà, tiền điện.',
+    tags: ['Tiền thuê nhà', 'Tiền điện'],
+  },
+  {
+    name: 'Quỹ Văn Phòng',
+    description:
+      'Thu chi của quỹ văn phòng: Love Lunch và khoản thu từ thành viên.',
+    tags: ['Love Lunch', 'Thu từ thành viên'],
+  },
+  {
+    name: 'Khác',
+    description: 'Các khoản không thuộc danh mục nào ở trên.',
+    tags: [],
+  },
+];
+
+/** Keeps filled rows; appends suggestions whose name isn't taken yet. */
+export const withSuggestedRows = (rows: CategoryRow[]): CategoryRow[] => {
+  const current = rows.filter((r) => !isBlankRow(r));
+  const taken = new Set(current.map((r) => r.name.trim().toLowerCase()));
+  const added = suggestedCategoryRows
+    .filter((r) => !taken.has(r.name.toLowerCase()))
+    .map((r) => ({ ...r, tags: [...r.tags] }));
+  return [...current, ...added, emptyCategoryRow()];
+};
+
 export const isBlankRow = (row: CategoryRow) =>
   !row.name.trim() && !row.description.trim() && row.tags.length === 0;
 
