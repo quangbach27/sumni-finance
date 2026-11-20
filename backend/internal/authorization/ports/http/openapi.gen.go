@@ -187,7 +187,7 @@ func (w *ServerInterfaceWrapper) ListAccessGrants(ctx *echo.Context) error {
 
 	// ------------- Optional query parameter "resource" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource", ctx.QueryParams(), &params.Resource, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "resource", ctx.QueryParams(), &params.Resource, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter resource: %s", err))
 	}

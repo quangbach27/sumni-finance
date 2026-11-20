@@ -23,7 +23,7 @@ jobs:
         env:
           POSTGRES_USER: user
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: wild-workout
+          POSTGRES_DB: sumni-finance
         ports:
           - 5432:5432
         options: >-

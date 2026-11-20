@@ -435,7 +435,7 @@ func NewListAccessGrantsRequest(server string, params *ListAccessGrantsParams) (
 
 		if params.Resource != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "resource", *params.Resource, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "resource", *params.Resource, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
