@@ -54,7 +54,7 @@ jobs:
 
       - name: Test
         working-directory: backend
-        run: make test-unit
+        run: make test
 
       - name: Build
         working-directory: backend
