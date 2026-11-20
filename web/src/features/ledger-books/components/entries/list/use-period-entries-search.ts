@@ -13,7 +13,9 @@ export function usePeriodEntriesSearch() {
       // opening or closing a dialog keeps the page.
       search: (prev) => ({
         ...prev,
-        ...('category' in patch || 'fundSource' in patch ? { page: 1 } : {}),
+        ...('category' in patch || 'fundSource' in patch || 'status' in patch
+          ? { page: 1 }
+          : {}),
         ...patch,
       }),
       replace: true,

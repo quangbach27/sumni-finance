@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/select';
 
 import { getFundSourcesQueryOptions } from '@/features/fund-sources/api/get-fund-sources';
+import { ENTRY_STATUS_OPTIONS } from '@/features/ledger-entries/components/entries-status-options';
 
 import { getCategoriesQueryOptions } from '../../../api/get-categories';
 import { usePeriodEntriesSearch } from './use-period-entries-search';
@@ -52,6 +53,29 @@ export default function PeriodEntriesFilterBar() {
           {fundSources.map((f) => (
             <SelectItem key={f.uuid} value={f.uuid}>
               {f.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={search.status ?? 'all'}
+        onValueChange={(v) => {
+          if (v) update({ status: v });
+        }}
+      >
+        <SelectTrigger>
+          Trạng thái:{' '}
+          {
+            ENTRY_STATUS_OPTIONS.find(
+              (s) => s.value === (search.status ?? 'all'),
+            )?.label
+          }
+        </SelectTrigger>
+        <SelectContent>
+          {ENTRY_STATUS_OPTIONS.map((s) => (
+            <SelectItem key={s.value} value={s.value}>
+              {s.label}
             </SelectItem>
           ))}
         </SelectContent>

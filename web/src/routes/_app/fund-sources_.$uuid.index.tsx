@@ -17,10 +17,7 @@ const searchSchema = z.object({
     .catch(1),
   category: z.string().optional().catch(undefined),
   page: z.number().int().min(1).catch(1),
-  orderBy: z
-    .enum(['occurred_at', 'fund_source_uuid', 'category_uuid'])
-    .catch('occurred_at'),
-  order: z.enum(['asc', 'desc']).catch('desc'),
+  status: z.enum(['posted', 'voided', 'all']).catch('all'),
   /** Entry whose details dialog is open. */
   entry: z.string().optional().catch(undefined),
 });

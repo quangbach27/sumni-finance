@@ -49,6 +49,7 @@ export default function PeriodEntriesTable({
       fundSourceUuid: search.fundSource,
       // Reversal entries are reached from their voided entry's details.
       kind: 'normal',
+      status: search.status,
       page: search.page,
     }),
   );

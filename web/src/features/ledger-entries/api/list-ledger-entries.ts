@@ -8,20 +8,18 @@ import type { ListLedgerEntriesResponse } from './types';
 
 export const ENTRIES_PAGE_SIZE = 10;
 
-export type LedgerEntriesOrderBy =
-  'occurred_at' | 'fund_source_uuid' | 'category_uuid';
+export type LedgerEntriesStatus = 'posted' | 'voided' | 'all';
 
 export type ListLedgerEntriesParams = {
   fundSourceUuid?: string;
   ledgerPeriodUuid?: string;
   categoryUuid?: string;
   kind?: 'normal' | 'reversal';
+  status?: LedgerEntriesStatus;
   /** ISO date-time, inclusive. */
   fromDate?: string;
   /** ISO date-time, inclusive. */
   toDate?: string;
-  orderBy?: LedgerEntriesOrderBy;
-  order?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
 };
@@ -36,10 +34,9 @@ export const listLedgerEntries = async (
       ledger_period_uuid: params.ledgerPeriodUuid,
       category_uuid: params.categoryUuid,
       kind: params.kind,
+      status: params.status,
       from_date: params.fromDate,
       to_date: params.toDate,
-      order_by: params.orderBy,
-      order: params.order,
       page: params.page,
       page_size: params.pageSize ?? ENTRIES_PAGE_SIZE,
     },

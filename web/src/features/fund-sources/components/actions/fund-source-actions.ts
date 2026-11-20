@@ -1,4 +1,4 @@
-import { List, Pencil, QrCode, Trash2, Users } from 'lucide-react';
+import { List, QrCode, Trash2, Users } from 'lucide-react';
 
 import type { FundSource } from '../../api/types';
 import type { LazyTriggerProps } from '@/components/shared/lazy-trigger/lazy-trigger';
@@ -37,14 +37,6 @@ export const getFundSourceActionGroups = ({
 }: Args): FundSourceAction[][] => [
   [
     {
-      id: 'vietqr',
-      label: 'Tạo mã VietQR',
-      icon: QrCode,
-      hidden: item.type !== 'bank',
-      onSelect: vietQr.onClick,
-      triggerProps: vietQr,
-    },
-    {
       id: 'entries',
       label: 'Xem bút toán',
       icon: List,
@@ -52,8 +44,20 @@ export const getFundSourceActionGroups = ({
         void navigate({
           to: '/fund-sources/$uuid',
           params: { uuid: item.uuid },
-          search: { range: 1, page: 1, orderBy: 'occurred_at', order: 'desc' },
+          search: {
+            range: 1,
+            page: 1,
+            status: 'posted',
+          },
         }),
+    },
+    {
+      id: 'vietqr',
+      label: 'Tạo mã VietQR',
+      icon: QrCode,
+      hidden: item.type !== 'bank',
+      onSelect: vietQr.onClick,
+      triggerProps: vietQr,
     },
     {
       id: 'accountants',

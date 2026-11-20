@@ -19,11 +19,10 @@ export function useEntriesParams(
     categoryUuid: search.category,
     // Reversal entries are reached from their voided entry's details.
     kind: 'normal',
+    status: search.status,
     // Day precision keeps the query key stable within a day.
     fromDate: startOfDay(from).toISOString(),
     toDate: endOfDay(today).toISOString(),
-    orderBy: search.orderBy,
-    order: search.order,
     page: search.page,
   };
 }

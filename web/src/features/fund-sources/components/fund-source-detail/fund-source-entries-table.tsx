@@ -1,8 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -29,45 +28,9 @@ import FundSourceEntriesFilterBar from './fund-source-entries-filter-bar';
 import { useEntriesParams } from './use-entries-params';
 import { useEntriesSearch } from './use-entries-search';
 
-import type { LedgerEntriesOrderBy } from '@/features/ledger-entries/api/list-ledger-entries';
 import type { LedgerEntry } from '@/features/ledger-entries/api/types';
 
 const dash = <span className="text-muted-foreground">—</span>;
-
-function SortableHead({
-  column,
-  children,
-}: {
-  column: LedgerEntriesOrderBy;
-  children: string;
-}) {
-  const { search, update } = useEntriesSearch();
-  const active = search.orderBy === column;
-  const Icon = !active
-    ? ArrowUpDown
-    : search.order === 'asc'
-      ? ArrowUp
-      : ArrowDown;
-
-  return (
-    <TableHead>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-ml-2"
-        onClick={() =>
-          update({
-            orderBy: column,
-            order: active && search.order === 'desc' ? 'asc' : 'desc',
-          })
-        }
-      >
-        {children}
-        <Icon data-icon="inline-end" />
-      </Button>
-    </TableHead>
-  );
-}
 
 export default function FundSourceEntriesTable({
   fundSourceUuid,
@@ -100,8 +63,8 @@ export default function FundSourceEntriesTable({
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <SortableHead column="occurred_at">Ngày</SortableHead>
-              <SortableHead column="category_uuid">Danh mục</SortableHead>
+              <TableHead>Ngày</TableHead>
+              <TableHead>Danh mục</TableHead>
               <TableHead>Thẻ</TableHead>
               <TableHead className="text-right">Nợ</TableHead>
               <TableHead className="text-right">Có</TableHead>

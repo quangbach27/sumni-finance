@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 
 import { getCategoriesQueryOptions } from '@/features/ledger-books/api/get-categories';
+import { ENTRY_STATUS_OPTIONS } from '@/features/ledger-entries/components/entries-status-options';
 
 import { useEntriesSearch } from './use-entries-search';
 
@@ -68,6 +69,25 @@ export default function FundSourceEntriesFilterBar({
           {categories.map((c) => (
             <SelectItem key={c.uuid} value={c.uuid}>
               {c.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={search.status}
+        onValueChange={(v) => {
+          if (v) update({ status: v });
+        }}
+      >
+        <SelectTrigger>
+          Trạng thái:{' '}
+          {ENTRY_STATUS_OPTIONS.find((s) => s.value === search.status)?.label}
+        </SelectTrigger>
+        <SelectContent>
+          {ENTRY_STATUS_OPTIONS.map((s) => (
+            <SelectItem key={s.value} value={s.value}>
+              {s.label}
             </SelectItem>
           ))}
         </SelectContent>

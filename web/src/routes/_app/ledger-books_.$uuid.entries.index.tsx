@@ -13,6 +13,7 @@ import PeriodEntriesPage from '@/features/ledger-books/components/entries/list/p
 const searchSchema = z.object({
   category: z.string().optional().catch(undefined),
   fundSource: z.string().optional().catch(undefined),
+  status: z.enum(['posted', 'voided', 'all']).optional().catch(undefined),
   page: z.number().int().min(1).catch(1),
   /** Entry whose details dialog is open. */
   entry: z.string().optional().catch(undefined),

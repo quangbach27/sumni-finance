@@ -48,7 +48,7 @@ export interface paths {
         };
         /**
          * List ledger entries
-         * @description Entries across all ledger periods, optionally of one fund source and within a date range. Sorted by occurred_at descending by default.
+         * @description Entries across all ledger periods, optionally of one fund source and within a date range. Always sorted by occurred_at, then created_at, newest first.
          */
         get: operations["listLedgerEntries"];
         put?: never;
@@ -769,8 +769,8 @@ export interface operations {
                 to_date?: string;
                 /** @description Only entries of this kind; omit for both. */
                 kind?: components["schemas"]["LedgerEntryKind"];
-                order_by?: "occurred_at" | "fund_source_uuid" | "category_uuid";
-                order?: "asc" | "desc";
+                /** @description Only entries of this status; omit or `all` for both. */
+                status?: "posted" | "voided" | "all";
                 page?: number;
                 page_size?: number;
             };
