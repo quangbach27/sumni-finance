@@ -17,6 +17,7 @@ import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 import { Route as AppLedgerBooksCategoriesRouteImport } from './routes/_app/ledger-books_.categories'
+import { Route as AppSettingsRolesRouteImport } from './routes/_app/settings_.roles'
 import { Route as AppFundSourcesUuidIndexRouteImport } from './routes/_app/fund-sources_.$uuid.index'
 import { Route as AppLedgerBooksUuidIndexRouteImport } from './routes/_app/ledger-books_.$uuid.index'
 import { Route as AppLedgerBooksUuidEntriesIndexRouteImport } from './routes/_app/ledger-books_.$uuid.entries.index'
@@ -62,6 +63,11 @@ const AppLedgerBooksCategoriesRoute =
     path: '/ledger-books/categories',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppSettingsRolesRoute = AppSettingsRolesRouteImport.update({
+  id: '/settings_/roles',
+  path: '/settings/roles',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppFundSourcesUuidIndexRoute = AppFundSourcesUuidIndexRouteImport.update({
   id: '/fund-sources_/$uuid/',
   path: '/fund-sources/$uuid/',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
+  '/settings/roles': typeof AppSettingsRolesRoute
   '/fund-sources/$uuid/': typeof AppFundSourcesUuidIndexRoute
   '/ledger-books/$uuid/': typeof AppLedgerBooksUuidIndexRoute
   '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/ledger-books/categories': typeof AppLedgerBooksCategoriesRoute
+  '/settings/roles': typeof AppSettingsRolesRoute
   '/fund-sources/$uuid': typeof AppFundSourcesUuidIndexRoute
   '/ledger-books/$uuid': typeof AppLedgerBooksUuidIndexRoute
   '/ledger-books/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/_app/ledger-books_/categories': typeof AppLedgerBooksCategoriesRoute
+  '/_app/settings_/roles': typeof AppSettingsRolesRoute
   '/_app/fund-sources_/$uuid/': typeof AppFundSourcesUuidIndexRoute
   '/_app/ledger-books_/$uuid/': typeof AppLedgerBooksUuidIndexRoute
   '/_app/ledger-books_/$uuid/entries/post': typeof AppLedgerBooksUuidEntriesPostRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sign-in/$'
     | '/ledger-books/categories'
+    | '/settings/roles'
     | '/fund-sources/$uuid/'
     | '/ledger-books/$uuid/'
     | '/ledger-books/$uuid/entries/post'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sign-in/$'
     | '/ledger-books/categories'
+    | '/settings/roles'
     | '/fund-sources/$uuid'
     | '/ledger-books/$uuid'
     | '/ledger-books/$uuid/entries/post'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/sign-in/$'
     | '/_app/ledger-books_/categories'
+    | '/_app/settings_/roles'
     | '/_app/fund-sources_/$uuid/'
     | '/_app/ledger-books_/$uuid/'
     | '/_app/ledger-books_/$uuid/entries/post'
@@ -233,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLedgerBooksCategoriesRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/settings_/roles': {
+      id: '/_app/settings_/roles'
+      path: '/settings/roles'
+      fullPath: '/settings/roles'
+      preLoaderRoute: typeof AppSettingsRolesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/fund-sources_/$uuid/': {
       id: '/_app/fund-sources_/$uuid/'
       path: '/fund-sources/$uuid'
@@ -270,6 +289,7 @@ interface AppRouteRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppLedgerBooksCategoriesRoute: typeof AppLedgerBooksCategoriesRoute
+  AppSettingsRolesRoute: typeof AppSettingsRolesRoute
   AppFundSourcesUuidIndexRoute: typeof AppFundSourcesUuidIndexRoute
   AppLedgerBooksUuidIndexRoute: typeof AppLedgerBooksUuidIndexRoute
   AppLedgerBooksUuidEntriesPostRoute: typeof AppLedgerBooksUuidEntriesPostRoute
@@ -282,6 +302,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppLedgerBooksCategoriesRoute: AppLedgerBooksCategoriesRoute,
+  AppSettingsRolesRoute: AppSettingsRolesRoute,
   AppFundSourcesUuidIndexRoute: AppFundSourcesUuidIndexRoute,
   AppLedgerBooksUuidIndexRoute: AppLedgerBooksUuidIndexRoute,
   AppLedgerBooksUuidEntriesPostRoute: AppLedgerBooksUuidEntriesPostRoute,
