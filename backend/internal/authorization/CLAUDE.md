@@ -40,9 +40,9 @@ Grants are per user and per org; they never carry over to another user or org.
 | Role | Policy | Allows |
 |---|---|---|
 | `office_admin` | AdministratorAccess | every action on every resource (including `access_grant`) |
-| `office_accountant`, `office_viewer` | ReadOnlyAccess | `read` on `fund_source`, `ledger_period`, `ledger_entry`, `ledger_category` |
+| `office_accountant`, `office_viewer` | ReadOnlyAccess | `read` on `fund_source`, `ledger_period`, `ledger_entry`, `ledger_category`, `access_grant` |
 
-Anything beyond the baseline is an access grant given by an admin. `access_grant` itself can never be granted (prevents privilege escalation), so managing grants is admin-only.
+Anything beyond the baseline is an access grant given by an admin. `access_grant` itself can never be granted (prevents privilege escalation), so creating, updating and revoking grants is admin-only, while every role can list them. `GET /api/v1/role-policies` returns this baseline (from `PolicyCatalog.RolePolicies`) to any member, so clients never hardcode it.
 
 ## Cross-module contract (`ports/module/client`)
 

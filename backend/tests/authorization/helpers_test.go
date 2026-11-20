@@ -142,3 +142,12 @@ func (e env) revokeAccess(t *testing.T, token string, id authzClients.AccessGran
 
 	return resp
 }
+
+func (e env) listRolePolicies(t *testing.T, token string) *authzClients.ListRolePoliciesClientResponse {
+	t.Helper()
+
+	resp, err := e.clients.Authorization.ListRolePoliciesWithResponse(context.Background(), utils.AuthEditorFn(token))
+	require.NoError(t, err)
+
+	return resp
+}

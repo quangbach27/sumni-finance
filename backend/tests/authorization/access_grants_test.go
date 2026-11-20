@@ -3,6 +3,7 @@
 package authorization_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -120,12 +121,20 @@ func TestIdentityMapping(t *testing.T) {
 }
 
 func TestListAccessGrants(t *testing.T) {
-	t.Run("only admins can list", func(t *testing.T) {
+	t.Run("every role can list grants but only admins can change them", func(t *testing.T) {
 		e := newEnv(t)
+
+		granted := e.grantAccess(t, e.token(admin), scopedEntryGrant(userID(accountant), fundSourceScope(t, "123")))
+		require.Equal(t, http.StatusCreated, granted.StatusCode(), "body: %s", string(granted.Body))
 
 		for _, role := range []shared.Role{accountant, viewer} {
 			resp := e.listAccessGrants(t, e.token(role), nil)
-			assert.Equal(t, http.StatusForbidden, resp.StatusCode(), "role %s, body: %s", role, string(resp.Body))
+			require.Equal(t, http.StatusOK, resp.StatusCode(), "role %s, body: %s", role, string(resp.Body))
+			require.Len(t, resp.JSON200.Items, 1, "role %s", role)
+			assert.Equal(t, userID(accountant), resp.JSON200.Items[0].UserId)
+
+			assert.Equal(t, http.StatusForbidden, e.grantAccess(t, e.token(role), createFundSourceGrant("u")).StatusCode(), "role %s", role)
+			assert.Equal(t, http.StatusForbidden, e.revokeAccess(t, e.token(role), granted.JSON201.Uuid).StatusCode(), "role %s", role)
 		}
 	})
 
@@ -143,10 +152,21 @@ func TestListAccessGrants(t *testing.T) {
 		require.Len(t, one, 1)
 		assert.Equal(t, "user_1", one[0].UserId)
 
-		none := e.listAccessGrants(t, e.token(admin), &authzClients.ListAccessGrantsParams{Resource: apputils.Ptr("ledger_period")}).JSON200.Items
+		none := e.listAccessGrants(t, e.token(admin), &authzClients.ListAccessGrantsParams{Resource: apputils.Ptr(shared.ResourceLedgerPeriod)}).JSON200.Items
 		assert.Empty(t, none)
 
-		bad := e.listAccessGrants(t, e.token(admin), &authzClients.ListAccessGrantsParams{Resource: apputils.Ptr("nope")})
+		// The typed client cannot build an unknown resource, so set the raw query value.
+		setBadResource := func(_ context.Context, req *http.Request) error {
+			q := req.URL.Query()
+			q.Set("resource", "nope")
+			req.URL.RawQuery = q.Encode()
+
+			return nil
+		}
+		bad, err := e.clients.Authorization.ListAccessGrantsWithResponse(
+			context.Background(), nil, utils.AuthEditorFn(e.token(admin)), setBadResource,
+		)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, bad.StatusCode(), "body: %s", string(bad.Body))
 
 		assert.Empty(t, e.listAccessGrants(t, otherOrgAdmin, nil).JSON200.Items, "other org must not see these grants")
@@ -209,5 +229,51 @@ func TestRevokeAccess(t *testing.T) {
 
 		// A revoked grant can be granted again.
 		assert.Equal(t, http.StatusCreated, e.grantAccess(t, e.token(admin), createFundSourceGrant("u")).StatusCode())
+	})
+}
+
+func TestListRolePolicies(t *testing.T) {
+	t.Run("every role can read the baseline policies", func(t *testing.T) {
+		e := newEnv(t)
+
+		for _, role := range []shared.Role{admin, accountant, viewer} {
+			resp := e.listRolePolicies(t, e.token(role))
+			require.Equal(t, http.StatusOK, resp.StatusCode(), "role %s, body: %s", role, string(resp.Body))
+			require.Len(t, resp.JSON200.Items, 3)
+		}
+	})
+
+	t.Run("policies match the role baseline", func(t *testing.T) {
+		e := newEnv(t)
+
+		byRole := map[shared.Role][]authzClients.PolicyRule{}
+		for _, item := range e.listRolePolicies(t, e.token(viewer)).JSON200.Items {
+			for _, policy := range item.Policies {
+				byRole[item.Role] = append(byRole[item.Role], policy.Rules...)
+			}
+		}
+
+		assert.Len(t, byRole[admin], len(shared.AllResources()))
+		for _, rule := range byRole[admin] {
+			assert.ElementsMatch(t, shared.AllActions(), rule.Actions, "admin on %s", rule.Resource)
+		}
+
+		for _, role := range []shared.Role{accountant, viewer} {
+			resources := make([]shared.Resource, 0, len(byRole[role]))
+			for _, rule := range byRole[role] {
+				assert.Equal(t, []authzClients.Action{shared.ActionRead}, rule.Actions, "%s on %s", role, rule.Resource)
+				resources = append(resources, rule.Resource)
+			}
+			assert.Contains(t, resources, shared.ResourceAccessGrant, "role %s", role)
+			assert.Contains(t, resources, shared.ResourceLedgerEntry, "role %s", role)
+		}
+	})
+
+	t.Run("a session without an organization is unauthorized", func(t *testing.T) {
+		e := newEnv(t)
+
+		noOrg := utils.NewSession("user-"+common.NewUUIDv7().String(), admin.String())
+		resp := e.listRolePolicies(t, noOrg)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode(), "body: %s", string(resp.Body))
 	})
 }

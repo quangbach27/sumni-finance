@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 
-	common "github.com/quangbach27/golang-common"
-
 	"backend/internal/authorization/apps"
 	"backend/internal/authorization/apps/commands"
 	"backend/internal/authorization/apps/models"
@@ -135,14 +133,7 @@ func (h *Handlers) ListAccessGrants(ctx context.Context, request ListAccessGrant
 		query.UserID = *request.Params.UserId
 	}
 
-	if request.Params.Resource != nil && *request.Params.Resource != "" {
-		resource, err := common.NewEnum[shared.Resource](*request.Params.Resource)
-		if err != nil {
-			return nil, common.NewInvalidInputError(
-				"invalid-resource", "resource %q is not recognized", *request.Params.Resource,
-			)
-		}
-
+	if resource := request.Params.Resource; resource != nil && !resource.IsZero() {
 		query.Resource = resource.String()
 	}
 
@@ -170,4 +161,30 @@ func toAccessGrant(v models.GrantView) AccessGrant {
 		CreatedAt: v.CreatedAt,
 		UpdatedAt: v.UpdatedAt,
 	}
+}
+
+// ListRolePolicies returns the baseline policies of every role. It is static
+// configuration, so any authenticated member of an organization may read it.
+func (h *Handlers) ListRolePolicies(ctx context.Context, _ ListRolePoliciesRequestObject) (ListRolePoliciesResponseObject, error) {
+	if _, err := module.PrincipalFromContext(ctx); err != nil {
+		return nil, err
+	}
+
+	views := h.catalog.RolePolicies()
+	items := make([]RolePolicies, 0, len(views))
+	for _, v := range views {
+		policies := make([]Policy, 0, len(v.Policies))
+		for _, p := range v.Policies {
+			rules := make([]PolicyRule, 0, len(p.Rules))
+			for _, r := range p.Rules {
+				rules = append(rules, PolicyRule{Resource: r.Resource, Actions: r.Actions})
+			}
+
+			policies = append(policies, Policy{Name: p.Name, Rules: rules})
+		}
+
+		items = append(items, RolePolicies{Role: v.Role, Policies: policies})
+	}
+
+	return ListRolePolicies200JSONResponse{Items: items}, nil
 }

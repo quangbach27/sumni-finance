@@ -74,3 +74,21 @@ func TestNewRuleAndPolicy_Validation(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestPolicy_Rules(t *testing.T) {
+	t.Parallel()
+
+	rule, err := domain.NewRule(shared.ResourceLedgerEntry, shared.ActionCreate, shared.ActionUpdate)
+	require.NoError(t, err)
+	policy, err := domain.NewPolicy("Edit", rule)
+	require.NoError(t, err)
+
+	rules := policy.Rules()
+	require.Len(t, rules, 1)
+	assert.Equal(t, shared.ResourceLedgerEntry, rules[0].Resource())
+	assert.Equal(t, []shared.Action{shared.ActionCreate, shared.ActionUpdate}, rules[0].Actions())
+
+	// Returned slices are copies: changing them must not change the policy.
+	rules[0].Actions()[0] = shared.ActionDelete
+	assert.True(t, policy.Allows(shared.ResourceLedgerEntry, shared.ActionCreate))
+}

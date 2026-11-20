@@ -41,6 +41,12 @@ func (r Rule) validate() error {
 	return nil
 }
 
+// Resource is the resource type the rule applies to.
+func (r Rule) Resource() shared.Resource { return r.resource }
+
+// Actions returns a copy of the actions the rule allows.
+func (r Rule) Actions() []shared.Action { return slices.Clone(r.actions) }
+
 func (r Rule) allows(resource shared.Resource, action shared.Action) bool {
 	return r.resource == resource && slices.Contains(r.actions, action)
 }
@@ -66,6 +72,9 @@ func NewPolicy(name string, rules ...Rule) (Policy, error) {
 }
 
 func (p Policy) Name() string { return p.name }
+
+// Rules returns a copy of the policy's rules.
+func (p Policy) Rules() []Rule { return slices.Clone(p.rules) }
 
 // Allows reports whether one of the policy's rules permits the action on the resource type.
 func (p Policy) Allows(resource shared.Resource, action shared.Action) bool {

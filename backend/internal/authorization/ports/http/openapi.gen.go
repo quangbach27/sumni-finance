@@ -79,6 +79,23 @@ type ListAccessGrantsResponse struct {
 	Items []AccessGrant `json:"items"`
 }
 
+// ListRolePoliciesResponse defines model for ListRolePoliciesResponse.
+type ListRolePoliciesResponse struct {
+	Items []RolePolicies `json:"items"`
+}
+
+// Policy defines model for Policy.
+type Policy struct {
+	Name  string       `json:"name"`
+	Rules []PolicyRule `json:"rules"`
+}
+
+// PolicyRule defines model for PolicyRule.
+type PolicyRule struct {
+	Actions  []Action `json:"actions"`
+	Resource Resource `json:"resource"`
+}
+
 // Resource defines model for Resource.
 type Resource = shared.Resource
 
@@ -86,6 +103,15 @@ type Resource = shared.Resource
 //
 // Example: fund_source/123
 type ResourceScope = shared.ResourceScope
+
+// Role defines model for Role.
+type Role = shared.Role
+
+// RolePolicies defines model for RolePolicies.
+type RolePolicies struct {
+	Policies []Policy `json:"policies"`
+	Role     Role     `json:"role"`
+}
 
 // UpdateAccessGrantRequest defines model for UpdateAccessGrantRequest.
 type UpdateAccessGrantRequest struct {
@@ -112,8 +138,8 @@ type Unauthorized = ErrorResponse
 
 // ListAccessGrantsParams defines parameters for ListAccessGrants.
 type ListAccessGrantsParams struct {
-	UserId   *string `form:"user_id,omitempty" json:"user_id,omitempty"`
-	Resource *string `form:"resource,omitempty" json:"resource,omitempty"`
+	UserId   *string   `form:"user_id,omitempty" json:"user_id,omitempty"`
+	Resource *Resource `form:"resource,omitempty" json:"resource,omitempty"`
 }
 
 // GrantAccessJSONRequestBody defines body for GrantAccess for application/json ContentType.
@@ -136,6 +162,9 @@ type ServerInterface interface {
 	// UpdateAccessGrant Replace the actions of an access grant
 	// (PUT /api/v1/access-grants/{access_grant_uuid})
 	UpdateAccessGrant(ctx *echo.Context, accessGrantUuid AccessGrantUUID) error
+	// ListRolePolicies List the baseline policies of every role
+	// (GET /api/v1/role-policies)
+	ListRolePolicies(ctx *echo.Context) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -209,6 +238,15 @@ func (w *ServerInterfaceWrapper) UpdateAccessGrant(ctx *echo.Context) error {
 	return err
 }
 
+// ListRolePolicies converts echo context to params.
+func (w *ServerInterfaceWrapper) ListRolePolicies(ctx *echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListRolePolicies(ctx)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -260,6 +298,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/api/v1/access-grants", wrapper.GrantAccess, options.OperationMiddlewares["grantAccess"]...)
 	router.DELETE(options.BaseURL+"/api/v1/access-grants/:access_grant_uuid", wrapper.RevokeAccess, options.OperationMiddlewares["revokeAccess"]...)
 	router.PUT(options.BaseURL+"/api/v1/access-grants/:access_grant_uuid", wrapper.UpdateAccessGrant, options.OperationMiddlewares["updateAccessGrant"]...)
+	router.GET(options.BaseURL+"/api/v1/role-policies", wrapper.ListRolePolicies, options.OperationMiddlewares["listRolePolicies"]...)
 
 }
 
@@ -612,6 +651,57 @@ func (response UpdateAccessGrant500JSONResponse) VisitUpdateAccessGrantResponse(
 	return err
 }
 
+type ListRolePoliciesRequestObject struct {
+}
+
+type ListRolePoliciesResponseObject interface {
+	VisitListRolePoliciesResponse(w http.ResponseWriter) error
+}
+
+type ListRolePolicies200JSONResponse ListRolePoliciesResponse
+
+func (response ListRolePolicies200JSONResponse) VisitListRolePoliciesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRolePolicies401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListRolePolicies401JSONResponse) VisitListRolePoliciesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRolePolicies500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ListRolePolicies500JSONResponse) VisitListRolePoliciesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListAccessGrants List access grants of the caller's organization
@@ -626,6 +716,9 @@ type StrictServerInterface interface {
 	// UpdateAccessGrant Replace the actions of an access grant
 	// (PUT /api/v1/access-grants/{access_grant_uuid})
 	UpdateAccessGrant(ctx context.Context, request UpdateAccessGrantRequestObject) (UpdateAccessGrantResponseObject, error)
+	// ListRolePolicies List the baseline policies of every role
+	// (GET /api/v1/role-policies)
+	ListRolePolicies(ctx context.Context, request ListRolePoliciesRequestObject) (ListRolePoliciesResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx *echo.Context, request any) (any, error)
@@ -778,6 +871,29 @@ func (sh *strictHandler) UpdateAccessGrant(ctx *echo.Context, accessGrantUuid Ac
 		return err
 	} else if validResponse, ok := response.(UpdateAccessGrantResponseObject); ok {
 		return validResponse.VisitUpdateAccessGrantResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListRolePolicies operation middleware
+func (sh *strictHandler) ListRolePolicies(ctx *echo.Context) error {
+	var request ListRolePoliciesRequestObject
+
+	handler := func(ctx *echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRolePolicies(ctx.Request().Context(), request.(ListRolePoliciesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRolePolicies")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListRolePoliciesResponseObject); ok {
+		return validResponse.VisitListRolePoliciesResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

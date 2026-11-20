@@ -81,6 +81,23 @@ type ListAccessGrantsResponse struct {
 	Items []AccessGrant `json:"items"`
 }
 
+// ListRolePoliciesResponse defines model for ListRolePoliciesResponse.
+type ListRolePoliciesResponse struct {
+	Items []RolePolicies `json:"items"`
+}
+
+// Policy defines model for Policy.
+type Policy struct {
+	Name  string       `json:"name"`
+	Rules []PolicyRule `json:"rules"`
+}
+
+// PolicyRule defines model for PolicyRule.
+type PolicyRule struct {
+	Actions  []Action `json:"actions"`
+	Resource Resource `json:"resource"`
+}
+
 // Resource defines model for Resource.
 type Resource = shared.Resource
 
@@ -88,6 +105,15 @@ type Resource = shared.Resource
 //
 // Example: fund_source/123
 type ResourceScope = shared.ResourceScope
+
+// Role defines model for Role.
+type Role = shared.Role
+
+// RolePolicies defines model for RolePolicies.
+type RolePolicies struct {
+	Policies []Policy `json:"policies"`
+	Role     Role     `json:"role"`
+}
 
 // UpdateAccessGrantRequest defines model for UpdateAccessGrantRequest.
 type UpdateAccessGrantRequest struct {
@@ -114,8 +140,8 @@ type Unauthorized = ErrorResponse
 
 // ListAccessGrantsParams defines parameters for ListAccessGrants.
 type ListAccessGrantsParams struct {
-	UserId   *string `form:"user_id,omitempty" json:"user_id,omitempty"`
-	Resource *string `form:"resource,omitempty" json:"resource,omitempty"`
+	UserId   *string   `form:"user_id,omitempty" json:"user_id,omitempty"`
+	Resource *Resource `form:"resource,omitempty" json:"resource,omitempty"`
 }
 
 // GrantAccessJSONRequestBody defines body for GrantAccess for application/json ContentType.
@@ -239,6 +265,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/access-grants/{access_grant_uuid} (the `UpdateAccessGrant` operationId).
 	UpdateAccessGrant(ctx context.Context, accessGrantUuid AccessGrantUUID, body UpdateAccessGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListRolePolicies List the baseline policies of every role
+	//
+	// The default permissions each role has before any access grant. Readable by every member of an organization.
+	//
+	// Corresponds with GET /api/v1/role-policies (the `ListRolePolicies` operationId).
+	ListRolePolicies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListAccessGrants List access grants of the caller's organization
@@ -333,6 +366,23 @@ func (c *Client) UpdateAccessGrantWithBody(ctx context.Context, accessGrantUuid 
 // Corresponds with PUT /api/v1/access-grants/{access_grant_uuid} (the `UpdateAccessGrant` operationId).
 func (c *Client) UpdateAccessGrant(ctx context.Context, accessGrantUuid AccessGrantUUID, body UpdateAccessGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAccessGrantRequest(c.Server, accessGrantUuid, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListRolePolicies List the baseline policies of every role
+//
+// The default permissions each role has before any access grant. Readable by every member of an organization.
+//
+// Corresponds with GET /api/v1/role-policies (the `ListRolePolicies` operationId).
+func (c *Client) ListRolePolicies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListRolePoliciesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -530,6 +580,33 @@ func NewUpdateAccessGrantRequestWithBody(server string, accessGrantUuid AccessGr
 	return req, nil
 }
 
+// NewListRolePoliciesRequest constructs an http.Request for the ListRolePolicies method
+func NewListRolePoliciesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/role-policies")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -619,6 +696,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v1/access-grants/{access_grant_uuid} (the `UpdateAccessGrant` operationId).
 	UpdateAccessGrantWithResponse(ctx context.Context, accessGrantUuid AccessGrantUUID, body UpdateAccessGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAccessGrantClientResponse, error)
+
+	// ListRolePoliciesWithResponse List the baseline policies of every role
+	//
+	// The default permissions each role has before any access grant. Readable by every member of an organization.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/role-policies (the `ListRolePolicies` operationId).
+	ListRolePoliciesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListRolePoliciesClientResponse, error)
 }
 
 type ListAccessGrantsClientResponse struct {
@@ -897,6 +983,61 @@ func (r UpdateAccessGrantClientResponse) ContentType() string {
 	return ""
 }
 
+type ListRolePoliciesClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListRolePoliciesResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListRolePoliciesClientResponse) GetJSON200() *ListRolePoliciesResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListRolePoliciesClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListRolePoliciesClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListRolePoliciesClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListRolePoliciesClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListRolePoliciesClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListRolePoliciesClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListAccessGrantsWithResponse List access grants of the caller's organization
 //
 // Returns a wrapper object for the known response body format(s).
@@ -977,6 +1118,21 @@ func (c *ClientWithResponses) UpdateAccessGrantWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseUpdateAccessGrantClientResponse(rsp)
+}
+
+// ListRolePoliciesWithResponse List the baseline policies of every role
+//
+// The default permissions each role has before any access grant. Readable by every member of an organization.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/role-policies (the `ListRolePolicies` operationId).
+func (c *ClientWithResponses) ListRolePoliciesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListRolePoliciesClientResponse, error) {
+	rsp, err := c.ListRolePolicies(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListRolePoliciesClientResponse(rsp)
 }
 
 // ParseListAccessGrantsClientResponse parses an HTTP response from a ListAccessGrantsWithResponse call
@@ -1188,6 +1344,46 @@ func ParseUpdateAccessGrantClientResponse(rsp *http.Response) (*UpdateAccessGran
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListRolePoliciesClientResponse parses an HTTP response from a ListRolePoliciesWithResponse call
+func ParseListRolePoliciesClientResponse(rsp *http.Response) (*ListRolePoliciesClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListRolePoliciesClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListRolePoliciesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
