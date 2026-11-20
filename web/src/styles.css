@@ -238,7 +238,7 @@
   --dsg-header-active-text-color: var(--foreground);
   --dsg-cell-background-color: var(--card);
   --dsg-cell-disabled-background-color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.875rem;
   border-radius: var(--radius-lg);
 }
 
@@ -249,7 +249,7 @@
 
 .dsg-container .dsg-input {
   height: 100%;
-  padding-inline: 1.25rem;
+  padding-inline: 0.75rem;
 }
 
 .dsg-container .dsg-row-error .dsg-cell:not(.dsg-cell-gutter) {

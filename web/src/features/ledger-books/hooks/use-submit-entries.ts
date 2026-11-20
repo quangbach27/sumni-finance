@@ -18,6 +18,7 @@ import type { UseFormReturn } from 'react-hook-form';
 export function useSubmitEntries(
   form: UseFormReturn<LedgerEntriesFormValues>,
   periodUuid: string,
+  clearDraft: () => void,
 ) {
   const { handleSubmit, setError, getValues } = form;
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ export function useSubmitEntries(
         fundSourceUuid: getValues('fundSourceUuid'),
         entries: drafts,
       });
+      clearDraft();
       setConfirmOpen(false);
       await goBack();
     } catch (e) {

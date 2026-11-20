@@ -17,7 +17,6 @@ import {
   getFundSourceSubtitle,
   getFundSourceTitle,
 } from '../../shared/fund-source-label';
-import { formatSignedAmount } from './post-journal-entries-model';
 
 import type { LedgerStatementFundSource } from '../../../api/types';
 import type { LedgerEntriesFormValues } from './post-journal-entries-schema';
@@ -31,10 +30,10 @@ const FundSourceOption = ({ fs }: { fs: LedgerStatementFundSource }) => (
   <span className="flex min-w-0 flex-1 items-center gap-3 text-left">
     <FundSourceInitials name={getFundSourceTitle(fs)} />
     <span className="flex min-w-0 flex-col gap-0.5 leading-tight">
-      <span className="truncate text-base font-semibold">
+      <span className="truncate text-sm font-semibold">
         {getFundSourceTitle(fs)}
       </span>
-      <span className="text-muted-foreground truncate text-sm font-normal">
+      <span className="text-muted-foreground truncate text-xs font-normal">
         {getFundSourceSubtitle(fs)}
       </span>
     </span>
@@ -75,7 +74,7 @@ function FundSourceSelect({
         aria-invalid={invalid}
         aria-describedby={describedBy}
         onBlur={onBlur}
-        className="w-full rounded-xl py-2.5 pr-3 pl-3 data-[size=default]:h-auto"
+        className="w-full rounded-md py-1.5 pr-2 pl-2 data-[size=default]:h-auto"
       >
         {selected ? <FundSourceOption fs={selected} /> : 'Chọn nguồn quỹ'}
       </SelectTrigger>
@@ -90,53 +89,44 @@ function FundSourceSelect({
   );
 }
 
-/** Fund source picker plus the balance this batch would leave behind. */
+/** Compact fund source picker. */
 export default function FundSourceCard({ fundSources, disabled }: Props) {
+  const { control } = useFormContext<LedgerEntriesFormValues>();
+
+  return (
+    <div className="w-72 max-w-full">
+      <FormField
+        control={control}
+        name="fundSourceUuid"
+        label={<span className="sr-only">Ghi vào nguồn quỹ</span>}
+        Component={FundSourceSelect}
+        fundSources={fundSources}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
+/** Balance this batch would leave behind; shown in the grid footer. */
+export function FundSourceSummary({ fundSources }: Pick<Props, 'fundSources'>) {
   const { control } = useFormContext<LedgerEntriesFormValues>();
   const {
     fundSourceName,
     currentBalance: current,
     balanceAfter: after,
-    totals,
   } = useFundSourceBalance(control, fundSources);
 
   return (
-    <div className="bg-card grid gap-6 rounded-2xl border p-6 shadow-sm md:grid-cols-[minmax(0,22rem)_1fr]">
-      <div className="md:border-r md:pr-6">
-        <FormField
-          control={control}
-          name="fundSourceUuid"
-          label="Ghi vào nguồn quỹ"
-          description="Mỗi bảng chỉ ghi vào một nguồn quỹ. Đổi nguồn ở đây bất cứ lúc nào."
-          Component={FundSourceSelect}
-          fundSources={fundSources}
-          disabled={disabled}
-        />
-      </div>
-
-      <div className="flex flex-col justify-center gap-2">
-        <span className="text-muted-foreground text-sm">
-          Số dư {fundSourceName} sau khi lưu
-        </span>
-        <span className="text-5xl font-bold tabular-nums">
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 tabular-nums">
+      <span className="text-muted-foreground">
+        Số dư {fundSourceName} sau khi lưu
+        <span className="text-foreground ml-2 font-semibold">
           {formatAmount(after, DEFAULT_CURRENCY)}
         </span>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-base tabular-nums">
-          <span className="text-muted-foreground">
-            Hiện tại {formatAmount(current, DEFAULT_CURRENCY)}
-          </span>
-          {totals.inflow > 0 && (
-            <span className="text-primary">
-              {formatSignedAmount(totals.inflow, 'inflow')} thu vào
-            </span>
-          )}
-          {totals.outflow > 0 && (
-            <span className="text-destructive">
-              {formatSignedAmount(totals.outflow, 'outflow')} chi ra
-            </span>
-          )}
-        </div>
-      </div>
+      </span>
+      <span className="text-muted-foreground">
+        Hiện tại {formatAmount(current, DEFAULT_CURRENCY)}
+      </span>
     </div>
   );
 }

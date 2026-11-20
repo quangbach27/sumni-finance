@@ -51,7 +51,7 @@ export default function AppLayout({ children }: Props) {
       <SidebarProvider>
         <AppSidebar navItems={navItems} />
         <SidebarInset>
-          <AppHeader />
+          <AppHeader className="bg-background sticky top-0 z-20 h-14" />
 
           {children}
         </SidebarInset>

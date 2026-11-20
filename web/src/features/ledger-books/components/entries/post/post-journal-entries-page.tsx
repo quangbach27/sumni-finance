@@ -8,16 +8,17 @@ import { useFundSourceBalance } from '../../../hooks/use-fund-source-balance';
 import { usePostEntriesForm } from '../../../hooks/use-post-entries-form';
 import { useSubmitEntries } from '../../../hooks/use-submit-entries';
 import ConfirmPostDialog from './confirm-post-dialog';
-import FundSourceCard from './fund-source-card';
+import FundSourceCard, { FundSourceSummary } from './fund-source-card';
 import PostJournalEntriesGrid from './grid/post-journal-entries-grid';
 
 type Props = { periodUuid: string };
 
 export default function PostJournalEntriesPage({ periodUuid }: Props) {
-  const { period, fundSources, form } = usePostEntriesForm(periodUuid);
+  const { period, fundSources, form, clearDraft } =
+    usePostEntriesForm(periodUuid);
   const { fundSource, fundSourceName, currentBalance, totals } =
     useFundSourceBalance(form.control, fundSources);
-  const submit = useSubmitEntries(form, period.uuid);
+  const submit = useSubmitEntries(form, period.uuid, clearDraft);
 
   const canPost = period.status === 'opened' && !!fundSource;
 
@@ -26,7 +27,7 @@ export default function PostJournalEntriesPage({ periodUuid }: Props) {
       <form
         noValidate
         onSubmit={submit.openConfirm}
-        className="mt-6 flex flex-col gap-6"
+        className="mt-3 flex flex-col gap-3"
       >
         {period.status !== 'opened' && (
           <Alert>
@@ -50,20 +51,28 @@ export default function PostJournalEntriesPage({ periodUuid }: Props) {
 
         <FundSourceCard fundSources={fundSources} disabled={submit.isPending} />
 
-        <PostJournalEntriesGrid disabled={submit.isPending} />
-
-        <div className="flex justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={submit.goBack}
+        <div className="bg-background sticky top-14 flex h-[calc(100svh-5rem)] min-h-[24rem] flex-col">
+          <PostJournalEntriesGrid
             disabled={submit.isPending}
+            summary={<FundSourceSummary fundSources={fundSources} />}
           >
-            Hủy bỏ
-          </Button>
-          <Button type="submit" disabled={!canPost || totals.count === 0}>
-            Lưu {totals.count} bút toán vào {fundSourceName}
-          </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={submit.goBack}
+              disabled={submit.isPending}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!canPost || totals.count === 0}
+            >
+              Lưu {totals.count} bút toán vào {fundSourceName}
+            </Button>
+          </PostJournalEntriesGrid>
         </div>
 
         <ConfirmPostDialog
