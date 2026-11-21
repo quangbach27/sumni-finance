@@ -6,6 +6,10 @@ import CategoriesPage from '@/features/ledger-books/components/categories/catego
 import CreateCategoriesTrigger from '@/features/ledger-books/components/categories/create-categories-trigger';
 
 export const Route = createFileRoute('/_app/ledger-books_/categories')({
+  staticData: {
+    crumb: 'Danh mục và thẻ',
+    parentCrumbs: [{ label: 'Sổ cái', to: '/ledger-books' }],
+  },
   component: RouteComponent,
 });
 

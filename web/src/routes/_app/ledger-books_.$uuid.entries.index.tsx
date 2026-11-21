@@ -22,7 +22,13 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute('/_app/ledger-books_/$uuid/entries/')({
-  staticData: { crumb: 'Bút toán' },
+  staticData: {
+    crumb: 'Bút toán',
+    parentCrumbs: [
+      { label: 'Sổ cái', to: '/ledger-books' },
+      { label: 'Chi tiết kỳ', to: '/ledger-books/$uuid' },
+    ],
+  },
   validateSearch: searchSchema,
   component: RouteComponent,
   errorComponent: ({ error, reset }) => (
