@@ -23,7 +23,10 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute('/_app/fund-sources_/$uuid/')({
-  staticData: { crumb: 'Chi tiết nguồn quỹ' },
+  staticData: {
+    crumb: 'Chi tiết nguồn quỹ',
+    parentCrumbs: [{ label: 'Nguồn quỹ', to: '/fund-sources' }],
+  },
   validateSearch: searchSchema,
   component: RouteComponent,
   errorComponent: ({ error, reset }) => (

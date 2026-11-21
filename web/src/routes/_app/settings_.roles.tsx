@@ -6,7 +6,10 @@ import InviteMemberDialog from '@/features/members/components/invite-member-dial
 import MembersPage from '@/features/members/components/members-page';
 
 export const Route = createFileRoute('/_app/settings_/roles')({
-  staticData: { crumb: 'Vai trò và quyền' },
+  staticData: {
+    crumb: 'Vai trò và quyền',
+    parentCrumbs: [{ label: 'Cài đặt', to: '/settings' }],
+  },
   component: RouteComponent,
 });
 

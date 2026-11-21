@@ -17,7 +17,10 @@ import LedgerPeriodDetailsPage from '@/features/ledger-books/components/ledger-p
 import { formatDate } from '@/lib/date';
 
 export const Route = createFileRoute('/_app/ledger-books_/$uuid/')({
-  staticData: { crumb: 'Chi tiết kỳ' },
+  staticData: {
+    crumb: 'Chi tiết kỳ',
+    parentCrumbs: [{ label: 'Sổ cái', to: '/ledger-books' }],
+  },
   component: RouteComponent,
   errorComponent: ({ error, reset }) => (
     <ErrorComponent

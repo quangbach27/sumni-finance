@@ -32,6 +32,8 @@ declare module '@tanstack/react-router' {
   }
   interface StaticDataRouteOption {
     crumb?: string;
+    /** Ancestor crumbs for flat (`_`) routes that are not nested under their parent. `to` may contain params, filled from the match. */
+    parentCrumbs?: { label: string; to: string }[];
   }
 }
 
