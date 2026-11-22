@@ -17,6 +17,16 @@ const searchSchema = z.object({
     .catch(1),
   category: z.string().optional().catch(undefined),
   page: z.number().int().min(1).catch(1),
+  pageSize: z
+    .union([
+      z.literal(10),
+      z.literal(20),
+      z.literal(30),
+      z.literal(40),
+      z.literal(50),
+    ])
+    .catch(10)
+    .default(10),
   status: z.enum(['posted', 'voided', 'all']).catch('all'),
   /** Entry whose details dialog is open. */
   entry: z.string().optional().catch(undefined),

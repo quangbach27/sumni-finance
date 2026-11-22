@@ -16,7 +16,7 @@ import {
 import { getCategoriesQueryOptions } from '@/features/ledger-books/api/get-categories';
 import { ENTRY_STATUS_OPTIONS } from '@/features/ledger-entries/components/entries-status-options';
 
-import { useEntriesSearch } from './use-entries-search';
+import { useEntriesFilters } from './use-entries-filters';
 
 const ALL = 'all';
 const RANGES = [1, 2, 3, 6] as const;
@@ -26,10 +26,10 @@ export default function FundSourceEntriesFilterBar({
 }: {
   totalCount?: number;
 }) {
-  const { search, update } = useEntriesSearch();
+  const { filters, updateFilters } = useEntriesFilters();
   const { data } = useSuspenseQuery(getCategoriesQueryOptions());
   const categories = data.items;
-  const category = categories.find((c) => c.uuid === search.category);
+  const category = categories.find((c) => c.uuid === filters.category);
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -42,12 +42,12 @@ export default function FundSourceEntriesFilterBar({
       </InputGroup>
 
       <Select
-        value={String(search.range)}
+        value={String(filters.range)}
         onValueChange={(v) => {
-          if (v) update({ range: Number(v) as (typeof RANGES)[number] });
+          if (v) updateFilters({ range: Number(v) as (typeof RANGES)[number] });
         }}
       >
-        <SelectTrigger>{search.range} tháng gần nhất</SelectTrigger>
+        <SelectTrigger>{filters.range} tháng gần nhất</SelectTrigger>
         <SelectContent>
           {RANGES.map((m) => (
             <SelectItem key={m} value={String(m)}>
@@ -58,9 +58,9 @@ export default function FundSourceEntriesFilterBar({
       </Select>
 
       <Select
-        value={search.category ?? ALL}
+        value={filters.category ?? ALL}
         onValueChange={(v) => {
-          if (v) update({ category: v === ALL ? undefined : v });
+          if (v) updateFilters({ category: v === ALL ? undefined : v });
         }}
       >
         <SelectTrigger>Danh mục: {category?.name ?? 'Tất cả'}</SelectTrigger>
@@ -75,14 +75,14 @@ export default function FundSourceEntriesFilterBar({
       </Select>
 
       <Select
-        value={search.status}
+        value={filters.status}
         onValueChange={(v) => {
-          if (v) update({ status: v });
+          if (v) updateFilters({ status: v });
         }}
       >
         <SelectTrigger>
           Trạng thái:{' '}
-          {ENTRY_STATUS_OPTIONS.find((s) => s.value === search.status)?.label}
+          {ENTRY_STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
         </SelectTrigger>
         <SelectContent>
           {ENTRY_STATUS_OPTIONS.map((s) => (
@@ -95,7 +95,7 @@ export default function FundSourceEntriesFilterBar({
 
       {totalCount !== undefined && (
         <span className="text-muted-foreground ml-auto text-sm">
-          {search.range} tháng gần nhất · {totalCount} bút toán
+          {filters.range} tháng gần nhất · {totalCount} bút toán
         </span>
       )}
     </div>

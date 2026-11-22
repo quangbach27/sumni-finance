@@ -7,6 +7,7 @@ import { LEDGER_ENTRIES_URL, normalizeLedgerEntry } from './get-ledger-entry';
 import type { ListLedgerEntriesResponse } from './types';
 
 export const ENTRIES_PAGE_SIZE = 10;
+export const ENTRIES_PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const;
 
 export type LedgerEntriesStatus = 'posted' | 'voided' | 'all';
 
