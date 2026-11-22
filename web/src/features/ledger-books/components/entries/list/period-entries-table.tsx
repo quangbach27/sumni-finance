@@ -29,7 +29,7 @@ import {
 import { formatAmount } from '@/lib/currency';
 import { formatDate } from '@/lib/date';
 
-import { usePeriodEntriesSearch } from './use-period-entries-search';
+import { usePeriodEntriesFilters } from './use-period-entries-filters';
 
 import type { LedgerEntry } from '@/features/ledger-entries/api/types';
 
@@ -40,17 +40,18 @@ export default function PeriodEntriesTable({
 }: {
   periodUuid: string;
 }) {
-  const { search, update } = usePeriodEntriesSearch();
+  const { filters, updateFilters } = usePeriodEntriesFilters();
   const queryClient = useQueryClient();
   const { data, isPending } = useQuery(
     listLedgerEntriesQueryOptions({
       ledgerPeriodUuid: periodUuid,
-      categoryUuid: search.category,
-      fundSourceUuid: search.fundSource,
+      categoryUuid: filters.category,
+      fundSourceUuid: filters.fundSource,
       // Reversal entries are reached from their voided entry's details.
       kind: 'normal',
-      status: search.status,
-      page: search.page,
+      status: filters.status,
+      page: filters.page,
+      pageSize: filters.pageSize,
     }),
   );
 
@@ -62,11 +63,11 @@ export default function PeriodEntriesTable({
     );
   const openEntry = (entry: LedgerEntry) => {
     seed(entry);
-    update({ entry: entry.uuid });
+    updateFilters({ entry: entry.uuid });
   };
   const cancelEntry = (entry: LedgerEntry) => {
     seed(entry);
-    update({ cancel: entry.uuid });
+    updateFilters({ cancel: entry.uuid });
   };
 
   return (
@@ -207,21 +208,24 @@ export default function PeriodEntriesTable({
         )}
 
         <EntriesPagination
-          page={search.page}
-          pageSize={data?.page_info.page_size ?? 10}
+          page={filters.page}
+          pageSize={filters.pageSize}
           totalCount={data?.page_info.total_count ?? 0}
-          onPageChange={(page) => update({ page })}
+          onPageChange={(page) => updateFilters({ page })}
+          onPageSizeChange={(pageSize) => updateFilters({ pageSize })}
         />
       </div>
 
       <EntryDetailDialog
-        entryUuid={search.entry}
-        onEntryChange={(uuid) => update({ entry: uuid })}
-        onCancelEntry={(uuid) => update({ entry: undefined, cancel: uuid })}
+        entryUuid={filters.entry}
+        onEntryChange={(uuid) => updateFilters({ entry: uuid })}
+        onCancelEntry={(uuid) =>
+          updateFilters({ entry: undefined, cancel: uuid })
+        }
       />
       <CancelEntryDialog
-        entryUuid={search.cancel}
-        onClose={() => update({ cancel: undefined })}
+        entryUuid={filters.cancel}
+        onClose={() => updateFilters({ cancel: undefined })}
       />
     </>
   );

@@ -15,6 +15,16 @@ const searchSchema = z.object({
   fundSource: z.string().optional().catch(undefined),
   status: z.enum(['posted', 'voided', 'all']).optional().catch(undefined),
   page: z.number().int().min(1).catch(1),
+  pageSize: z
+    .union([
+      z.literal(10),
+      z.literal(20),
+      z.literal(30),
+      z.literal(40),
+      z.literal(50),
+    ])
+    .catch(10)
+    .default(10),
   /** Entry whose details dialog is open. */
   entry: z.string().optional().catch(undefined),
   /** Entry whose cancel dialog is open. */
