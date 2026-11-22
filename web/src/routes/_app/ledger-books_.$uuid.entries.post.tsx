@@ -10,7 +10,14 @@ import ErrorComponent from '@/components/layout/error-component/error-component'
 import PostJournalEntriesPage from '@/features/ledger-books/components/entries/post/post-journal-entries-page';
 
 export const Route = createFileRoute('/_app/ledger-books_/$uuid/entries/post')({
-  staticData: { crumb: 'Ghi bút toán' },
+  staticData: {
+    crumb: 'Ghi bút toán',
+    parentCrumbs: [
+      { label: 'Sổ cái', to: '/ledger-books' },
+      { label: 'Chi tiết kỳ', to: '/ledger-books/$uuid' },
+      { label: 'Bút toán', to: '/ledger-books/$uuid/entries' },
+    ],
+  },
   component: RouteComponent,
   errorComponent: ({ error, reset }) => (
     <ErrorComponent

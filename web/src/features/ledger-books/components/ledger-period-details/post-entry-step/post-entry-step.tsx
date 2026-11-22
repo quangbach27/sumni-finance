@@ -83,6 +83,7 @@ export default function PostEntryStep({ periodUuid }: { periodUuid: string }) {
               <div className="flex flex-wrap gap-3">
                 <Button
                   variant="outline"
+                  nativeButton={false}
                   render={
                     <Link
                       to="/ledger-books/$uuid/entries"
@@ -95,6 +96,7 @@ export default function PostEntryStep({ periodUuid }: { periodUuid: string }) {
                   Tất cả bút toán
                 </Button>
                 <Button
+                  nativeButton={false}
                   render={
                     <Link
                       to="/ledger-books/$uuid/entries/post"
