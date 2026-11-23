@@ -45,9 +45,7 @@ func TestBuildReportSnapshot(t *testing.T) {
 		assert.True(t, snap.Ledger.TotalOutflow.Equal(dec(250)))
 
 		require.Len(t, snap.FundSources, 2)
-		assert.Equal(t, models.ReconcileStatusReconciled, snap.FundSources[0].ReconcileStatus)
 		assert.Equal(t, &by, snap.FundSources[0].ReconciledBy)
-		assert.Equal(t, models.ReconcileStatusUnreconciled, snap.FundSources[1].ReconcileStatus)
 		assert.Nil(t, snap.FundSources[1].ReconciledBy)
 	})
 

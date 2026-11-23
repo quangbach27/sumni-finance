@@ -10,12 +10,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Reconcile statuses of a fund source in a report.
-const (
-	ReconcileStatusReconciled   = "reconciled"
-	ReconcileStatusUnreconciled = "unreconciled"
-)
-
 // LedgerPeriodReport is the report of one reconciled ledger period. Its content is
 // the frozen ReportSnapshot, stored as json.
 type LedgerPeriodReport struct {
