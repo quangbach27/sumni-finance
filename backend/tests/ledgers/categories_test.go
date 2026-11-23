@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	ledgersClients "backend/internal/ledgers/ports/http/clients"
 	"backend/internal/shared"
@@ -161,8 +160,8 @@ func TestPostLedgerEntriesWithCategory(t *testing.T) {
 		food := listCategories(t, clients, token)[0]
 
 		inCategory, inSub := entryInput(shared.DirectionOutflow, 1_000), entryInput(shared.DirectionOutflow, 2_000)
-		inCategory.CategoryUuid = &food.Uuid
-		inSub.CategoryUuid = &food.SubCategories[0].Uuid
+		inCategory.CategoryUuid = food.Uuid
+		inSub.CategoryUuid = food.SubCategories[0].Uuid
 
 		resp := postLedgerEntries(t, clients, token, period, fs, inCategory, inSub)
 		assert.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
@@ -174,9 +173,9 @@ func TestPostLedgerEntriesWithCategory(t *testing.T) {
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
 		period := openPeriod(t, clients, token, fs)
 
-		unknown := models.CategoryUUID{UUID: common.NewUUIDv7()}
+		unknown := domain.CategoryUUID{UUID: common.NewUUIDv7()}
 		bad := entryInput(shared.DirectionInflow, 1_000)
-		bad.CategoryUuid = &unknown
+		bad.CategoryUuid = unknown
 
 		resp := postLedgerEntries(t, clients, token, period, fs, entryInput(shared.DirectionInflow, 1), bad)
 		require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
@@ -185,8 +184,19 @@ func TestPostLedgerEntriesWithCategory(t *testing.T) {
 	})
 }
 
+func TestPostLedgerEntriesRequiresCategory(t *testing.T) {
+	utils.ResetLedgerPeriods(t)
+	clients, token := utils.NewTestClients(t), newUserToken()
+	_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
+	period := openPeriod(t, clients, token, fs)
+
+	resp := postLedgerEntriesRaw(t, clients, token, period, fs, entryInput(shared.DirectionInflow, 1_000))
+	require.Equal(t, 400, resp.StatusCode(), "body: %s", string(resp.Body))
+	assert.Contains(t, errorSlugs(resp.JSON400), "category-required")
+}
+
 func TestGetLedgerPeriodCategorySummaries(t *testing.T) {
-	t.Run("rolls sub-category entries up to the parent and groups uncategorized ones", func(t *testing.T) {
+	t.Run("rolls sub-category entries up to the parent category", func(t *testing.T) {
 		utils.ResetLedgerPeriods(t)
 		clients, token := utils.NewTestClients(t), newUserToken()
 		_, fs := createFundSource(t, clients, token, domain.FundSourceTypeCash)
@@ -209,13 +219,12 @@ func TestGetLedgerPeriodCategorySummaries(t *testing.T) {
 		require.NotEmpty(t, food.SubCategories)
 
 		onFood, onRice := entryInput(shared.DirectionOutflow, 1_000), entryInput(shared.DirectionOutflow, 2_000)
-		onFood.CategoryUuid = &food.Uuid
-		onRice.CategoryUuid = &food.SubCategories[0].Uuid
+		onFood.CategoryUuid = food.Uuid
+		onRice.CategoryUuid = food.SubCategories[0].Uuid
 		onSalary := entryInput(shared.DirectionInflow, 5_000)
-		onSalary.CategoryUuid = &salary.Uuid
-		uncategorized := entryInput(shared.DirectionInflow, 700)
+		onSalary.CategoryUuid = salary.Uuid
 
-		resp := postLedgerEntries(t, clients, token, period, fs, onFood, onRice, onSalary, uncategorized)
+		resp := postLedgerEntries(t, clients, token, period, fs, onFood, onRice, onSalary)
 		require.Equal(t, 201, resp.StatusCode(), "body: %s", string(resp.Body))
 
 		got := getLedgerPeriod(t, clients, token, period)
@@ -226,13 +235,9 @@ func TestGetLedgerPeriodCategorySummaries(t *testing.T) {
 			in, out decimal.Decimal
 		}
 		byCategory := map[string]totals{}
-		var uncategorizedTotals *totals
 		for _, s := range got.JSON200.LedgerPeriod.CategorySummaries {
 			tt := totals{count: s.EntryCount, in: s.TotalInflow, out: s.TotalOutflow}
-			if s.CategoryUuid == nil {
-				uncategorizedTotals = &tt
-				continue
-			}
+			require.NotNil(t, s.CategoryUuid, "every entry has a category")
 			byCategory[s.CategoryUuid.String()] = tt
 		}
 
@@ -242,9 +247,6 @@ func TestGetLedgerPeriodCategorySummaries(t *testing.T) {
 		assert.True(t, byCategory[food.Uuid.String()].in.IsZero())
 		assert.EqualValues(t, 1, byCategory[salary.Uuid.String()].count)
 		assert.True(t, byCategory[salary.Uuid.String()].in.Equal(decimal.NewFromInt(5_000)))
-		require.NotNil(t, uncategorizedTotals)
-		assert.EqualValues(t, 1, uncategorizedTotals.count)
-		assert.True(t, uncategorizedTotals.in.Equal(decimal.NewFromInt(700)))
 	})
 
 	t.Run("period without entries has no summaries", func(t *testing.T) {

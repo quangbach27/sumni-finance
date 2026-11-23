@@ -10,7 +10,7 @@ import (
 	"github.com/quangbach27/golang-common/log"
 
 	"backend/internal/authorization/ports/module/client"
-	"backend/internal/ledgers/apps/models"
+	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
 
@@ -19,19 +19,19 @@ type CategoryRepository interface {
 	// UpsertCategories saves the categories with their sub-categories in one
 	// transaction: an existing UUID updates the name and description, a new
 	// one inserts.
-	UpsertCategories(ctx context.Context, orgID string, categories []models.Category) error
+	UpsertCategories(ctx context.Context, orgID string, categories []domain.Category) error
 }
 
 type SubCategoryInput struct {
 	// UUID updates the sub-category when set; otherwise a new one is created.
-	UUID        *models.CategoryUUID
+	UUID        *domain.CategoryUUID
 	Name        string
 	Description *string
 }
 
 type CategoryInput struct {
 	// UUID updates the category when set; otherwise a new one is created.
-	UUID          *models.CategoryUUID
+	UUID          *domain.CategoryUUID
 	Name          string
 	Description   *string
 	SubCategories []SubCategoryInput
@@ -47,7 +47,7 @@ type UpsertCategory struct {
 // category's UUID and name with the new sub-category. Sub-categories that are
 // not sent are left as they are. It returns the saved category UUIDs in the
 // order of cmd.Categories.
-func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]models.CategoryUUID, error) {
+func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]domain.CategoryUUID, error) {
 	principal, err := h.modules.Authorize(ctx, client.AuthorizeRequest{
 		Session:  cmd.Session,
 		Resource: shared.ResourceLedgerCategory,
@@ -70,7 +70,7 @@ func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]mo
 		return nil, err
 	}
 
-	uuids := make([]models.CategoryUUID, 0, len(categories))
+	uuids := make([]domain.CategoryUUID, 0, len(categories))
 	for _, c := range categories {
 		uuids = append(uuids, c.UUID)
 	}
@@ -80,19 +80,19 @@ func (h *Handlers) UpsertCategory(ctx context.Context, cmd UpsertCategory) ([]mo
 	return uuids, nil
 }
 
-func newCategoryUUID(in *models.CategoryUUID) models.CategoryUUID {
+func newCategoryUUID(in *domain.CategoryUUID) domain.CategoryUUID {
 	if in != nil {
 		return *in
 	}
 
-	return models.CategoryUUID{UUID: common.NewUUIDv7()}
+	return domain.CategoryUUID{UUID: common.NewUUIDv7()}
 }
 
 // buildCategories creates the models. Validation failures of all categories
 // and sub-categories are returned together, each detail tagged with the index
 // path ("1" for a category, "1.0" for its first sub-category).
-func buildCategories(cmd UpsertCategory) ([]models.Category, error) {
-	categories := make([]models.Category, 0, len(cmd.Categories))
+func buildCategories(cmd UpsertCategory) ([]domain.Category, error) {
+	categories := make([]domain.Category, 0, len(cmd.Categories))
 
 	var details []common.ErrorDetails
 
@@ -118,9 +118,9 @@ func buildCategories(cmd UpsertCategory) ([]models.Category, error) {
 		parentUUID := newCategoryUUID(in.UUID)
 		prefix := strconv.Itoa(i)
 
-		children := make([]models.Category, 0, len(in.SubCategories))
+		children := make([]domain.Category, 0, len(in.SubCategories))
 		for j, sub := range in.SubCategories {
-			child, err := models.NewCategory(newCategoryUUID(sub.UUID), &parentUUID, sub.Name, sub.Description, nil)
+			child, err := domain.NewCategory(newCategoryUUID(sub.UUID), &parentUUID, sub.Name, sub.Description, nil)
 			if err != nil {
 				if err := collect(prefix+"."+strconv.Itoa(j), err); err != nil {
 					return nil, err
@@ -132,7 +132,7 @@ func buildCategories(cmd UpsertCategory) ([]models.Category, error) {
 			children = append(children, child)
 		}
 
-		category, err := models.NewCategory(parentUUID, nil, in.Name, in.Description, children)
+		category, err := domain.NewCategory(parentUUID, nil, in.Name, in.Description, children)
 		if err != nil {
 			if err := collect(prefix, err); err != nil {
 				return nil, err

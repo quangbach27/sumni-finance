@@ -44,11 +44,19 @@ func TestUnmarshalLedgerPeriod(t *testing.T) {
 	require.NoError(t, err)
 
 	got := domain.UnmarshalLedgerPeriod(
-		p.UUID(), p.Name(), p.OpeningBalance(), nil, p.OpenDate(), p.CloseDate(), p.Status(), nil, nil, nil,
+		p.UUID(), p.Name(), p.OpeningBalance(), nil, p.OpenDate(), p.CloseDate(), p.Status(), nil, nil, nil, nil,
 	)
 
 	assert.Equal(t, p, got)
 	assert.True(t, got.CanPostEntries())
+	assert.Nil(t, got.ReportUUID())
+
+	reportUUID := domain.ReportUUID{UUID: common.NewUUIDv7()}
+	withReport := domain.UnmarshalLedgerPeriod(
+		p.UUID(), p.Name(), p.OpeningBalance(), nil, p.OpenDate(), p.CloseDate(), p.Status(), nil, nil, nil, &reportUUID,
+	)
+	require.NotNil(t, withReport.ReportUUID())
+	assert.Equal(t, reportUUID, *withReport.ReportUUID())
 }
 
 func TestUnmarshalFundSourceStatement(t *testing.T) {

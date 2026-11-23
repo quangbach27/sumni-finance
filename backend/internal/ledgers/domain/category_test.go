@@ -1,4 +1,4 @@
-package models_test
+package domain_test
 
 import (
 	"testing"
@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"backend/internal/ledgers/apps/models"
+	"backend/internal/ledgers/domain"
 )
 
-func newID() models.CategoryUUID { return models.CategoryUUID{UUID: common.NewUUIDv7()} }
+func newID() domain.CategoryUUID { return domain.CategoryUUID{UUID: common.NewUUIDv7()} }
 
 func slugs(t *testing.T, err error) []string {
 	t.Helper()
@@ -31,7 +31,7 @@ func TestNewCategory(t *testing.T) {
 
 	t.Run("returns a trimmed value", func(t *testing.T) {
 		id := newID()
-		c, err := models.NewCategory(id, nil, "  Food ", &desc, nil)
+		c, err := domain.NewCategory(id, nil, "  Food ", &desc, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "Food", c.Name)
 		require.NotNil(t, c.Description)
@@ -41,35 +41,35 @@ func TestNewCategory(t *testing.T) {
 
 	t.Run("blank description becomes nil", func(t *testing.T) {
 		blank := "  "
-		c, err := models.NewCategory(newID(), nil, "Food", &blank, nil)
+		c, err := domain.NewCategory(newID(), nil, "Food", &blank, nil)
 		require.NoError(t, err)
 		assert.Nil(t, c.Description)
 	})
 
 	t.Run("collects field errors", func(t *testing.T) {
-		_, err := models.NewCategory(models.CategoryUUID{}, nil, " ", nil, nil)
+		_, err := domain.NewCategory(domain.CategoryUUID{}, nil, " ", nil, nil)
 		assert.ElementsMatch(t, []string{"category-name-required", "category-uuid-required"}, slugs(t, err))
 	})
 
 	t.Run("children must point at the parent", func(t *testing.T) {
 		parent := newID()
-		child, err := models.NewCategory(newID(), &parent, "Rice", nil, nil)
+		child, err := domain.NewCategory(newID(), &parent, "Rice", nil, nil)
 		require.NoError(t, err)
 
-		c, err := models.NewCategory(parent, nil, "Food", nil, []models.Category{child})
+		c, err := domain.NewCategory(parent, nil, "Food", nil, []domain.Category{child})
 		require.NoError(t, err)
 		assert.Len(t, c.Children, 1)
 
-		_, err = models.NewCategory(newID(), nil, "Other", nil, []models.Category{child})
+		_, err = domain.NewCategory(newID(), nil, "Other", nil, []domain.Category{child})
 		assert.Equal(t, []string{"parent-category-invalid"}, slugs(t, err))
 	})
 
 	t.Run("a sub-category cannot have children", func(t *testing.T) {
 		parent := newID()
-		grandChild, err := models.NewCategory(newID(), &parent, "Deep", nil, nil)
+		grandChild, err := domain.NewCategory(newID(), &parent, "Deep", nil, nil)
 		require.NoError(t, err)
 
-		_, err = models.NewCategory(newID(), &parent, "Sub", nil, []models.Category{grandChild})
+		_, err = domain.NewCategory(newID(), &parent, "Sub", nil, []domain.Category{grandChild})
 		assert.Contains(t, slugs(t, err), "category-too-deep")
 	})
 }

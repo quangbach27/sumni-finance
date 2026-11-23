@@ -14,9 +14,9 @@ import (
 )
 
 type LedgersCategory struct {
-	Uuid        models.CategoryUUID
+	Uuid        domain.CategoryUUID
 	OrgID       string
-	ParentUuid  *models.CategoryUUID
+	ParentUuid  *domain.CategoryUUID
 	Name        string
 	Description *string
 	CreatedAt   time.Time
@@ -58,7 +58,7 @@ type LedgersLedgerEntry struct {
 	Direction           shared.Direction
 	Description         string
 	OccurredAt          time.Time
-	CategoryUuid        *models.CategoryUUID
+	CategoryUuid        domain.CategoryUUID
 	FsBalanceBefore     decimal.Decimal
 	FsBalanceAfter      decimal.Decimal
 	Status              domain.EntryStatus
@@ -84,10 +84,12 @@ type LedgersLedgerPeriod struct {
 	ReopenedAt     *time.Time
 	ReconciledAt   *time.Time
 	CreatedAt      time.Time
-	ReportUuid     *models.ReportUUID
+	ReportUuid     *domain.ReportUUID
 }
 
 type LedgersLedgerPeriodReport struct {
-	Uuid      models.ReportUUID
+	Uuid      domain.ReportUUID
+	OrgID     string
+	Snapshot  models.ReportSnapshot
 	CreatedAt time.Time
 }

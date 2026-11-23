@@ -19,9 +19,8 @@ CREATE UNIQUE INDEX categories_sub_category_name_unique
     ON ledgers.categories (parent_uuid, lower(name))
     WHERE parent_uuid IS NOT NULL;
 
--- NOT VALID: entries posted before categories existed may hold unknown UUIDs.
 ALTER TABLE ledgers.ledger_entries
     ADD CONSTRAINT ledger_entries_category_fk
-    FOREIGN KEY (category_uuid) REFERENCES ledgers.categories (uuid) NOT VALID;
+    FOREIGN KEY (category_uuid) REFERENCES ledgers.categories (uuid);
 
 COMMIT;

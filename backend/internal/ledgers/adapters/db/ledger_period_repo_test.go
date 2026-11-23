@@ -176,14 +176,28 @@ type entrySpec struct {
 	amount    int64
 }
 
+// seedCategory inserts a category of the test org; entries must reference an existing one.
+func seedCategory(t *testing.T) domain.CategoryUUID {
+	t.Helper()
+
+	id := domain.CategoryUUID{UUID: common.NewUUIDv7()}
+	_, err := pgxDb.Exec(context.Background(),
+		"INSERT INTO ledgers.categories (uuid, org_id, name) VALUES ($1, $2, $3)", id.UUID, testOrgID, "cat-"+id.String())
+	require.NoError(t, err)
+
+	return id
+}
+
 func postFnFor(t *testing.T, specs []entrySpec) func(*domain.LedgerPeriod, map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {
 	t.Helper()
+
+	category := seedCategory(t)
 
 	return func(period *domain.LedgerPeriod, fss map[domain.FundSourceUUID]*domain.FundSource) ([]*domain.LedgerEntry, error) {
 		entries := make([]*domain.LedgerEntry, 0, len(specs))
 		for _, s := range specs {
 			e, err := domain.NewLedgerEntry(period.UUID(), s.fs.UUID(), decimal.NewFromInt(s.amount), s.direction,
-				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), nil, "user_test")
+				"entry", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), category, "user_test")
 			if err != nil {
 				return nil, err
 			}

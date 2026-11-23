@@ -9,7 +9,6 @@ import (
 	"github.com/quangbach27/golang-common/http/auth"
 
 	"backend/internal/ledgers/apps/commands"
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/apps/queries"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
@@ -204,6 +203,23 @@ func (h *Handlers) GenerateLedgerPeriodReport(ctx context.Context, request Gener
 	return GenerateLedgerPeriodReport200JSONResponse{ReportUuid: reportUUID}, nil
 }
 
+func (h *Handlers) GetLedgerPeriodReport(ctx context.Context, request GetLedgerPeriodReportRequestObject) (GetLedgerPeriodReportResponseObject, error) {
+	session, err := sessionFromRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshot, err := h.queryHandlers.GetLedgerPeriodReport(ctx, queries.GetLedgerPeriodReport{
+		Session:    session,
+		ReportUUID: request.ReportUuid,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return GetLedgerPeriodReport200JSONResponse(snapshot), nil
+}
+
 func (h *Handlers) ReconcileLedgerPeriod(ctx context.Context, request ReconcileLedgerPeriodRequestObject) (ReconcileLedgerPeriodResponseObject, error) {
 	session, err := sessionFromRequest(ctx)
 	if err != nil {
@@ -363,7 +379,7 @@ func toAPILedgerPeriodDetail(period queries.LedgerPeriodDetail) LedgerPeriodDeta
 			TotalOutflow: cs.TotalOutflow,
 		}
 		if cs.CategoryUUID != nil {
-			summary.CategoryUuid = &models.CategoryUUID{UUID: common.MustUUIDFromString(*cs.CategoryUUID)}
+			summary.CategoryUuid = &domain.CategoryUUID{UUID: common.MustUUIDFromString(*cs.CategoryUUID)}
 		}
 
 		summaries = append(summaries, summary)
@@ -407,12 +423,12 @@ func toAPILedgerPeriod(p queries.LedgerPeriod) LedgerPeriod {
 	}
 }
 
-func toAPIReportUUID(id *string) *models.ReportUUID {
+func toAPIReportUUID(id *string) *domain.ReportUUID {
 	if id == nil {
 		return nil
 	}
 
-	return &models.ReportUUID{UUID: common.MustUUIDFromString(*id)}
+	return &domain.ReportUUID{UUID: common.MustUUIDFromString(*id)}
 }
 
 func (h *Handlers) ListFundSources(ctx context.Context, _ ListFundSourcesRequestObject) (ListFundSourcesResponseObject, error) {
@@ -469,14 +485,14 @@ func (h *Handlers) ListCategories(ctx context.Context, request ListCategoriesReq
 		subs := make([]SubCategory, 0, len(c.SubCategories))
 		for _, s := range c.SubCategories {
 			subs = append(subs, SubCategory{
-				Uuid:        models.CategoryUUID{UUID: common.MustUUIDFromString(s.UUID)},
+				Uuid:        domain.CategoryUUID{UUID: common.MustUUIDFromString(s.UUID)},
 				Name:        s.Name,
 				Description: s.Description,
 			})
 		}
 
 		items = append(items, Category{
-			Uuid:          models.CategoryUUID{UUID: common.MustUUIDFromString(c.UUID)},
+			Uuid:          domain.CategoryUUID{UUID: common.MustUUIDFromString(c.UUID)},
 			Name:          c.Name,
 			Description:   c.Description,
 			SubCategories: subs,
@@ -601,7 +617,7 @@ func toAPICategoryRef(ref *queries.CategoryRef) *LedgerEntryCategoryRef {
 	}
 
 	return &LedgerEntryCategoryRef{
-		Uuid: models.CategoryUUID{UUID: common.MustUUIDFromString(ref.UUID)},
+		Uuid: domain.CategoryUUID{UUID: common.MustUUIDFromString(ref.UUID)},
 		Name: ref.Name,
 	}
 }

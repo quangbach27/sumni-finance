@@ -5,7 +5,6 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/shared"
 )
 
@@ -56,6 +55,7 @@ func UnmarshalLedgerPeriod(
 	status LedgerStatus,
 	reopenReason *string,
 	reopenedAt, reconciledAt *time.Time,
+	reportUUID *ReportUUID,
 ) *LedgerPeriod {
 	return &LedgerPeriod{
 		uuid:           uuid,
@@ -68,6 +68,7 @@ func UnmarshalLedgerPeriod(
 		reopenReason:   reopenReason,
 		reopenedAt:     reopenedAt,
 		reconciledAt:   reconciledAt,
+		reportUUID:     reportUUID,
 	}
 }
 
@@ -100,7 +101,7 @@ func UnmarshalLedgerEntry(
 	direction shared.Direction,
 	description string,
 	occurredAt time.Time,
-	categoryUUID *models.CategoryUUID,
+	categoryUUID CategoryUUID,
 	fsBalanceBefore, fsBalanceAfter decimal.Decimal,
 	status EntryStatus,
 	kind EntryKind,

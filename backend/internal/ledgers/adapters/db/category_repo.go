@@ -13,7 +13,7 @@ import (
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
 	"backend/internal/ledgers/apps/commands"
-	"backend/internal/ledgers/apps/models"
+	"backend/internal/ledgers/domain"
 )
 
 const pgUniqueViolation = "23505"
@@ -32,13 +32,12 @@ func NewCategoryRepository(db *pgxpool.Pool) (*CategoryRepo, error) {
 	return &CategoryRepo{db: db}, nil
 }
 
-func (r *CategoryRepo) UpsertCategories(ctx context.Context, orgID string, categories []models.Category) error {
+func (r *CategoryRepo) UpsertCategories(ctx context.Context, orgID string, categories []domain.Category) error {
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		return saveCategories(ctx, dbmodels.New(tx), orgID, categories)
 	})
 	if err != nil {
-		var cerr common.Error
-		if errors.As(err, &cerr) {
+		if _, ok := errors.AsType[common.Error](err); ok {
 			return err
 		}
 
@@ -55,8 +54,8 @@ func (r *CategoryRepo) UpsertCategories(ctx context.Context, orgID string, categ
 
 // flatten returns each category followed by its sub-categories, so a parent is
 // always saved before its children.
-func flatten(categories []models.Category) []models.Category {
-	flat := make([]models.Category, 0, len(categories))
+func flatten(categories []domain.Category) []domain.Category {
+	flat := make([]domain.Category, 0, len(categories))
 	for _, c := range categories {
 		flat = append(flat, c)
 		flat = append(flat, c.Children...)
@@ -69,11 +68,11 @@ func saveCategories(
 	ctx context.Context,
 	q *dbmodels.Queries,
 	orgID string,
-	categories []models.Category,
+	categories []domain.Category,
 ) error {
 	items := flatten(categories)
 
-	seen := make(map[models.CategoryUUID]struct{}, len(items))
+	seen := make(map[domain.CategoryUUID]struct{}, len(items))
 	for _, c := range items {
 		if _, dup := seen[c.UUID]; dup {
 			return common.NewInvalidInputError("duplicate-category", "category %s is sent more than once", c.UUID.String())
@@ -96,7 +95,7 @@ func saveCategories(
 
 	// known maps a category to its parent (nil for top-level): the loaded
 	// parents first, then each item once it is saved.
-	known := make(map[models.CategoryUUID]*models.CategoryUUID, len(rows)+len(items))
+	known := make(map[domain.CategoryUUID]*domain.CategoryUUID, len(rows)+len(items))
 	for _, row := range rows {
 		known[row.Uuid] = row.ParentUuid
 	}
@@ -128,9 +127,9 @@ func saveCategories(
 
 // checkParent makes sure a parent is a top-level category.
 func checkParent(
-	c models.Category,
-	known map[models.CategoryUUID]*models.CategoryUUID,
-	inBatch map[models.CategoryUUID]struct{},
+	c domain.Category,
+	known map[domain.CategoryUUID]*domain.CategoryUUID,
+	inBatch map[domain.CategoryUUID]struct{},
 ) error {
 	if c.ParentUUID == nil {
 		return nil

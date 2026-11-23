@@ -88,7 +88,7 @@ type CategorySummary struct {
 }
 
 // CategoryUUID defines model for CategoryUUID.
-type CategoryUUID = models.CategoryUUID
+type CategoryUUID = domain.CategoryUUID
 
 // CreateFundSourceRequest defines model for CreateFundSourceRequest.
 type CreateFundSourceRequest struct {
@@ -211,11 +211,11 @@ type LedgerEntryDirection string
 
 // LedgerEntryInput defines model for LedgerEntryInput.
 type LedgerEntryInput struct {
-	Amount       Decimal       `json:"amount"`
-	CategoryUuid *CategoryUUID `json:"category_uuid,omitempty"`
-	Description  string        `json:"description"`
-	Direction    Direction     `json:"direction"`
-	OccurredAt   time.Time     `json:"occurred_at"`
+	Amount       Decimal      `json:"amount"`
+	CategoryUuid CategoryUUID `json:"category_uuid"`
+	Description  string       `json:"description"`
+	Direction    Direction    `json:"direction"`
+	OccurredAt   time.Time    `json:"occurred_at"`
 }
 
 // LedgerEntryKind defines model for LedgerEntryKind.
@@ -309,6 +309,9 @@ type LedgerPeriodDetail struct {
 	TotalOutflow   Decimal                 `json:"total_outflow"`
 	Uuid           LedgerPeriodUUID        `json:"uuid"`
 }
+
+// LedgerPeriodReport The frozen report of a reconciled ledger period. Bound to models.ReportSnapshot, so the json names below are the snapshot's json tags. A category's percentage is its share of all the money moved by live entries (inflow + outflow); a tag is a sub-category.
+type LedgerPeriodReport = models.ReportSnapshot
 
 // LedgerPeriodUUID defines model for LedgerPeriodUUID.
 type LedgerPeriodUUID = domain.LedgerPeriodUUID
@@ -408,7 +411,7 @@ type ReopenLedgerPeriodRequest struct {
 }
 
 // ReportUUID defines model for ReportUUID.
-type ReportUUID = models.ReportUUID
+type ReportUUID = domain.ReportUUID
 
 // SubCategory defines model for SubCategory.
 type SubCategory struct {
@@ -664,6 +667,13 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
 	VoidLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetLedgerPeriodReport Get a ledger period report
+	//
+	// Returns the stored report. 404 `report-not-found` when no report with this UUID exists in the caller's org.
+	//
+	// Corresponds with GET /api/v1/ledger-period-reports/{report_uuid} (the `GetLedgerPeriodReport` operationId).
+	GetLedgerPeriodReport(ctx context.Context, reportUuid ReportUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListLedgerPeriods List ledger periods
 	//
 	// Newest period (by open date) first.
@@ -755,7 +765,7 @@ type ClientInterface interface {
 
 	// GenerateLedgerPeriodReport Generate a report for a ledger period
 	//
-	// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+	// Generates the report of a reconciled ledger period and stores it on the period. A period has one report; when it already has one, its UUID is returned. Periods that are not reconciled are rejected with 409 `period-not-reconciled`.
 	//
 	// Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/report (the `GenerateLedgerPeriodReport` operationId).
 	GenerateLedgerPeriodReport(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -975,6 +985,23 @@ func (c *Client) VoidLedgerEntry(ctx context.Context, ledgerEntryUuid openapi_ty
 	return c.Client.Do(req)
 }
 
+// GetLedgerPeriodReport Get a ledger period report
+//
+// Returns the stored report. 404 `report-not-found` when no report with this UUID exists in the caller's org.
+//
+// Corresponds with GET /api/v1/ledger-period-reports/{report_uuid} (the `GetLedgerPeriodReport` operationId).
+func (c *Client) GetLedgerPeriodReport(ctx context.Context, reportUuid ReportUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerPeriodReportRequest(c.Server, reportUuid)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListLedgerPeriods List ledger periods
 //
 // Newest period (by open date) first.
@@ -1176,7 +1203,7 @@ func (c *Client) ReopenLedgerPeriod(ctx context.Context, ledgerPeriodUuid Ledger
 
 // GenerateLedgerPeriodReport Generate a report for a ledger period
 //
-// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+// Generates the report of a reconciled ledger period and stores it on the period. A period has one report; when it already has one, its UUID is returned. Periods that are not reconciled are rejected with 409 `period-not-reconciled`.
 //
 // Corresponds with POST /api/v1/ledger-periods/{ledger_period_uuid}/report (the `GenerateLedgerPeriodReport` operationId).
 func (c *Client) GenerateLedgerPeriodReport(ctx context.Context, ledgerPeriodUuid LedgerPeriodUUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1639,6 +1666,40 @@ func NewVoidLedgerEntryRequestWithBody(server string, ledgerEntryUuid openapi_ty
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetLedgerPeriodReportRequest constructs an http.Request for the GetLedgerPeriodReport method
+func NewGetLedgerPeriodReportRequest(server string, reportUuid ReportUUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "report_uuid", reportUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ledger-period-reports/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -2234,6 +2295,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/ledger-entries/{ledger_entry_uuid}/void (the `VoidLedgerEntry` operationId).
 	VoidLedgerEntryWithResponse(ctx context.Context, ledgerEntryUuid openapi_types.UUID, body VoidLedgerEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*VoidLedgerEntryClientResponse, error)
 
+	// GetLedgerPeriodReportWithResponse Get a ledger period report
+	//
+	// Returns the stored report. 404 `report-not-found` when no report with this UUID exists in the caller's org.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ledger-period-reports/{report_uuid} (the `GetLedgerPeriodReport` operationId).
+	GetLedgerPeriodReportWithResponse(ctx context.Context, reportUuid ReportUUID, reqEditors ...RequestEditorFn) (*GetLedgerPeriodReportClientResponse, error)
+
 	// ListLedgerPeriodsWithResponse List ledger periods
 	//
 	// Newest period (by open date) first.
@@ -2335,7 +2405,7 @@ type ClientWithResponsesInterface interface {
 
 	// GenerateLedgerPeriodReportWithResponse Generate a report for a ledger period
 	//
-	// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+	// Generates the report of a reconciled ledger period and stores it on the period. A period has one report; when it already has one, its UUID is returned. Periods that are not reconciled are rejected with 409 `period-not-reconciled`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2858,6 +2928,75 @@ func (r VoidLedgerEntryClientResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r VoidLedgerEntryClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerPeriodReportClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LedgerPeriodReport
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalServerError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerPeriodReportClientResponse) GetJSON200() *LedgerPeriodReport {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetLedgerPeriodReportClientResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerPeriodReportClientResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetLedgerPeriodReportClientResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetLedgerPeriodReportClientResponse) GetJSON500() *InternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerPeriodReportClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerPeriodReportClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerPeriodReportClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerPeriodReportClientResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -3420,6 +3559,8 @@ type GenerateLedgerPeriodReportClientResponse struct {
 	JSON401 *Unauthorized
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *InternalServerError
 }
@@ -3442,6 +3583,11 @@ func (r GenerateLedgerPeriodReportClientResponse) GetJSON401() *Unauthorized {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r GenerateLedgerPeriodReportClientResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r GenerateLedgerPeriodReportClientResponse) GetJSON409() *Conflict {
+	return r.JSON409
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -3766,6 +3912,21 @@ func (c *ClientWithResponses) VoidLedgerEntryWithResponse(ctx context.Context, l
 	return ParseVoidLedgerEntryClientResponse(rsp)
 }
 
+// GetLedgerPeriodReportWithResponse Get a ledger period report
+//
+// Returns the stored report. 404 `report-not-found` when no report with this UUID exists in the caller's org.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ledger-period-reports/{report_uuid} (the `GetLedgerPeriodReport` operationId).
+func (c *ClientWithResponses) GetLedgerPeriodReportWithResponse(ctx context.Context, reportUuid ReportUUID, reqEditors ...RequestEditorFn) (*GetLedgerPeriodReportClientResponse, error) {
+	rsp, err := c.GetLedgerPeriodReport(ctx, reportUuid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerPeriodReportClientResponse(rsp)
+}
+
 // ListLedgerPeriodsWithResponse List ledger periods
 //
 // Newest period (by open date) first.
@@ -3933,7 +4094,7 @@ func (c *ClientWithResponses) ReopenLedgerPeriodWithResponse(ctx context.Context
 
 // GenerateLedgerPeriodReportWithResponse Generate a report for a ledger period
 //
-// Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+// Generates the report of a reconciled ledger period and stores it on the period. A period has one report; when it already has one, its UUID is returned. Periods that are not reconciled are rejected with 409 `period-not-reconciled`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4355,6 +4516,60 @@ func ParseVoidLedgerEntryClientResponse(rsp *http.Response) (*VoidLedgerEntryCli
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerPeriodReportClientResponse parses an HTTP response from a GetLedgerPeriodReportWithResponse call
+func ParseGetLedgerPeriodReportClientResponse(rsp *http.Response) (*GetLedgerPeriodReportClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerPeriodReportClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LedgerPeriodReport
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -4843,6 +5058,13 @@ func ParseGenerateLedgerPeriodReportClientResponse(rsp *http.Response) (*Generat
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
