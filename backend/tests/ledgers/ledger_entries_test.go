@@ -30,7 +30,64 @@ func entryInput(direction shared.Direction, amount int64) ledgersClients.LedgerE
 	}
 }
 
+// defaultCategory returns a category named "General", creating it when missing. Entries
+// need a category, so postLedgerEntries uses it for entries that have none.
+func defaultCategory(t *testing.T, clients *utils.TestClients, token string) domain.CategoryUUID {
+	t.Helper()
+
+	find := func() (domain.CategoryUUID, bool) {
+		for _, c := range listCategories(t, clients, token) {
+			if c.Name == "General" {
+				return c.Uuid, true
+			}
+		}
+
+		return domain.CategoryUUID{}, false
+	}
+
+	if id, ok := find(); ok {
+		return id
+	}
+
+	require.Equal(t, 200, upsertCategories(t, clients, token, ledgersClients.CategoryInput{Name: "General"}).StatusCode())
+
+	id, ok := find()
+	require.True(t, ok, "default category was not created")
+
+	return id
+}
+
+// postLedgerEntries posts the entries, giving the default category to those without one.
 func postLedgerEntries(
+	t *testing.T,
+	clients *utils.TestClients,
+	token string,
+	period domain.LedgerPeriodUUID,
+	fs domain.FundSourceUUID,
+	entries ...ledgersClients.LedgerEntryInput,
+) *ledgersClients.PostLedgerEntriesClientResponse {
+	t.Helper()
+
+	var fallback domain.CategoryUUID
+
+	filled := make([]ledgersClients.LedgerEntryInput, len(entries))
+	for i, e := range entries {
+		if e.CategoryUuid.IsZero() {
+			if fallback.IsZero() {
+				fallback = defaultCategory(t, clients, token)
+			}
+
+			e.CategoryUuid = fallback
+		}
+
+		filled[i] = e
+	}
+
+	return postLedgerEntriesRaw(t, clients, token, period, fs, filled...)
+}
+
+// postLedgerEntriesRaw posts the entries as they are.
+func postLedgerEntriesRaw(
 	t *testing.T,
 	clients *utils.TestClients,
 	token string,

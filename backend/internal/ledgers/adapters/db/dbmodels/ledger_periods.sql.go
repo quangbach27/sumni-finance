@@ -9,7 +9,6 @@ import (
 	"context"
 	"time"
 
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	golang_common "github.com/quangbach27/golang-common"
 	"github.com/shopspring/decimal"
@@ -142,7 +141,7 @@ ORDER BY category_uuid NULLS LAST
 `
 
 type GetLedgerPeriodCategorySummaryRow struct {
-	CategoryUuid *models.CategoryUUID
+	CategoryUuid *domain.CategoryUUID
 	EntryCount   int64
 	TotalInflow  decimal.Decimal
 	TotalOutflow decimal.Decimal
@@ -187,9 +186,9 @@ type GetLedgerPeriodReportUUIDParams struct {
 	Uuid  domain.LedgerPeriodUUID
 }
 
-func (q *Queries) GetLedgerPeriodReportUUID(ctx context.Context, arg GetLedgerPeriodReportUUIDParams) (*models.ReportUUID, error) {
+func (q *Queries) GetLedgerPeriodReportUUID(ctx context.Context, arg GetLedgerPeriodReportUUIDParams) (*domain.ReportUUID, error) {
 	row := q.db.QueryRow(ctx, getLedgerPeriodReportUUID, arg.OrgID, arg.Uuid)
-	var report_uuid *models.ReportUUID
+	var report_uuid *domain.ReportUUID
 	err := row.Scan(&report_uuid)
 	return report_uuid, err
 }
@@ -454,7 +453,7 @@ WHERE org_id = $2
 `
 
 type UpdateLedgerPeriodReportUUIDParams struct {
-	ReportUuid *models.ReportUUID
+	ReportUuid *domain.ReportUUID
 	OrgID      string
 	Uuid       domain.LedgerPeriodUUID
 }

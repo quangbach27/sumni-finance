@@ -9,7 +9,6 @@ import (
 	"context"
 	"time"
 
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 	golang_common "github.com/quangbach27/golang-common"
@@ -19,7 +18,7 @@ import (
 const countLedgerEntries = `-- name: CountLedgerEntries :one
 SELECT count(*)
 FROM ledgers.ledger_entries e
-LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
 WHERE e.org_id = $1
   AND ($2::timestamptz IS NULL OR e.occurred_at >= $2::timestamptz)
   AND ($3::timestamptz IS NULL OR e.occurred_at <= $3::timestamptz)
@@ -93,7 +92,7 @@ SELECT
 FROM ledgers.ledger_entries e
 JOIN ledgers.fund_sources fs ON fs.uuid = e.fund_source_uuid
 JOIN ledgers.ledger_periods lp ON lp.uuid = e.ledger_period_uuid
-LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
 LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
 WHERE e.org_id = $1
   AND e.uuid = $2
@@ -113,7 +112,7 @@ type GetLedgerEntryRow struct {
 	Direction               shared.Direction
 	Description             string
 	OccurredAt              time.Time
-	CategoryUuid            *models.CategoryUUID
+	CategoryUuid            domain.CategoryUUID
 	FsBalanceBefore         decimal.Decimal
 	FsBalanceAfter          decimal.Decimal
 	Status                  domain.EntryStatus
@@ -129,8 +128,8 @@ type GetLedgerEntryRow struct {
 	FundSourceAccountNumber *string
 	PeriodName              string
 	PeriodStatus            domain.LedgerStatus
-	EntryCategoryName       *string
-	ParentCategoryUuid      *models.CategoryUUID
+	EntryCategoryName       string
+	ParentCategoryUuid      *domain.CategoryUUID
 	ParentCategoryName      *string
 }
 
@@ -217,7 +216,7 @@ type InsertLedgerEntriesParams struct {
 	Direction        shared.Direction
 	Description      string
 	OccurredAt       time.Time
-	CategoryUuid     *models.CategoryUUID
+	CategoryUuid     domain.CategoryUUID
 	FsBalanceBefore  decimal.Decimal
 	FsBalanceAfter   decimal.Decimal
 	Status           domain.EntryStatus
@@ -239,7 +238,7 @@ SELECT
 FROM ledgers.ledger_entries e
 JOIN ledgers.fund_sources fs ON fs.uuid = e.fund_source_uuid
 JOIN ledgers.ledger_periods lp ON lp.uuid = e.ledger_period_uuid
-LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
 LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
 WHERE e.org_id = $1
   AND ($2::timestamptz IS NULL OR e.occurred_at >= $2::timestamptz)
@@ -276,7 +275,7 @@ type ListLedgerEntriesRow struct {
 	Direction               shared.Direction
 	Description             string
 	OccurredAt              time.Time
-	CategoryUuid            *models.CategoryUUID
+	CategoryUuid            domain.CategoryUUID
 	FsBalanceBefore         decimal.Decimal
 	FsBalanceAfter          decimal.Decimal
 	Status                  domain.EntryStatus
@@ -292,8 +291,8 @@ type ListLedgerEntriesRow struct {
 	FundSourceAccountNumber *string
 	PeriodName              string
 	PeriodStatus            domain.LedgerStatus
-	EntryCategoryName       *string
-	ParentCategoryUuid      *models.CategoryUUID
+	EntryCategoryName       string
+	ParentCategoryUuid      *domain.CategoryUUID
 	ParentCategoryName      *string
 }
 

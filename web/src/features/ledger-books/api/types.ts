@@ -57,3 +57,44 @@ export type LedgerPeriodDetail = LedgerPeriod & {
 };
 
 export type LedgerPeriodsPage = { items: LedgerPeriod[]; pageInfo: PageInfo };
+
+export type ReportTag = {
+  tagUuid: string;
+  name: string;
+  totalInflow: number;
+  totalOutflow: number;
+  difference: number;
+};
+
+export type ReportCategory = {
+  categoryUuid: string;
+  name: string;
+  totalInflow: number;
+  totalOutflow: number;
+  difference: number;
+  /** Share of all money moved, 0-100. */
+  percentage: number;
+  tags: ReportTag[];
+};
+
+export type ReportFundSource = {
+  fundSourceUuid: string;
+  name: string;
+  startBalance: number;
+  closeBalance: number;
+  totalInflow: number;
+  totalOutflow: number;
+  isReconciled: boolean;
+};
+
+/** The frozen report of a reconciled period. */
+export type LedgerPeriodReport = {
+  uuid: string;
+  periodUuid: string;
+  startBalance: number;
+  closeBalance: number;
+  totalInflow: number;
+  totalOutflow: number;
+  fundSources: ReportFundSource[];
+  categories: ReportCategory[];
+};

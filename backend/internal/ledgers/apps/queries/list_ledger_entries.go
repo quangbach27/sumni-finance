@@ -7,7 +7,6 @@ import (
 	"github.com/quangbach27/golang-common/http/auth"
 
 	"backend/internal/authorization/ports/module/client"
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -16,7 +15,7 @@ type ListLedgerEntries struct {
 	Session          *auth.Session
 	LedgerPeriodUUID *domain.LedgerPeriodUUID // nil = all periods
 	FundSourceUUID   *domain.FundSourceUUID   // nil = all fund sources
-	CategoryUUID     *models.CategoryUUID     // matches the category and its sub-categories
+	CategoryUUID     *domain.CategoryUUID     // matches the category and its sub-categories
 	Kind             *domain.EntryKind        // nil = both
 	Status           *domain.EntryStatus      // nil = both posted and voided
 	FromDate         *time.Time

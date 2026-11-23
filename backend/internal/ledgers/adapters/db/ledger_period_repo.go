@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	common "github.com/quangbach27/golang-common"
 	commonDb "github.com/quangbach27/golang-common/db"
+	"github.com/quangbach27/golang-common/log"
 	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
@@ -290,7 +291,7 @@ func validateEntryCategories(
 ) error {
 	var uuids []common.UUID
 	for _, e := range entries {
-		if e != nil && e.CategoryUUID() != nil {
+		if e != nil {
 			uuids = append(uuids, e.CategoryUUID().UUID)
 		}
 	}
@@ -303,17 +304,17 @@ func validateEntryCategories(
 		return err
 	}
 
-	existing := make(map[models.CategoryUUID]struct{}, len(found))
+	existing := make(map[domain.CategoryUUID]struct{}, len(found))
 	for _, id := range found {
 		existing[id] = struct{}{}
 	}
 
 	var details []common.ErrorDetails
 	for i, e := range entries {
-		if e == nil || e.CategoryUUID() == nil {
+		if e == nil {
 			continue
 		}
-		if _, ok := existing[*e.CategoryUUID()]; !ok {
+		if _, ok := existing[e.CategoryUUID()]; !ok {
 			details = append(details, common.ErrorDetails{
 				EntityType: "ledger-entry",
 				EntityID:   strconv.Itoa(i),
@@ -784,41 +785,71 @@ func (r *LedgerPeriodRepo) ReopenLedgerPeriod(
 	return nil
 }
 
-// GenerateLedgerPeriodReport generates the period's report and links it to the period.
-// A period gets one report: when it already has one, that report UUID is returned.
-// TODO: the report is an empty placeholder row until real generation is implemented.
+// GenerateLedgerPeriodReport generates the report of a reconciled period and links it to
+// the period. A period gets one report: when it already has one, that report UUID is
+// returned. A period that is not reconciled fails with 409 period-not-reconciled.
 func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
 	ctx context.Context,
 	orgID string,
 	ledgerPeriodUUID domain.LedgerPeriodUUID,
-) (models.ReportUUID, error) {
+) (domain.ReportUUID, error) {
 	if ledgerPeriodUUID.IsZero() {
-		return models.ReportUUID{}, common.NewInvalidInputError("ledger-period-required", "ledger period is required")
+		return domain.ReportUUID{}, common.NewInvalidInputError("ledger-period-required", "ledger period is required")
 	}
 
-	var reportUUID models.ReportUUID
+	var reportUUID domain.ReportUUID
 
 	err := commonDb.UpdateInSerializableTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		q := dbmodels.New(tx)
 
-		existing, err := q.GetLedgerPeriodReportUUID(ctx, dbmodels.GetLedgerPeriodReportUUIDParams{OrgID: orgID, Uuid: ledgerPeriodUUID})
+		period, err := getLedgerPeriodByUUID(ctx, q, orgID, ledgerPeriodUUID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return common.NewNotFoundError("ledger-period-not-found", "ledger period %s was not found", ledgerPeriodUUID.String())
-			}
-
 			return err
 		}
 
-		if existing != nil {
+		if existing := period.ReportUUID(); existing != nil {
 			reportUUID = *existing
+			log.FromContext(ctx).
+				With("report_uuid", reportUUID).
+				With("ledger_period_uuid", ledgerPeriodUUID).
+				Info("report already generated, returning existing report")
 
 			return nil
 		}
 
-		reportUUID = models.ReportUUID{UUID: common.NewUUIDv7()}
+		if !period.IsReconciled() {
+			return common.NewConflictError("period-not-reconciled", "a report can only be generated for a reconciled ledger period")
+		}
 
-		if err := q.CreateLedgerPeriodReport(ctx, reportUUID); err != nil {
+		fundSourceRows, err := q.ListReportFundSourceRows(ctx, dbmodels.ListReportFundSourceRowsParams{OrgID: orgID, LedgerPeriodUuid: ledgerPeriodUUID})
+		if err != nil {
+			return err
+		}
+
+		categoryRows, err := q.ListReportCategoryRows(ctx, dbmodels.ListReportCategoryRowsParams{OrgID: orgID, LedgerPeriodUuid: ledgerPeriodUUID})
+		if err != nil {
+			return err
+		}
+
+		reportUUID = domain.ReportUUID{UUID: common.NewUUIDv7()}
+
+		snapshot := models.BuildReportSnapshot(
+			reportUUID,
+			models.ReportPeriod{UUID: period.UUID(), OpeningBalance: period.OpeningBalance(), ClosingBalance: *period.ClosingBalance()},
+			toReportFundSourceRows(fundSourceRows),
+			toReportCategoryRows(categoryRows),
+		)
+
+		report, err := models.NewLedgerPeriodReport(snapshot)
+		if err != nil {
+			return err
+		}
+
+		if err := q.CreateLedgerPeriodReport(ctx, dbmodels.CreateLedgerPeriodReportParams{
+			Uuid:     report.UUID(),
+			OrgID:    orgID,
+			Snapshot: report.Snapshot(),
+		}); err != nil {
 			return err
 		}
 
@@ -831,13 +862,54 @@ func (r *LedgerPeriodRepo) GenerateLedgerPeriodReport(
 	if err != nil {
 		var cerr common.Error
 		if errors.As(err, &cerr) {
-			return models.ReportUUID{}, err
+			return domain.ReportUUID{}, err
 		}
 
-		return models.ReportUUID{}, fmt.Errorf("generate ledger period report: %w", err)
+		return domain.ReportUUID{}, fmt.Errorf("generate ledger period report: %w", err)
 	}
 
 	return reportUUID, nil
+}
+
+func toReportFundSourceRows(rows []dbmodels.ListReportFundSourceRowsRow) []models.FundSourceRow {
+	out := make([]models.FundSourceRow, 0, len(rows))
+
+	for _, row := range rows {
+		closing := decimal.Zero
+		if row.ClosingBalance != nil {
+			closing = *row.ClosingBalance
+		}
+
+		out = append(out, models.FundSourceRow{
+			FundSourceUUID: row.FundSourceUuid,
+			Name:           row.FundSourceName,
+			OpeningBalance: row.OpeningBalance,
+			ClosingBalance: closing,
+			TotalInflow:    row.TotalInflow,
+			TotalOutflow:   row.TotalOutflow,
+			ReconciledBy:   row.ReconciledBy,
+			ReconciledAt:   row.ReconciledAt,
+		})
+	}
+
+	return out
+}
+
+func toReportCategoryRows(rows []dbmodels.ListReportCategoryRowsRow) []models.CategoryRow {
+	out := make([]models.CategoryRow, 0, len(rows))
+
+	for _, row := range rows {
+		out = append(out, models.CategoryRow{
+			CategoryUUID: row.CategoryUuid,
+			Name:         row.CategoryName,
+			ParentUUID:   row.ParentUuid,
+			ParentName:   row.ParentName,
+			TotalInflow:  row.TotalInflow,
+			TotalOutflow: row.TotalOutflow,
+		})
+	}
+
+	return out
 }
 
 func (r *LedgerPeriodRepo) ReconcileLedgerPeriod(

@@ -24,7 +24,7 @@ VALUES (
     @direction,
     @description,
     @occurred_at,
-    sqlc.narg('category_uuid'),
+    @category_uuid,
     @fs_balance_before,
     @fs_balance_after,
     @status,
@@ -48,7 +48,7 @@ SELECT
 FROM ledgers.ledger_entries e
 JOIN ledgers.fund_sources fs ON fs.uuid = e.fund_source_uuid
 JOIN ledgers.ledger_periods lp ON lp.uuid = e.ledger_period_uuid
-LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
 LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
 -- Predicate order: tenant (e.org_id, first column of every index) first, then the date range (the filter users pick
 -- most), then the scope filters. Keep identical in CountLedgerEntries.
@@ -69,7 +69,7 @@ OFFSET @page_offset;
 -- name: CountLedgerEntries :one
 SELECT count(*)
 FROM ledgers.ledger_entries e
-LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
 -- Same predicate order as ListLedgerEntries.
 WHERE e.org_id = @org_id
   AND (sqlc.narg('from_date')::timestamptz IS NULL OR e.occurred_at >= sqlc.narg('from_date')::timestamptz)
@@ -102,7 +102,7 @@ SELECT
 FROM ledgers.ledger_entries e
 JOIN ledgers.fund_sources fs ON fs.uuid = e.fund_source_uuid
 JOIN ledgers.ledger_periods lp ON lp.uuid = e.ledger_period_uuid
-LEFT JOIN ledgers.categories c ON c.uuid = e.category_uuid
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
 LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
 WHERE e.org_id = @org_id
   AND e.uuid = @uuid;

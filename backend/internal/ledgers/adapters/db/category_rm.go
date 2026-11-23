@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/apps/queries"
+	"backend/internal/ledgers/domain"
 )
 
 type CategoryReadModel struct {
@@ -34,7 +34,7 @@ func (r *CategoryReadModel) ListCategories(ctx context.Context, orgID string) ([
 	}
 
 	items := make([]queries.Category, 0, len(rows))
-	index := make(map[models.CategoryUUID]int, len(rows))
+	index := make(map[domain.CategoryUUID]int, len(rows))
 
 	// Rows are sorted by name only, so place every top-level category first.
 	for _, row := range rows {
