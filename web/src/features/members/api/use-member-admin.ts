@@ -27,6 +27,13 @@ export type PendingInvitation = {
   role: string;
 };
 
+export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+
+export type Invitation = PendingInvitation & {
+  status: InvitationStatus;
+  createdAt: Date;
+};
+
 const errorMessage = (error: unknown, fallback: string) =>
   isClerkAPIResponseError(error)
     ? (error.errors[0]?.longMessage ?? fallback)
@@ -62,7 +69,7 @@ export const useMemberAdmin = () => {
           infinite: true,
           keepPreviousData: true,
           pageSize: 100,
-          status: ['pending'],
+          status: ['pending', 'accepted', 'revoked', 'expired'],
         }
       : undefined,
   });
@@ -88,8 +95,18 @@ export const useMemberAdmin = () => {
     ];
   });
 
-  const pendingInvitations: PendingInvitation[] = (invitations?.data ?? []).map(
-    (i) => ({ id: i.id, email: i.emailAddress, role: orgRoleName(i.role) }),
+  const allInvitations: Invitation[] = (invitations?.data ?? [])
+    .map((i) => ({
+      id: i.id,
+      email: i.emailAddress,
+      role: orgRoleName(i.role),
+      status: i.status,
+      createdAt: i.createdAt,
+    }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  const pendingInvitations = allInvitations.filter(
+    (i) => i.status === 'pending',
   );
 
   const run = async (
@@ -171,6 +188,7 @@ export const useMemberAdmin = () => {
   return {
     members,
     pendingInvitations,
+    invitations: allInvitations,
     isLoading:
       !isLoaded || Boolean(memberships?.isLoading || invitations?.isLoading),
     isAdmin,
