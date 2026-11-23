@@ -7,16 +7,175 @@ package dbmodels
 
 import (
 	"context"
+	"time"
 
 	"backend/internal/ledgers/apps/models"
+	"backend/internal/ledgers/domain"
+	"github.com/shopspring/decimal"
 )
 
 const createLedgerPeriodReport = `-- name: CreateLedgerPeriodReport :exec
-INSERT INTO ledgers.ledger_period_reports (uuid)
-VALUES ($1)
+INSERT INTO ledgers.ledger_period_reports (uuid, org_id, snapshot)
+VALUES ($1, $2, $3)
 `
 
-func (q *Queries) CreateLedgerPeriodReport(ctx context.Context, uuid models.ReportUUID) error {
-	_, err := q.db.Exec(ctx, createLedgerPeriodReport, uuid)
+type CreateLedgerPeriodReportParams struct {
+	Uuid     domain.ReportUUID
+	OrgID    string
+	Snapshot models.ReportSnapshot
+}
+
+func (q *Queries) CreateLedgerPeriodReport(ctx context.Context, arg CreateLedgerPeriodReportParams) error {
+	_, err := q.db.Exec(ctx, createLedgerPeriodReport, arg.Uuid, arg.OrgID, arg.Snapshot)
 	return err
+}
+
+const getLedgerPeriodReportSnapshot = `-- name: GetLedgerPeriodReportSnapshot :one
+SELECT snapshot
+FROM ledgers.ledger_period_reports
+WHERE org_id = $1
+  AND uuid = $2
+`
+
+type GetLedgerPeriodReportSnapshotParams struct {
+	OrgID string
+	Uuid  domain.ReportUUID
+}
+
+func (q *Queries) GetLedgerPeriodReportSnapshot(ctx context.Context, arg GetLedgerPeriodReportSnapshotParams) (models.ReportSnapshot, error) {
+	row := q.db.QueryRow(ctx, getLedgerPeriodReportSnapshot, arg.OrgID, arg.Uuid)
+	var snapshot models.ReportSnapshot
+	err := row.Scan(&snapshot)
+	return snapshot, err
+}
+
+const listReportCategoryRows = `-- name: ListReportCategoryRows :many
+SELECT
+    c.uuid AS category_uuid,
+    c.name AS category_name,
+    c.parent_uuid,
+    p.name AS parent_name,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)::numeric(20, 2) AS total_inflow,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'outflow'), 0)::numeric(20, 2) AS total_outflow
+FROM ledgers.ledger_entries e
+JOIN ledgers.categories c ON c.uuid = e.category_uuid
+LEFT JOIN ledgers.categories p ON p.uuid = c.parent_uuid
+WHERE e.org_id = $1
+  AND e.ledger_period_uuid = $2
+  AND e.status = 'posted'
+  AND e.kind = 'normal'
+GROUP BY c.uuid, p.uuid
+ORDER BY c.name, c.uuid
+`
+
+type ListReportCategoryRowsParams struct {
+	OrgID            string
+	LedgerPeriodUuid domain.LedgerPeriodUUID
+}
+
+type ListReportCategoryRowsRow struct {
+	CategoryUuid domain.CategoryUUID
+	CategoryName string
+	ParentUuid   *domain.CategoryUUID
+	ParentName   *string
+	TotalInflow  decimal.Decimal
+	TotalOutflow decimal.Decimal
+}
+
+// Inflow and outflow per category an entry was posted to. Only live entries count: a
+// voided entry and its reversal (status posted, kind reversal) cancel out, so both are skipped.
+// parent_* are set when the entry's category is a sub-category (a tag).
+func (q *Queries) ListReportCategoryRows(ctx context.Context, arg ListReportCategoryRowsParams) ([]ListReportCategoryRowsRow, error) {
+	rows, err := q.db.Query(ctx, listReportCategoryRows, arg.OrgID, arg.LedgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReportCategoryRowsRow{}
+	for rows.Next() {
+		var i ListReportCategoryRowsRow
+		if err := rows.Scan(
+			&i.CategoryUuid,
+			&i.CategoryName,
+			&i.ParentUuid,
+			&i.ParentName,
+			&i.TotalInflow,
+			&i.TotalOutflow,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReportFundSourceRows = `-- name: ListReportFundSourceRows :many
+SELECT
+    st.fund_source_uuid,
+    fs.name AS fund_source_name,
+    st.opening_balance,
+    st.closing_balance,
+    st.reconciled_by,
+    st.reconciled_at,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'inflow'), 0)::numeric(20, 2) AS total_inflow,
+    COALESCE(SUM(e.amount) FILTER (WHERE e.direction = 'outflow'), 0)::numeric(20, 2) AS total_outflow
+FROM ledgers.fund_source_statements st
+JOIN ledgers.fund_sources fs ON fs.uuid = st.fund_source_uuid
+LEFT JOIN ledgers.ledger_entries e
+       ON e.ledger_period_uuid = st.ledger_period_uuid
+      AND e.fund_source_uuid = st.fund_source_uuid
+WHERE fs.org_id = $1
+  AND st.ledger_period_uuid = $2
+GROUP BY st.uuid, fs.uuid
+ORDER BY fs.name, st.uuid
+`
+
+type ListReportFundSourceRowsParams struct {
+	OrgID            string
+	LedgerPeriodUuid domain.LedgerPeriodUUID
+}
+
+type ListReportFundSourceRowsRow struct {
+	FundSourceUuid domain.FundSourceUUID
+	FundSourceName string
+	OpeningBalance decimal.Decimal
+	ClosingBalance *decimal.Decimal
+	ReconciledBy   *string
+	ReconciledAt   *time.Time
+	TotalInflow    decimal.Decimal
+	TotalOutflow   decimal.Decimal
+}
+
+// One row per fund source of the period. The entry sums include every entry (voided
+// originals and their reversals too), so opening + inflow - outflow = closing holds.
+func (q *Queries) ListReportFundSourceRows(ctx context.Context, arg ListReportFundSourceRowsParams) ([]ListReportFundSourceRowsRow, error) {
+	rows, err := q.db.Query(ctx, listReportFundSourceRows, arg.OrgID, arg.LedgerPeriodUuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReportFundSourceRowsRow{}
+	for rows.Next() {
+		var i ListReportFundSourceRowsRow
+		if err := rows.Scan(
+			&i.FundSourceUuid,
+			&i.FundSourceName,
+			&i.OpeningBalance,
+			&i.ClosingBalance,
+			&i.ReconciledBy,
+			&i.ReconciledAt,
+			&i.TotalInflow,
+			&i.TotalOutflow,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

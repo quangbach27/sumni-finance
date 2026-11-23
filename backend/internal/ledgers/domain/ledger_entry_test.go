@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -19,11 +18,10 @@ func newEntry(t *testing.T) *domain.LedgerEntry {
 
 	fs := newFundSource(t, 100)
 	period := newPeriodUUID()
-	cat := models.CategoryUUID{}
-	cat.UUID = fs.UUID().UUID // any non-zero uuid
+	cat := newID()
 	e, err := domain.NewLedgerEntry(
 		period, fs.UUID(), decimal.NewFromInt(50), shared.DirectionOutflow,
-		"  lunch  ", time.Now().Add(-time.Hour), &cat, "  user-1  ",
+		"  lunch  ", time.Now().Add(-time.Hour), cat, "  user-1  ",
 	)
 	require.NoError(t, err)
 
@@ -52,9 +50,22 @@ func TestNewLedgerEntry(t *testing.T) {
 		t.Parallel()
 		_, err := domain.NewLedgerEntry(
 			domain.LedgerPeriodUUID{}, domain.FundSourceUUID{}, decimal.Zero, shared.Direction{},
-			"  ", time.Time{}, nil, "  ",
+			"  ", time.Time{}, domain.CategoryUUID{}, "  ",
 		)
 		require.Error(t, err)
+	})
+
+	t.Run("category is required", func(t *testing.T) {
+		t.Parallel()
+		fs := newFundSource(t, 100)
+		_, err := domain.NewLedgerEntry(
+			newPeriodUUID(), fs.UUID(), decimal.NewFromInt(1), shared.DirectionInflow,
+			"lunch", time.Now().Add(-time.Hour), domain.CategoryUUID{}, "user-1",
+		)
+		var cerr common.Error
+		require.ErrorAs(t, err, &cerr)
+		require.Len(t, cerr.Details, 1)
+		assert.Equal(t, "category-required", cerr.Details[0].ErrorSlug)
 	})
 
 	t.Run("created by is required", func(t *testing.T) {
@@ -62,7 +73,7 @@ func TestNewLedgerEntry(t *testing.T) {
 		fs := newFundSource(t, 100)
 		_, err := domain.NewLedgerEntry(
 			newPeriodUUID(), fs.UUID(), decimal.NewFromInt(1), shared.DirectionInflow,
-			"lunch", time.Now().Add(-time.Hour), nil, " ",
+			"lunch", time.Now().Add(-time.Hour), newID(), " ",
 		)
 		require.Error(t, err)
 		var cerr common.Error
@@ -197,7 +208,7 @@ func TestLedgerEntry_RecordFundSourceSnapshot(t *testing.T) {
 
 		e, err := domain.NewLedgerEntry(
 			period, fs.UUID(), decimal.NewFromInt(30), shared.DirectionOutflow,
-			"lunch", time.Now().Add(-time.Hour), nil, "user-1",
+			"lunch", time.Now().Add(-time.Hour), newID(), "user-1",
 		)
 		require.NoError(t, err)
 

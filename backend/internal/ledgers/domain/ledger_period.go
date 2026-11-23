@@ -12,6 +12,11 @@ type LedgerPeriodUUID struct {
 	common.UUID
 }
 
+// ReportUUID identifies the report generated for a reconciled ledger period.
+type ReportUUID struct {
+	common.UUID
+}
+
 type LedgerStatus struct {
 	common.Enum[LedgerStatusValue]
 }
@@ -47,6 +52,9 @@ type LedgerPeriod struct {
 	reopenReason *string
 	reopenedAt   *time.Time
 	reconciledAt *time.Time
+
+	// set once the report of the reconciled period was generated
+	reportUUID *ReportUUID
 }
 
 func NewLedgerPeriod(
@@ -104,6 +112,7 @@ func (p *LedgerPeriod) Status() LedgerStatus             { return p.status }
 func (p *LedgerPeriod) ReopenReason() *string            { return p.reopenReason }
 func (p *LedgerPeriod) ReopenedAt() *time.Time           { return p.reopenedAt }
 func (p *LedgerPeriod) ReconciledAt() *time.Time         { return p.reconciledAt }
+func (p *LedgerPeriod) ReportUUID() *ReportUUID          { return p.reportUUID }
 
 func (p *LedgerPeriod) IsOpened() bool     { return p.status.Equal(LedgerStatusOpened.Enum) }
 func (p *LedgerPeriod) IsClosed() bool     { return p.status.Equal(LedgerStatusClosed.Enum) }

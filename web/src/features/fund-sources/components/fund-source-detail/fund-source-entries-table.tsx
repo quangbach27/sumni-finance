@@ -25,8 +25,8 @@ import { formatAmount } from '@/lib/currency';
 import { formatDate } from '@/lib/date';
 
 import FundSourceEntriesFilterBar from './fund-source-entries-filter-bar';
+import { useEntriesFilters } from './use-entries-filters';
 import { useEntriesParams } from './use-entries-params';
-import { useEntriesSearch } from './use-entries-search';
 
 import type { LedgerEntry } from '@/features/ledger-entries/api/types';
 
@@ -38,12 +38,12 @@ export default function FundSourceEntriesTable({
   fundSourceUuid: string;
 }) {
   const params = useEntriesParams(fundSourceUuid);
-  const { search, update } = useEntriesSearch();
+  const { filters, updateFilters } = useEntriesFilters();
   const queryClient = useQueryClient();
   const { data, isPending } = useQuery(listLedgerEntriesQueryOptions(params));
 
   const totalCount = data?.page_info.total_count;
-  const pageSize = data?.page_info.page_size ?? 10;
+  const pageSize = filters.pageSize;
   const page = params.page ?? 1;
 
   // Seed the details query with the row so the dialog opens instantly.
@@ -52,7 +52,7 @@ export default function FundSourceEntriesTable({
       getLedgerEntryQueryOptions(entry.uuid).queryKey,
       entry,
     );
-    update({ entry: entry.uuid, page });
+    updateFilters({ entry: entry.uuid, page });
   };
 
   return (
@@ -184,12 +184,13 @@ export default function FundSourceEntriesTable({
           page={page}
           pageSize={pageSize}
           totalCount={totalCount ?? 0}
-          onPageChange={(p) => update({ page: p })}
+          onPageChange={(p) => updateFilters({ page: p })}
+          onPageSizeChange={(size) => updateFilters({ pageSize: size })}
         />
       </div>
       <EntryDetailDialog
-        entryUuid={search.entry}
-        onEntryChange={(uuid) => update({ entry: uuid, page })}
+        entryUuid={filters.entry}
+        onEntryChange={(uuid) => updateFilters({ entry: uuid, page })}
       />
     </>
   );

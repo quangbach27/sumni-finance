@@ -1,4 +1,5 @@
 import { useSuspenseInfiniteQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { Check, ChevronDown, ChevronRight, FileText, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -52,13 +53,18 @@ function StatusBadge({ p }: { p: LedgerPeriod }) {
 function ReportButton({ p }: { p: LedgerPeriod }) {
   const { mutate, isPending } = useGenerateLedgerPeriodReport();
 
-  // TODO: enable once the report page exists.
-  if (hasReport(p)) {
+  if (p.reportUuid) {
     return (
-      <Button variant="outline" disabled>
-        <FileText data-icon="inline-start" />
-        Mở báo cáo
-      </Button>
+      <Button
+        variant="outline"
+        nativeButton={false}
+        render={
+          <Link to="/ledger-books/reports/$id" params={{ id: p.reportUuid }}>
+            <FileText data-icon="inline-start" />
+            Mở báo cáo
+          </Link>
+        }
+      />
     );
   }
 
@@ -135,8 +141,15 @@ export default function PastPeriods() {
                 <TableCell>
                   <ReportButton p={p} />
                 </TableCell>
-                <TableCell className="text-primary pr-6 font-medium">
-                  Bút toán
+                <TableCell className="pr-6 font-medium">
+                  <Link
+                    to="/ledger-books/$uuid/entries"
+                    params={{ uuid: p.uuid }}
+                    search={{ page: 1, pageSize: 10 }}
+                    className="text-primary hover:underline"
+                  >
+                    Bút toán
+                  </Link>
                 </TableCell>
               </TableRow>
             ))}
@@ -161,9 +174,14 @@ export default function PastPeriods() {
                 <p className="text-muted-foreground text-xs">
                   Đối soát {reconciledOn(p)}
                 </p>
-                <span className="text-primary mt-1 inline-flex items-center text-sm font-medium">
+                <Link
+                  to="/ledger-books/$uuid/entries"
+                  params={{ uuid: p.uuid }}
+                  search={{ page: 1, pageSize: 10 }}
+                  className="text-primary mt-1 inline-flex items-center text-sm font-medium"
+                >
                   Xem bút toán <ChevronRight className="size-4" />
-                </span>
+                </Link>
               </div>
               <ReportButton p={p} />
             </li>

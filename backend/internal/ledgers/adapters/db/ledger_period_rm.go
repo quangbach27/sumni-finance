@@ -10,6 +10,7 @@ import (
 	common "github.com/quangbach27/golang-common"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/apps/queries"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
@@ -208,4 +209,22 @@ func uuidPtrToString[T fmt.Stringer](id *T) *string {
 	s := (*id).String()
 
 	return &s
+}
+
+// GetLedgerPeriodReport returns the stored report snapshot (404 report-not-found).
+func (r *LedgerPeriodReadModel) GetLedgerPeriodReport(
+	ctx context.Context,
+	orgID string,
+	reportUUID domain.ReportUUID,
+) (models.ReportSnapshot, error) {
+	snapshot, err := dbmodels.New(r.db).GetLedgerPeriodReportSnapshot(ctx, dbmodels.GetLedgerPeriodReportSnapshotParams{OrgID: orgID, Uuid: reportUUID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.ReportSnapshot{}, common.NewNotFoundError("report-not-found", "report %s was not found", reportUUID.String())
+		}
+
+		return models.ReportSnapshot{}, fmt.Errorf("get ledger period report: %w", err)
+	}
+
+	return snapshot, nil
 }

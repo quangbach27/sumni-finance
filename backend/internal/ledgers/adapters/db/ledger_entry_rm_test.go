@@ -220,7 +220,7 @@ func TestLedgerEntryReadModel_FixedOrder(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, fsRepo.CreateFundSource(ctx, orgID, fs))
 
-	periodID := uuid.New()
+	periodID, categoryID := uuid.New(), uuid.New()
 	now := time.Now().UTC().Truncate(time.Second)
 
 	exec := func(sql string, args ...any) {
@@ -229,13 +229,14 @@ func TestLedgerEntryReadModel_FixedOrder(t *testing.T) {
 	}
 	exec(`INSERT INTO ledgers.ledger_periods (uuid, org_id, name, opening_balance, open_date, close_date, status)
 		VALUES ($1, $2, 'Tháng 11/2026', 0, $3, $3, 'opened')`, periodID, orgID, now)
+	exec(`INSERT INTO ledgers.categories (uuid, org_id, name) VALUES ($1, $2, 'Chung')`, categoryID, orgID)
 
 	insert := func(id uuid.UUID, occurredAt time.Time) {
 		exec(`INSERT INTO ledgers.ledger_entries
 			(uuid, org_id, ledger_period_uuid, fund_source_uuid, amount, direction, description, occurred_at, category_uuid,
 			 fs_balance_before, fs_balance_after, status, kind, created_by)
-			VALUES ($1, $2, $3, $4, 1, 'inflow', 'entry', $5, NULL, 0, 1, 'posted', 'normal', 'user_1')`,
-			id, orgID, periodID, fs.UUID().UUID, occurredAt)
+			VALUES ($1, $2, $3, $4, 1, 'inflow', 'entry', $5, $6, 0, 1, 'posted', 'normal', 'user_1')`,
+			id, orgID, periodID, fs.UUID().UUID, occurredAt, categoryID)
 	}
 
 	day := now.Add(-48 * time.Hour)

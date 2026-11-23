@@ -1,5 +1,6 @@
 import type {
   LedgerPeriodDetailResponse,
+  LedgerPeriodReportResponse,
   LedgerPeriodResponse,
   LedgerStatementResponse,
   ListLedgerPeriodsResponse,
@@ -7,6 +8,7 @@ import type {
 import type {
   LedgerPeriod,
   LedgerPeriodDetail,
+  LedgerPeriodReport,
   LedgerPeriodsPage,
   LedgerStatement,
 } from './types';
@@ -76,4 +78,39 @@ export const toLedgerPeriodsPage = (
     pageSize: r.page_info.page_size,
     totalCount: r.page_info.total_count,
   },
+});
+
+export const toLedgerPeriodReport = (
+  r: LedgerPeriodReportResponse,
+): LedgerPeriodReport => ({
+  uuid: r.uuid,
+  periodUuid: r.period_uuid,
+  startBalance: toNumber(r.ledger.start_balance),
+  closeBalance: toNumber(r.ledger.close_balance),
+  totalInflow: toNumber(r.ledger.total_inflow),
+  totalOutflow: toNumber(r.ledger.total_outflow),
+  fundSources: r.fund_sources.map((f) => ({
+    fundSourceUuid: f.fund_source_uuid,
+    name: f.name,
+    startBalance: toNumber(f.start_balance),
+    closeBalance: toNumber(f.close_balance),
+    totalInflow: toNumber(f.total_inflow),
+    totalOutflow: toNumber(f.total_outflow),
+    isReconciled: f.reconcile_status === 'reconciled',
+  })),
+  categories: r.categories.map((c) => ({
+    categoryUuid: c.category_uuid,
+    name: c.name,
+    totalInflow: toNumber(c.total_inflow),
+    totalOutflow: toNumber(c.total_outflow),
+    difference: toNumber(c.total_inflow) - toNumber(c.total_outflow),
+    percentage: toNumber(c.percentage),
+    tags: c.tags.map((t) => ({
+      tagUuid: t.tag_uuid,
+      name: t.name,
+      totalInflow: toNumber(t.total_inflow),
+      totalOutflow: toNumber(t.total_outflow),
+      difference: toNumber(t.difference),
+    })),
+  })),
 });

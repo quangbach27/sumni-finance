@@ -10,7 +10,7 @@ CREATE TABLE ledgers.ledger_entries (
     direction             text NOT NULL CHECK (direction IN ('inflow', 'outflow')),
     description           text NOT NULL,
     occurred_at           timestamptz NOT NULL,
-    category_uuid         uuid,
+    category_uuid         uuid NOT NULL,
     -- fund source balance right before and after this entry was applied
     fs_balance_before     numeric(20, 2) NOT NULL CHECK (fs_balance_before >= 0),
     fs_balance_after      numeric(20, 2) NOT NULL CHECK (fs_balance_after >= 0),

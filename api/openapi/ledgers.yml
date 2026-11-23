@@ -517,8 +517,9 @@ paths:
       operationId: generateLedgerPeriodReport
       summary: Generate a report for a ledger period
       description: >
-        Generates a report for the period and stores its UUID on the period.
-        Currently the report UUID is a placeholder random value.
+        Generates the report of a reconciled ledger period and stores it on the period.
+        A period has one report; when it already has one, its UUID is returned.
+        Periods that are not reconciled are rejected with 409 `period-not-reconciled`.
       parameters:
         - name: ledger_period_uuid
           in: path
@@ -532,6 +533,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GenerateLedgerPeriodReportResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/ledger-period-reports/{report_uuid}:
+    get:
+      tags: [ledger-periods]
+      operationId: getLedgerPeriodReport
+      summary: Get a ledger period report
+      description: >
+        Returns the stored report. 404 `report-not-found` when no report with this UUID
+        exists in the caller's org.
+      parameters:
+        - name: report_uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ReportUUID"
+      responses:
+        "200":
+          description: The ledger period report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerPeriodReport"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -881,9 +914,9 @@ components:
     ReportUUID:
       type: string
       format: uuid
-      x-go-type: models.ReportUUID
+      x-go-type: domain.ReportUUID
       x-go-type-import:
-        path: backend/internal/ledgers/apps/models
+        path: backend/internal/ledgers/domain
 
     GenerateLedgerPeriodReportResponse:
       type: object
@@ -891,6 +924,67 @@ components:
       properties:
         report_uuid:
           $ref: "#/components/schemas/ReportUUID"
+
+    LedgerPeriodReport:
+      description: >
+        The frozen report of a reconciled ledger period. Bound to models.ReportSnapshot, so the
+        json names below are the snapshot's json tags. A category's percentage is its share of
+        all the money moved by live entries (inflow + outflow); a tag is a sub-category.
+      type: object
+      required: [uuid, period_uuid, ledger, fund_sources, categories]
+      x-go-type: models.ReportSnapshot
+      x-go-type-import:
+        path: backend/internal/ledgers/apps/models
+      properties:
+        uuid:
+          $ref: "#/components/schemas/ReportUUID"
+        period_uuid:
+          $ref: "#/components/schemas/LedgerPeriodUUID"
+        ledger:
+          type: object
+          required: [start_balance, close_balance, total_inflow, total_outflow]
+          properties:
+            start_balance: { $ref: "#/components/schemas/Decimal" }
+            close_balance: { $ref: "#/components/schemas/Decimal" }
+            total_inflow: { $ref: "#/components/schemas/Decimal" }
+            total_outflow: { $ref: "#/components/schemas/Decimal" }
+        fund_sources:
+          type: array
+          items:
+            type: object
+            required: [fund_source_uuid, name, start_balance, close_balance, total_inflow, total_outflow, reconcile_status]
+            properties:
+              fund_source_uuid: { $ref: "#/components/schemas/FundSourceUUID" }
+              name: { type: string }
+              start_balance: { $ref: "#/components/schemas/Decimal" }
+              close_balance: { $ref: "#/components/schemas/Decimal" }
+              total_inflow: { $ref: "#/components/schemas/Decimal" }
+              total_outflow: { $ref: "#/components/schemas/Decimal" }
+              reconcile_status: { type: string, enum: [reconciled, unreconciled] }
+              reconciled_by: { type: string, nullable: true }
+              reconciled_at: { type: string, format: date-time, nullable: true }
+        categories:
+          type: array
+          items:
+            type: object
+            required: [category_uuid, name, total_inflow, total_outflow, percentage, tags]
+            properties:
+              category_uuid: { $ref: "#/components/schemas/CategoryUUID" }
+              name: { type: string }
+              total_inflow: { $ref: "#/components/schemas/Decimal" }
+              total_outflow: { $ref: "#/components/schemas/Decimal" }
+              percentage: { $ref: "#/components/schemas/Decimal" }
+              tags:
+                type: array
+                items:
+                  type: object
+                  required: [tag_uuid, name, total_inflow, total_outflow, difference]
+                  properties:
+                    tag_uuid: { $ref: "#/components/schemas/CategoryUUID" }
+                    name: { type: string }
+                    total_inflow: { $ref: "#/components/schemas/Decimal" }
+                    total_outflow: { $ref: "#/components/schemas/Decimal" }
+                    difference: { $ref: "#/components/schemas/Decimal" }
 
     LedgerStatus:
       type: string
@@ -1003,9 +1097,9 @@ components:
     CategoryUUID:
       type: string
       format: uuid
-      x-go-type: models.CategoryUUID
+      x-go-type: domain.CategoryUUID
       x-go-type-import:
-        path: backend/internal/ledgers/apps/models
+        path: backend/internal/ledgers/domain
 
     SubCategoryInput:
       type: object
@@ -1098,7 +1192,7 @@ components:
 
     LedgerEntryInput:
       type: object
-      required: [amount, direction, description, occurred_at]
+      required: [amount, direction, description, occurred_at, category_uuid]
       properties:
         amount:
           $ref: "#/components/schemas/Decimal"
@@ -1110,6 +1204,7 @@ components:
           type: string
           format: date-time
         category_uuid:
+          description: The category or sub-category of the entry. Required.
           $ref: "#/components/schemas/CategoryUUID"
 
     PostLedgerEntriesRequest:

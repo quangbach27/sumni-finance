@@ -12,7 +12,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	"backend/internal/authorization/ports/module/client"
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -22,7 +21,7 @@ type LedgerEntryInput struct {
 	Direction    shared.Direction
 	Description  string
 	OccurredAt   time.Time
-	CategoryUUID *models.CategoryUUID
+	CategoryUUID domain.CategoryUUID
 }
 
 type PostLedgerEntries struct {

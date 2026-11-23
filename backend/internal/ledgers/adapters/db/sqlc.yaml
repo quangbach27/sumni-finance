@@ -29,14 +29,19 @@ sql:
 
           - column: "ledgers.ledger_periods.report_uuid"
             go_type:
-              import: "backend/internal/ledgers/apps/models"
+              import: "backend/internal/ledgers/domain"
               type: "ReportUUID"
               pointer: true
 
           - column: "ledgers.ledger_period_reports.uuid"
             go_type:
-              import: "backend/internal/ledgers/apps/models"
+              import: "backend/internal/ledgers/domain"
               type: "ReportUUID"
+
+          - column: "ledgers.ledger_period_reports.snapshot"
+            go_type:
+              import: "backend/internal/ledgers/apps/models"
+              type: "ReportSnapshot"
 
           - column: "ledgers.ledger_periods.status"
             go_type:
@@ -90,18 +95,17 @@ sql:
 
           - column: "ledgers.ledger_entries.category_uuid"
             go_type:
-              import: "backend/internal/ledgers/apps/models"
+              import: "backend/internal/ledgers/domain"
               type: "CategoryUUID"
-              pointer: true
 
           - column: "ledgers.categories.uuid"
             go_type:
-              import: "backend/internal/ledgers/apps/models"
+              import: "backend/internal/ledgers/domain"
               type: "CategoryUUID"
 
           - column: "ledgers.categories.parent_uuid"
             go_type:
-              import: "backend/internal/ledgers/apps/models"
+              import: "backend/internal/ledgers/domain"
               type: "CategoryUUID"
               pointer: true
 

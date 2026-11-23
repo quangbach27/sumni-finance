@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"backend/internal/authorization/ports/module/client"
+	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
 )
@@ -23,6 +24,7 @@ type LedgerPeriodReadModel interface {
 	ListLedgerPeriods(ctx context.Context, orgID string, query ListLedgerPeriods) (shared.PagedResult[LedgerPeriod], error)
 	GetLedgerPeriod(ctx context.Context, orgID string, ledgerPeriodUUID domain.LedgerPeriodUUID) (LedgerPeriodDetail, error)
 	GetUnlockedLedgerPeriod(ctx context.Context, orgID string) (LedgerPeriodDetail, error)
+	GetLedgerPeriodReport(ctx context.Context, orgID string, reportUUID domain.ReportUUID) (models.ReportSnapshot, error)
 }
 
 type FundSourceStatementReadModel interface {

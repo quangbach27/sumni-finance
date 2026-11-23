@@ -71,6 +71,7 @@ func ledgerPeriodToDomain(row dbmodels.LedgersLedgerPeriod) *domain.LedgerPeriod
 		row.ReopenReason,
 		row.ReopenedAt,
 		row.ReconciledAt,
+		row.ReportUuid,
 	)
 }
 

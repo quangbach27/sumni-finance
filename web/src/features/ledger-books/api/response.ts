@@ -4,6 +4,7 @@ type Schemas = components['schemas'];
 
 export type ListLedgerPeriodsResponse = Schemas['ListLedgerPeriodsResponse'];
 export type GetLedgerPeriodResponse = Schemas['GetLedgerPeriodResponse'];
+export type LedgerPeriodReportResponse = Schemas['LedgerPeriodReport'];
 export type OpenLedgerPeriodResponse = Schemas['OpenLedgerPeriodResponse'];
 
 export type LedgerPeriodResponse = ListLedgerPeriodsResponse['items'][number];

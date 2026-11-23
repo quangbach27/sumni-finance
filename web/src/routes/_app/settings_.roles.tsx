@@ -1,12 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { z } from 'zod';
 
 import ContentLayout from '@/components/layout/content-layout/content-layout';
 
 import InviteMemberDialog from '@/features/members/components/invite-member-dialog';
 import MembersPage from '@/features/members/components/members-page';
 
+const searchSchema = z.object({
+  tab: z.enum(['members', 'roles', 'invitations']).catch('members'),
+});
+
 export const Route = createFileRoute('/_app/settings_/roles')({
-  staticData: { crumb: 'Vai trò và quyền' },
+  staticData: {
+    crumb: 'Vai trò và quyền',
+    parentCrumbs: [{ label: 'Cài đặt', to: '/settings' }],
+  },
+  validateSearch: searchSchema,
   component: RouteComponent,
 });
 

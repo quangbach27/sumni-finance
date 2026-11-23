@@ -11,23 +11,23 @@ import { getFundSourcesQueryOptions } from '@/features/fund-sources/api/get-fund
 import { ENTRY_STATUS_OPTIONS } from '@/features/ledger-entries/components/entries-status-options';
 
 import { getCategoriesQueryOptions } from '../../../api/get-categories';
-import { usePeriodEntriesSearch } from './use-period-entries-search';
+import { usePeriodEntriesFilters } from './use-period-entries-filters';
 
 const ALL = 'all';
 
 export default function PeriodEntriesFilterBar() {
-  const { search, update } = usePeriodEntriesSearch();
+  const { filters, updateFilters } = usePeriodEntriesFilters();
   const { data } = useSuspenseQuery(getCategoriesQueryOptions());
   const { data: fundSources } = useSuspenseQuery(getFundSourcesQueryOptions());
-  const category = data.items.find((c) => c.uuid === search.category);
-  const fundSource = fundSources.find((f) => f.uuid === search.fundSource);
+  const category = data.items.find((c) => c.uuid === filters.category);
+  const fundSource = fundSources.find((f) => f.uuid === filters.fundSource);
 
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Select
-        value={search.category ?? ALL}
+        value={filters.category ?? ALL}
         onValueChange={(v) => {
-          if (v) update({ category: v === ALL ? undefined : v });
+          if (v) updateFilters({ category: v === ALL ? undefined : v });
         }}
       >
         <SelectTrigger>Danh mục: {category?.name ?? 'Tất cả'}</SelectTrigger>
@@ -42,9 +42,9 @@ export default function PeriodEntriesFilterBar() {
       </Select>
 
       <Select
-        value={search.fundSource ?? ALL}
+        value={filters.fundSource ?? ALL}
         onValueChange={(v) => {
-          if (v) update({ fundSource: v === ALL ? undefined : v });
+          if (v) updateFilters({ fundSource: v === ALL ? undefined : v });
         }}
       >
         <SelectTrigger>Nguồn quỹ: {fundSource?.name ?? 'Tất cả'}</SelectTrigger>
@@ -59,16 +59,16 @@ export default function PeriodEntriesFilterBar() {
       </Select>
 
       <Select
-        value={search.status ?? 'all'}
+        value={filters.status ?? 'all'}
         onValueChange={(v) => {
-          if (v) update({ status: v });
+          if (v) updateFilters({ status: v });
         }}
       >
         <SelectTrigger>
           Trạng thái:{' '}
           {
             ENTRY_STATUS_OPTIONS.find(
-              (s) => s.value === (search.status ?? 'all'),
+              (s) => s.value === (filters.status ?? 'all'),
             )?.label
           }
         </SelectTrigger>

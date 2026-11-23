@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"backend/internal/ledgers/apps/models"
 	"strings"
 	"time"
 
@@ -55,7 +54,7 @@ type LedgerEntry struct {
 	description string
 	occurredAt  time.Time
 
-	categoryUUID *models.CategoryUUID
+	categoryUUID CategoryUUID
 
 	// fund source balance around this entry, recorded when the entry is
 	// applied to the fund source
@@ -83,7 +82,7 @@ func NewLedgerEntry(
 	direction shared.Direction,
 	description string,
 	occurredAt time.Time,
-	categoryUUID *models.CategoryUUID,
+	categoryUUID CategoryUUID,
 	createdBy string,
 ) (*LedgerEntry, error) {
 	description = strings.TrimSpace(description)
@@ -116,6 +115,9 @@ func NewLedgerEntry(
 	if occurredAt.IsZero() {
 		add("occurred-at-required", "occurred at is required")
 	}
+	if categoryUUID.IsZero() {
+		add("category-required", "category is required")
+	}
 	if createdBy == "" {
 		add("created-by-required", "created by is required")
 	}
@@ -145,7 +147,7 @@ func (e *LedgerEntry) Amount() decimal.Decimal             { return e.amount }
 func (e *LedgerEntry) Direction() shared.Direction         { return e.direction }
 func (e *LedgerEntry) Description() string                 { return e.description }
 func (e *LedgerEntry) OccurredAt() time.Time               { return e.occurredAt }
-func (e *LedgerEntry) CategoryUUID() *models.CategoryUUID  { return e.categoryUUID }
+func (e *LedgerEntry) CategoryUUID() CategoryUUID          { return e.categoryUUID }
 func (e *LedgerEntry) Status() EntryStatus                 { return e.status }
 func (e *LedgerEntry) Kind() EntryKind                     { return e.kind }
 func (e *LedgerEntry) ReversedByEntryID() *LedgerEntryUUID { return e.reversedByEntryID }

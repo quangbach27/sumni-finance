@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { Check, FileText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,11 +31,18 @@ export default function ReportStep({ periodUuid }: { periodUuid: string }) {
             {period.statements.length} nguồn quỹ · {period.entryCount} bút toán
           </p>
         </div>
-        {/* TODO: enable once the report page exists. */}
-        <Button disabled>
-          <FileText data-icon="inline-start" />
-          Mở báo cáo
-        </Button>
+        <Button
+          nativeButton={false}
+          render={
+            <Link
+              to="/ledger-books/reports/$id"
+              params={{ id: period.reportUuid }}
+            >
+              <FileText data-icon="inline-start" />
+              Mở báo cáo
+            </Link>
+          }
+        />
       </div>
     );
   }

@@ -4,15 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	common "github.com/quangbach27/golang-common"
-	"github.com/shopspring/decimal"
 
 	"backend/internal/ledgers/adapters/db/dbmodels"
-	"backend/internal/ledgers/apps/models"
 	"backend/internal/ledgers/apps/queries"
 	"backend/internal/ledgers/domain"
 	"backend/internal/shared"
@@ -96,35 +93,7 @@ func (r *LedgerEntryReadModel) ListLedgerEntries(
 
 	items := make([]queries.LedgerEntryListItem, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, toLedgerEntryListItem(ledgerEntryRow{
-			Uuid:                    row.Uuid,
-			OrgID:                   row.OrgID,
-			LedgerPeriodUuid:        row.LedgerPeriodUuid,
-			FundSourceUuid:          row.FundSourceUuid,
-			Amount:                  row.Amount,
-			Direction:               row.Direction,
-			Description:             row.Description,
-			OccurredAt:              row.OccurredAt,
-			CategoryUuid:            row.CategoryUuid,
-			FsBalanceBefore:         row.FsBalanceBefore,
-			FsBalanceAfter:          row.FsBalanceAfter,
-			Status:                  row.Status,
-			Kind:                    row.Kind,
-			ReversedByEntryUuid:     row.ReversedByEntryUuid,
-			VoidedReason:            row.VoidedReason,
-			VoidedBy:                row.VoidedBy,
-			VoidedAt:                row.VoidedAt,
-			CreatedAt:               row.CreatedAt,
-			CreatedBy:               row.CreatedBy,
-			FundSourceName:          row.FundSourceName,
-			FundSourceBankCode:      row.FundSourceBankCode,
-			FundSourceAccountNumber: row.FundSourceAccountNumber,
-			PeriodName:              row.PeriodName,
-			PeriodStatus:            row.PeriodStatus,
-			EntryCategoryName:       row.EntryCategoryName,
-			ParentCategoryUuid:      row.ParentCategoryUuid,
-			ParentCategoryName:      row.ParentCategoryName,
-		}))
+		items = append(items, toLedgerEntryListItem(dbmodels.GetLedgerEntryRow(row)))
 	}
 
 	return shared.NewPagedResult(items, query.Page, int(total)), nil
@@ -144,41 +113,12 @@ func (r *LedgerEntryReadModel) GetLedgerEntry(
 		return queries.LedgerEntryListItem{}, fmt.Errorf("get ledger entry: %w", err)
 	}
 
-	return toLedgerEntryListItem(ledgerEntryRow(row)), nil
+	return toLedgerEntryListItem(row), nil
 }
 
-// ledgerEntryRow is the shape shared by the list and get queries.
-type ledgerEntryRow struct {
-	Uuid                    domain.LedgerEntryUUID
-	OrgID                   string
-	LedgerPeriodUuid        domain.LedgerPeriodUUID
-	FundSourceUuid          domain.FundSourceUUID
-	Amount                  decimal.Decimal
-	Direction               shared.Direction
-	Description             string
-	OccurredAt              time.Time
-	CategoryUuid            *models.CategoryUUID
-	FsBalanceBefore         decimal.Decimal
-	FsBalanceAfter          decimal.Decimal
-	Status                  domain.EntryStatus
-	Kind                    domain.EntryKind
-	ReversedByEntryUuid     *domain.LedgerEntryUUID
-	VoidedReason            *string
-	VoidedBy                *string
-	VoidedAt                *time.Time
-	CreatedBy               string
-	CreatedAt               time.Time
-	FundSourceName          string
-	FundSourceBankCode      *string
-	FundSourceAccountNumber *string
-	PeriodName              string
-	PeriodStatus            domain.LedgerStatus
-	EntryCategoryName       *string
-	ParentCategoryUuid      *models.CategoryUUID
-	ParentCategoryName      *string
-}
-
-func toLedgerEntryListItem(row ledgerEntryRow) queries.LedgerEntryListItem {
+// toLedgerEntryListItem maps a get row. sqlc emits one struct per query and
+// ListLedgerEntriesRow has identical fields, so list rows are converted to it.
+func toLedgerEntryListItem(row dbmodels.GetLedgerEntryRow) queries.LedgerEntryListItem {
 	item := queries.LedgerEntryListItem{
 		UUID: row.Uuid.String(),
 		LedgerPeriod: queries.LedgerEntryPeriod{
@@ -210,14 +150,12 @@ func toLedgerEntryListItem(row ledgerEntryRow) queries.LedgerEntryListItem {
 
 	// A tag is a sub-category: the parent is the category, the entry's own
 	// category is the tag.
-	if row.CategoryUuid != nil && row.EntryCategoryName != nil {
-		own := &queries.CategoryRef{UUID: row.CategoryUuid.String(), Name: *row.EntryCategoryName}
-		if row.ParentCategoryUuid != nil && row.ParentCategoryName != nil {
-			item.Category = &queries.CategoryRef{UUID: row.ParentCategoryUuid.String(), Name: *row.ParentCategoryName}
-			item.Tag = own
-		} else {
-			item.Category = own
-		}
+	own := &queries.CategoryRef{UUID: row.CategoryUuid.String(), Name: row.EntryCategoryName}
+	if row.ParentCategoryUuid != nil && row.ParentCategoryName != nil {
+		item.Category = &queries.CategoryRef{UUID: row.ParentCategoryUuid.String(), Name: *row.ParentCategoryName}
+		item.Tag = own
+	} else {
+		item.Category = own
 	}
 
 	return item

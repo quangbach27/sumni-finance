@@ -8,7 +8,7 @@ package dbmodels
 import (
 	"context"
 
-	"backend/internal/ledgers/apps/models"
+	"backend/internal/ledgers/domain"
 	golang_common "github.com/quangbach27/golang-common"
 )
 
@@ -97,15 +97,15 @@ type ListExistingCategoryUUIDsParams struct {
 	Uuids []golang_common.UUID
 }
 
-func (q *Queries) ListExistingCategoryUUIDs(ctx context.Context, arg ListExistingCategoryUUIDsParams) ([]models.CategoryUUID, error) {
+func (q *Queries) ListExistingCategoryUUIDs(ctx context.Context, arg ListExistingCategoryUUIDsParams) ([]domain.CategoryUUID, error) {
 	rows, err := q.db.Query(ctx, listExistingCategoryUUIDs, arg.OrgID, arg.Uuids)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []models.CategoryUUID{}
+	items := []domain.CategoryUUID{}
 	for rows.Next() {
-		var uuid models.CategoryUUID
+		var uuid domain.CategoryUUID
 		if err := rows.Scan(&uuid); err != nil {
 			return nil, err
 		}
@@ -141,8 +141,8 @@ WHERE ledgers.categories.org_id = EXCLUDED.org_id
 
 type UpsertCategoryParams struct {
 	OrgID       string
-	Uuid        models.CategoryUUID
-	ParentUuid  *models.CategoryUUID
+	Uuid        domain.CategoryUUID
+	ParentUuid  *domain.CategoryUUID
 	Name        string
 	Description *string
 }
