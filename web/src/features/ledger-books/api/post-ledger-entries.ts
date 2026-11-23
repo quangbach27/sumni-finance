@@ -20,7 +20,7 @@ export type LedgerEntryDraft = {
   amount: number;
   direction: 'inflow' | 'outflow';
   /** The tag when one is chosen, otherwise the category. */
-  categoryUuid?: string;
+  categoryUuid: string;
 };
 
 type PostLedgerEntriesInput = {

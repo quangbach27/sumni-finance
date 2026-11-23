@@ -258,9 +258,29 @@ export interface paths {
         put?: never;
         /**
          * Generate a report for a ledger period
-         * @description Generates a report for the period and stores its UUID on the period. Currently the report UUID is a placeholder random value.
+         * @description Generates the report of a reconciled ledger period and stores it on the period. A period has one report; when it already has one, its UUID is returned. Periods that are not reconciled are rejected with 409 `period-not-reconciled`.
          */
         post: operations["generateLedgerPeriodReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger-period-reports/{report_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a ledger period report
+         * @description Returns the stored report. 404 `report-not-found` when no report with this UUID exists in the caller's org.
+         */
+        get: operations["getLedgerPeriodReport"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -444,6 +464,44 @@ export interface components {
         GenerateLedgerPeriodReportResponse: {
             report_uuid: components["schemas"]["ReportUUID"];
         };
+        /** @description The frozen report of a reconciled ledger period. Bound to models.ReportSnapshot, so the json names below are the snapshot's json tags. A category's percentage is its share of all the money moved by live entries (inflow + outflow); a tag is a sub-category. */
+        LedgerPeriodReport: {
+            uuid: components["schemas"]["ReportUUID"];
+            period_uuid: components["schemas"]["LedgerPeriodUUID"];
+            ledger: {
+                start_balance: components["schemas"]["Decimal"];
+                close_balance: components["schemas"]["Decimal"];
+                total_inflow: components["schemas"]["Decimal"];
+                total_outflow: components["schemas"]["Decimal"];
+            };
+            fund_sources: {
+                fund_source_uuid: components["schemas"]["FundSourceUUID"];
+                name: string;
+                start_balance: components["schemas"]["Decimal"];
+                close_balance: components["schemas"]["Decimal"];
+                total_inflow: components["schemas"]["Decimal"];
+                total_outflow: components["schemas"]["Decimal"];
+                /** @enum {string} */
+                reconcile_status: "reconciled" | "unreconciled";
+                reconciled_by?: string | null;
+                /** Format: date-time */
+                reconciled_at?: string | null;
+            }[];
+            categories: {
+                category_uuid: components["schemas"]["CategoryUUID"];
+                name: string;
+                total_inflow: components["schemas"]["Decimal"];
+                total_outflow: components["schemas"]["Decimal"];
+                percentage: components["schemas"]["Decimal"];
+                tags: {
+                    tag_uuid: components["schemas"]["CategoryUUID"];
+                    name: string;
+                    total_inflow: components["schemas"]["Decimal"];
+                    total_outflow: components["schemas"]["Decimal"];
+                    difference: components["schemas"]["Decimal"];
+                }[];
+            }[];
+        };
         /** @enum {string} */
         LedgerStatus: "opened" | "closed" | "reconciled";
         PageInfo: {
@@ -536,7 +594,8 @@ export interface components {
             description: string;
             /** Format: date-time */
             occurred_at: string;
-            category_uuid?: components["schemas"]["CategoryUUID"];
+            /** @description The category or sub-category of the entry. Required. */
+            category_uuid: components["schemas"]["CategoryUUID"];
         };
         PostLedgerEntriesRequest: {
             /** @description The one fund source all entries are posted to. Must belong to the period (have a statement in it). */
@@ -1105,6 +1164,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerateLedgerPeriodReportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getLedgerPeriodReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_uuid: components["schemas"]["ReportUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ledger period report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerPeriodReport"];
                 };
             };
             400: components["responses"]["BadRequest"];

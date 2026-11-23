@@ -75,7 +75,7 @@ export const toDrafts = (rows: LedgerEntryRow[]) => {
     description: row.description.trim(),
     amount: row.inflow > 0 ? row.inflow : row.outflow,
     direction: row.inflow > 0 ? 'inflow' : 'outflow',
-    categoryUuid: row.tagUuid || row.categoryUuid || undefined,
+    categoryUuid: row.tagUuid || row.categoryUuid,
   }));
   const rowIndexes = rows.flatMap((row, i) => (isFilled(row) ? [i] : []));
   return { drafts, rowIndexes };
